@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Download, Eye, Plus, ShoppingCart, CreditCard, FileText } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { RefreshCw, Download, Eye, Plus, ShoppingCart, CreditCard, FileText, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,10 +10,13 @@ import { toast } from '@/hooks/use-toast';
 import DateFilter from '@/components/dashboard/DateFilter';
 import SummaryCards from '@/components/dashboard/SummaryCards';
 import SalesChart from '@/components/dashboard/SalesChart';
-import TopProductsChart from '@/components/dashboard/TopProductsChart';
-import PlatformPerformanceChart from '@/components/dashboard/PlatformPerformanceChart';
+import InteractiveTopProductsChart from '@/components/dashboard/InteractiveTopProductsChart';
+import InteractivePlatformChart from '@/components/dashboard/InteractivePlatformChart';
 import { formatDate } from '@/utils/format';
-import { useDashboardAnalytics, useTopProducts, usePlatformPerformance } from '@/hooks/useSupabase';
+import { useRealtimeDashboard, useInteractiveAnalytics } from '@/hooks/useRealtimeAnalytics';
+import { useTopProducts, usePlatformPerformance } from '@/hooks/useSupabase';
+import { exportToPDF } from '@/utils/pdfExport';
+import { exportToCSV, formatDataForCSV } from '@/utils/csvExport';
 
 interface DateRange {
   from: Date | undefined;
@@ -40,17 +44,22 @@ const Dashboard = () => {
     to: new Date() // Today
   });
   const [refreshing, setRefreshing] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
-  // Use the analytics hooks
+  // Use the enhanced analytics hooks
   const startDate = dateRange.from?.toISOString().split('T')[0] || '';
   const endDate = dateRange.to?.toISOString().split('T')[0] || '';
   
+  // Real-time dashboard data
   const { 
     data: dashboardData, 
     salesChart: salesData, 
-    loading: analyticsLoading 
-  } = useDashboardAnalytics(startDate, endDate);
+    loading: analyticsLoading,
+    lastUpdate,
+    refresh: refreshDashboard
+  } = useRealtimeDashboard(startDate, endDate);
 
+  // Top products and platform data
   const { 
     data: topProductsData, 
     loading: topProductsLoading 
@@ -61,19 +70,95 @@ const Dashboard = () => {
     loading: platformLoading 
   } = usePlatformPerformance(startDate, endDate);
 
+  // Interactive analytics for drill-down
+  const {
+    selectedProduct,
+    selectedPlatform,
+    drillDownData,
+    loading: drillDownLoading,
+    fetchProductDrillDown,
+    fetchPlatformDrillDown,
+    clearDrillDown,
+  } = useInteractiveAnalytics(startDate, endDate);
+
   // Set loading based on analytics loading
   const loading = analyticsLoading;
 
   // Manual refresh
   const handleRefresh = async () => {
     setRefreshing(true);
-    // Trigger refresh by changing date range slightly
-    setDateRange(prev => ({ ...prev }));
+    await refreshDashboard();
     setRefreshing(false);
     toast({
       title: "Berhasil",
       description: "Data dashboard telah diperbarui",
     });
+  };
+
+  // Export functionality
+  const handleExportPDF = async () => {
+    try {
+      setExporting(true);
+      await exportToPDF('dashboard-content', {
+        filename: `dashboard-${startDate}-${endDate}.pdf`,
+        title: `Dashboard EQUINE Fashion - ${formatDate(dateRange.from || new Date())} s/d ${formatDate(dateRange.to || new Date())}`,
+        orientation: 'landscape',
+        includeHeader: true,
+        includeFooter: true,
+        companyInfo: {
+          name: 'EQUINE Fashion',
+          address: 'Indonesia',
+          email: 'info@equinefashion.com',
+        },
+      });
+      toast({
+        title: "Berhasil",
+        description: "Dashboard berhasil diexport ke PDF",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    try {
+      setExporting(true);
+      
+      // Prepare dashboard summary data for CSV
+      const summaryData = [{
+        'Periode': `${formatDate(dateRange.from || new Date())} - ${formatDate(dateRange.to || new Date())}`,
+        'Total Penjualan': dashboardData?.total_penjualan || 0,
+        'Total Pengeluaran': dashboardData?.total_pengeluaran || 0,
+        'Laba Bersih': dashboardData?.laba_bersih || 0,
+        'Saldo Kas & Bank': dashboardData?.saldo_kas_bank || 0,
+        'Diekspor pada': new Date().toLocaleString('id-ID'),
+      }];
+
+      exportToCSV({
+        filename: `dashboard-summary-${startDate}-${endDate}.csv`,
+        data: summaryData,
+        includeHeaders: true,
+      });
+
+      toast({
+        title: "Berhasil",
+        description: "Data dashboard berhasil diexport ke CSV",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
   };
 
   // Check permissions
@@ -92,14 +177,22 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6" id="dashboard-content">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold gradient-text">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Selamat datang, {profile?.full_name}! Berikut ringkasan bisnis Anda.
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-muted-foreground">
+              Selamat datang, {profile?.full_name}! Berikut ringkasan bisnis Anda.
+            </p>
+            {lastUpdate && (
+              <Badge variant="outline" className="text-xs flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                Update: {lastUpdate.toLocaleTimeString('id-ID')}
+              </Badge>
+            )}
+          </div>
         </div>
         
         <div className="flex items-center gap-3">
@@ -115,10 +208,27 @@ const Dashboard = () => {
           </Button>
           
           {hasPermission('reports.export') && (
-            <Button size="sm" className="gradient-primary">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
+            <>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExportCSV}
+                disabled={exporting}
+                className="glass-button"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                CSV
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={handleExportPDF}
+                disabled={exporting}
+                className="gradient-primary"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {exporting ? 'Exporting...' : 'PDF'}
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -152,10 +262,26 @@ const Dashboard = () => {
           <SalesChart data={salesData} loading={loading} />
         </div>
 
-        {/* Additional Charts would go here */}
-        <TopProductsChart data={topProductsData} loading={topProductsLoading} />
+        {/* Interactive Charts with Drill-down */}
+        <InteractiveTopProductsChart 
+          data={topProductsData} 
+          loading={topProductsLoading}
+          onProductClick={fetchProductDrillDown}
+          drillDownData={drillDownData}
+          drillDownLoading={drillDownLoading}
+          selectedProduct={selectedProduct}
+          onCloseDrillDown={clearDrillDown}
+        />
 
-        <PlatformPerformanceChart data={platformData} loading={platformLoading} />
+        <InteractivePlatformChart 
+          data={platformData} 
+          loading={platformLoading}
+          onPlatformClick={fetchPlatformDrillDown}
+          drillDownData={drillDownData}
+          drillDownLoading={drillDownLoading}
+          selectedPlatform={selectedPlatform}
+          onCloseDrillDown={clearDrillDown}
+        />
       </div>
 
       {/* Quick Actions */}
