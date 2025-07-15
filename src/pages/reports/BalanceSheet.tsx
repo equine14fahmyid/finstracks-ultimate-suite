@@ -13,7 +13,6 @@ import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/utils/format';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { calculateRetainedEarnings, getCompanySettings, calculateAccountsPayable } from '@/utils/financialCalculations';
 
 interface BalanceSheetData {
   assets: {
@@ -72,11 +71,22 @@ const BalanceSheet = () => {
           `)
           .eq('is_active', true);
 
-        // Fetch assets
+        // Fetch real assets data
         const { data: assetsData } = await supabase
           .from('assets')
-          .select('harga_perolehan, akumulasi_penyusutan')
+          .select('harga_perolehan, nilai_buku, akumulasi_penyusutan')
           .eq('is_active', true);
+
+        // Fetch expenses for retained earnings calculation
+        const { data: expensesData } = await supabase
+          .from('expenses')
+          .select('jumlah');
+
+        // Fetch sales for retained earnings calculation
+        const { data: salesData } = await supabase
+          .from('sales')
+          .select('total')
+          .eq('status', 'delivered');
 
         // Calculate current assets
         const kasBankTotal = banksData?.reduce((sum, bank) => sum + (bank.saldo_akhir || 0), 0) || 0;
@@ -87,21 +97,20 @@ const BalanceSheet = () => {
 
         const currentAssetsTotal = kasBankTotal + piutangTotal + persediaanTotal;
 
-        // Calculate fixed assets
+        // Calculate fixed assets using real assets data
         const equipmentTotal = assetsData?.reduce((sum, asset) => sum + (asset.harga_perolehan || 0), 0) || 0;
         const accumulatedDepreciation = assetsData?.reduce((sum, asset) => sum + (asset.akumulasi_penyusutan || 0), 0) || 0;
-        const fixedAssetsTotal = equipmentTotal - accumulatedDepreciation;
+        const equipmentNetValue = assetsData?.reduce((sum, asset) => sum + (asset.nilai_buku || asset.harga_perolehan || 0), 0) || 0;
 
-        const totalAssets = currentAssetsTotal + fixedAssetsTotal;
+        const totalAssets = currentAssetsTotal + equipmentNetValue;
 
-        // Get actual company settings and financial data
-        const [companySettings, hutangUsaha, labaDitahan] = await Promise.all([
-          getCompanySettings(),
-          calculateAccountsPayable(reportDate),
-          calculateRetainedEarnings(reportDate)
-        ]);
-        
-        const modalAwal = companySettings.modal_awal;
+        // Calculate retained earnings from real data
+        const totalSales = salesData?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
+        const totalExpenses = expensesData?.reduce((sum, expense) => sum + (expense.jumlah || 0), 0) || 0;
+        const labaDitahan = totalSales - totalExpenses;
+
+        // Default modal awal (this could be configurable)
+        const modalAwal = 50000000; // 50 juta as default capital
 
         return {
           assets: {
@@ -114,16 +123,16 @@ const BalanceSheet = () => {
             fixed_assets: {
               equipment: equipmentTotal,
               accumulated_depreciation: accumulatedDepreciation,
-              total: fixedAssetsTotal
+              total: equipmentNetValue
             },
             total_assets: totalAssets
           },
           liabilities: {
             current_liabilities: {
-              hutang_usaha: hutangUsaha,
-              total: hutangUsaha
+              hutang_usaha: 0, // This would come from purchases with payment_status = 'pending'
+              total: 0
             },
-            total_liabilities: hutangUsaha
+            total_liabilities: 0
           },
           equity: {
             modal_awal: modalAwal,
@@ -207,7 +216,7 @@ const BalanceSheet = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-green-600">ASET</CardTitle>
-                <Link to="/master/assets">
+                <Link to="/master-data/asset">
                   <Button variant="ghost" size="sm">
                     <ExternalLink className="h-4 w-4 mr-1" />
                     Kelola Aset

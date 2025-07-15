@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -31,7 +32,8 @@ import {
   BarChart,
   FileSpreadsheet,
   Cog,
-  X
+  X,
+  Building
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -104,7 +106,7 @@ const navigationItems: NavItem[] = [
       { title: 'Toko', href: '/stores', icon: Building2 },
       { title: 'Ekspedisi', href: '/expeditions', icon: Truck },
       { title: 'Kategori', href: '/categories', icon: Tags },
-      { title: 'Asset', href: '/master-data/asset', icon: Building2 },
+      { title: 'Asset', href: '/master-data/asset', icon: Building },
     ]
   },
   {

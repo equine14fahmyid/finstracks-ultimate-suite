@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,10 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Building, Plus, Edit, Trash2, TrendingDown, Calculator } from 'lucide-react';
+import { Building, Plus, Edit, Trash2, TrendingDown, Calculator, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency, formatDate } from '@/utils/format';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Asset {
   id: string;
@@ -25,6 +27,7 @@ interface Asset {
 }
 
 const Assets = () => {
+  const { user } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -116,6 +119,51 @@ const Assets = () => {
           .insert([assetData])
           .select();
         result = { data, error };
+
+        // Record as expense when creating new asset
+        if (!error && data && data[0]) {
+          try {
+            // First, find or create "Pembelian Asset" category
+            let { data: categories } = await supabase
+              .from('categories')
+              .select('id')
+              .eq('nama_kategori', 'Pembelian Asset')
+              .eq('tipe_kategori', 'expense')
+              .eq('is_active', true)
+              .limit(1);
+
+            let categoryId = categories?.[0]?.id;
+
+            if (!categoryId) {
+              // Create the category if it doesn't exist
+              const { data: newCategory } = await supabase
+                .from('categories')
+                .insert([{
+                  nama_kategori: 'Pembelian Asset',
+                  tipe_kategori: 'expense'
+                }])
+                .select('id')
+                .single();
+              
+              categoryId = newCategory?.id;
+            }
+
+            if (categoryId) {
+              await supabase
+                .from('expenses')
+                .insert([{
+                  tanggal: formData.tanggal_perolehan,
+                  category_id: categoryId,
+                  jumlah: formData.harga_perolehan,
+                  keterangan: `Pembelian asset: ${formData.nama_asset}`,
+                  created_by: user?.id
+                }]);
+            }
+          } catch (expenseError) {
+            console.error('Error creating expense record:', expenseError);
+            // Don't fail the asset creation if expense recording fails
+          }
+        }
       }
       
       if (result.error) throw result.error;
@@ -133,6 +181,47 @@ const Assets = () => {
       toast({
         title: "Error",
         description: "Gagal menyimpan asset",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateDepreciation = async (assetId: string) => {
+    try {
+      const asset = assets.find(a => a.id === assetId);
+      if (!asset) return;
+
+      const monthsUsed = Math.floor(
+        (new Date().getTime() - new Date(asset.tanggal_perolehan).getTime()) / (1000 * 60 * 60 * 24 * 30)
+      );
+      
+      const akumulasiPenyusutan = Math.min(
+        monthsUsed * asset.penyusutan_per_bulan,
+        asset.harga_perolehan
+      );
+      
+      const nilaiBuku = asset.harga_perolehan - akumulasiPenyusutan;
+
+      const { error } = await supabase
+        .from('assets')
+        .update({
+          akumulasi_penyusutan: akumulasiPenyusutan,
+          nilai_buku: nilaiBuku
+        })
+        .eq('id', assetId);
+
+      if (error) throw error;
+
+      await fetchAssets();
+      toast({
+        title: "Sukses",
+        description: "Penyusutan asset berhasil diperbarui",
+      });
+    } catch (error) {
+      console.error('Update depreciation error:', error);
+      toast({
+        title: "Error",
+        description: "Gagal memperbarui penyusutan",
         variant: "destructive",
       });
     }
@@ -390,6 +479,14 @@ const Assets = () => {
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => updateDepreciation(asset.id)}
+                        title="Update Penyusutan"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => handleEdit(asset)}
                       >
                         <Edit className="h-4 w-4" />
@@ -408,7 +505,17 @@ const Assets = () => {
               )) : (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-6">
-                    Belum ada data asset
+                    <div className="text-center py-12">
+                      <div className="text-gray-500 text-lg mb-4">
+                        🏢 Belum ada data asset
+                      </div>
+                      <p className="text-gray-400 mb-6">
+                        Tambahkan asset pertama untuk mulai mengelola aset perusahaan
+                      </p>
+                      <Button onClick={() => setDialogOpen(true)}>
+                        + Tambah Asset Pertama
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               )}
