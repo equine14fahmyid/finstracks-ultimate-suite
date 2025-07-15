@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,8 +11,12 @@ import { DataTable } from '@/components/common/DataTable';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/utils/format';
+import { useNavigate } from 'react-router-dom';
+import EmptyState from '@/components/common/EmptyState';
+import { supabase } from '@/integrations/supabase/client';
 
 const Inventory = () => {
+  const navigate = useNavigate();
   const { stock, movements, loading, fetchStock, fetchStockMovements, adjustStock, createProductVariant, updateProductVariant, deleteProductVariant } = useStock();
   const { products, fetchProducts } = useProducts();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -37,6 +40,76 @@ const Inventory = () => {
     fetchStockMovements();
     fetchProducts();
   }, []);
+
+  // Function to seed sample data for testing
+  const seedSampleData = async () => {
+    console.log('🌱 Seeding sample data...');
+    
+    try {
+      // Create sample products
+      const products = [
+        {
+          nama_produk: 'Kaos Batik Tasikmalaya',
+          harga_beli: 75000,
+          harga_jual_default: 125000,
+          satuan: 'pcs',
+          deskripsi: 'Kaos batik premium khas Tasikmalaya'
+        },
+        {
+          nama_produk: 'Tas Anyaman Pandan',
+          harga_beli: 45000,
+          harga_jual_default: 85000,
+          satuan: 'pcs',
+          deskripsi: 'Tas anyaman tradisional'
+        }
+      ];
+
+      for (const productData of products) {
+        const { data: product, error } = await supabase
+          .from('products')
+          .insert(productData)
+          .select()
+          .single();
+
+        if (!error && product) {
+          // Create variants for each product
+          const variants = [
+            { warna: 'Biru', size: 'M', stok: 25 },
+            { warna: 'Merah', size: 'L', stok: 15 },
+            { warna: 'Hijau', size: 'S', stok: 30 }
+          ];
+
+          for (const variant of variants) {
+            await supabase
+              .from('product_variants')
+              .insert({
+                product_id: product.id,
+                warna: variant.warna,
+                size: variant.size,
+                stok: variant.stok,
+                sku: `${product.id.slice(0, 4)}-${variant.warna.slice(0, 2)}-${variant.size}`.toUpperCase()
+              });
+          }
+        }
+      }
+
+      toast({
+        title: "Berhasil",
+        description: "Sample data berhasil ditambahkan!",
+      });
+      
+      // Refresh data
+      fetchStock();
+      fetchProducts();
+    } catch (error) {
+      console.error('Error seeding data:', error);
+      toast({
+        title: "Error",
+        description: "Gagal menambahkan sample data",
+        variant: "destructive",
+      });
+    }
+  };
 
   const resetVariantForm = () => {
     setVariantFormData({
@@ -177,8 +250,6 @@ const Inventory = () => {
       title: 'Produk',
       render: (item: any) => {
         if (!item) return <div>Data tidak tersedia</div>;
-        
-        console.log('Rendering item:', item); // Debug log
         
         return (
           <div>
@@ -356,6 +427,7 @@ const Inventory = () => {
     }
   ];
 
+  // Calculate real totals from actual database data
   const totalStockValue = stock?.reduce((total, item) => 
     total + ((item?.stok || 0) * (item?.product?.harga_beli || 0)), 0
   ) || 0;
@@ -364,19 +436,36 @@ const Inventory = () => {
   const totalStock = stock?.reduce((total, item) => total + (item?.stok || 0), 0) || 0;
   const filteredMovements = movements?.filter(movement => movement != null) || [];
 
-  // Debug log to see what stock data looks like
-  console.log('=== INVENTORY COMPONENT DEBUG ===');
-  console.log('Stock array:', stock);
-  console.log('Sample stock item:', stock?.[0]);
-  console.log('Sample product data:', stock?.[0]?.product);
-
   if (loading) return <div className="p-6">Loading stock data...</div>;
-  if (!stock?.length) return (
-    <div className="container mx-auto p-6 space-y-6">
-      <h1 className="text-3xl font-bold">Manajemen Stok</h1>
-      <div className="p-6 text-center">Belum ada data stok</div>
-    </div>
-  );
+
+  // Show empty state if no stock data exists
+  if (!stock?.length) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Manajemen Stok</h1>
+        </div>
+
+        <EmptyState
+          icon="📦"
+          title="Belum Ada Data Stok"
+          description="Mulai dengan menambahkan produk dan varian untuk mengelola stok Anda. Anda juga bisa menambahkan data sample untuk testing."
+          actionLabel="+ Tambah Produk"
+          onAction={() => navigate('/master-data/products')}
+        />
+
+        <div className="flex gap-4 justify-center">
+          <Button 
+            onClick={seedSampleData}
+            variant="outline"
+            className="gradient-primary"
+          >
+            🌱 Tambah Data Sample (Testing)
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -384,7 +473,7 @@ const Inventory = () => {
         <h1 className="text-3xl font-bold">Manajemen Stok</h1>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards - Using real data only */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -435,128 +524,138 @@ const Inventory = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Level Stok Saat Ini</CardTitle>
-          <Dialog open={variantDialogOpen} onOpenChange={(open) => {
-            setVariantDialogOpen(open);
-            if (!open) resetVariantForm();
-          }}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Tambah Item Stok
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <form onSubmit={handleVariantSubmit}>
-                <DialogHeader>
-                  <DialogTitle>
-                    {isEditMode ? 'Edit Varian Produk' : 'Tambah Varian Produk Baru'}
-                  </DialogTitle>
-                  <DialogDescription>
-                    {isEditMode ? 'Perbarui informasi varian produk' : 'Lengkapi informasi varian produk yang akan ditambahkan'}
-                  </DialogDescription>
-                </DialogHeader>
+          <div className="flex gap-2">
+            <Button 
+              onClick={seedSampleData}
+              variant="outline"
+              size="sm"
+            >
+              🌱 Tambah Sample Data
+            </Button>
+            <Dialog open={variantDialogOpen} onOpenChange={(open) => {
+              setVariantDialogOpen(open);
+              if (!open) resetVariantForm();
+            }}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Tambah Item Stok
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
                 
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="product_id">Produk *</Label>
-                    <Select
-                      value={variantFormData.product_id}
-                      onValueChange={(value) => setVariantFormData(prev => ({
-                        ...prev,
-                        product_id: value
-                      }))}
+                <form onSubmit={handleVariantSubmit}>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {isEditMode ? 'Edit Varian Produk' : 'Tambah Varian Produk Baru'}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {isEditMode ? 'Perbarui informasi varian produk' : 'Lengkapi informasi varian produk yang akan ditambahkan'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="product_id">Produk *</Label>
+                      <Select
+                        value={variantFormData.product_id}
+                        onValueChange={(value) => setVariantFormData(prev => ({
+                          ...prev,
+                          product_id: value
+                        }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih produk" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products?.map((product: any) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.nama_produk}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="warna">Warna *</Label>
+                        <Input
+                          id="warna"
+                          value={variantFormData.warna}
+                          onChange={(e) => setVariantFormData(prev => ({
+                            ...prev,
+                            warna: e.target.value
+                          }))}
+                          placeholder="Merah, Biru, dll"
+                          required
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="size">Size *</Label>
+                        <Input
+                          id="size"
+                          value={variantFormData.size}
+                          onChange={(e) => setVariantFormData(prev => ({
+                            ...prev,
+                            size: e.target.value
+                          }))}
+                          placeholder="S, M, L, XL, dll"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="stok">Stok Awal</Label>
+                        <Input
+                          id="stok"
+                          type="number"
+                          value={variantFormData.stok}
+                          onChange={(e) => setVariantFormData(prev => ({
+                            ...prev,
+                            stok: parseInt(e.target.value) || 0
+                          }))}
+                          min="0"
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="sku">SKU</Label>
+                        <Input
+                          id="sku"
+                          value={variantFormData.sku}
+                          onChange={(e) => setVariantFormData(prev => ({
+                            ...prev,
+                            sku: e.target.value
+                          }))}
+                          placeholder="Kode produk"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setVariantDialogOpen(false);
+                        resetVariantForm();
+                      }}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih produk" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products?.map((product: any) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.nama_produk}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="warna">Warna *</Label>
-                      <Input
-                        id="warna"
-                        value={variantFormData.warna}
-                        onChange={(e) => setVariantFormData(prev => ({
-                          ...prev,
-                          warna: e.target.value
-                        }))}
-                        placeholder="Merah, Biru, dll"
-                        required
-                      />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="size">Size *</Label>
-                      <Input
-                        id="size"
-                        value={variantFormData.size}
-                        onChange={(e) => setVariantFormData(prev => ({
-                          ...prev,
-                          size: e.target.value
-                        }))}
-                        placeholder="S, M, L, XL, dll"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="stok">Stok Awal</Label>
-                      <Input
-                        id="stok"
-                        type="number"
-                        value={variantFormData.stok}
-                        onChange={(e) => setVariantFormData(prev => ({
-                          ...prev,
-                          stok: parseInt(e.target.value) || 0
-                        }))}
-                        min="0"
-                      />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="sku">SKU</Label>
-                      <Input
-                        id="sku"
-                        value={variantFormData.sku}
-                        onChange={(e) => setVariantFormData(prev => ({
-                          ...prev,
-                          sku: e.target.value
-                        }))}
-                        placeholder="Kode produk"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setVariantDialogOpen(false);
-                      resetVariantForm();
-                    }}
-                  >
-                    Batal
-                  </Button>
-                  <Button type="submit">
-                    {isEditMode ? 'Perbarui' : 'Simpan'}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+                      Batal
+                    </Button>
+                    <Button type="submit">
+                      {isEditMode ? 'Perbarui' : 'Simpan'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -575,13 +674,21 @@ const Inventory = () => {
           <CardTitle>Riwayat Pergerakan Stok</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={movementColumns}
-            data={filteredMovements}
-            loading={loading}
-            searchable={true}
-            searchPlaceholder="Cari riwayat..."
-          />
+          {filteredMovements.length > 0 ? (
+            <DataTable
+              columns={movementColumns}
+              data={filteredMovements}
+              loading={loading}
+              searchable={true}
+              searchPlaceholder="Cari riwayat..."
+            />
+          ) : (
+            <EmptyState
+              icon="📊"
+              title="Belum Ada Pergerakan Stok"
+              description="Riwayat pergerakan stok akan muncul ketika ada transaksi penjualan, pembelian, atau penyesuaian stok."
+            />
+          )}
         </CardContent>
       </Card>
 

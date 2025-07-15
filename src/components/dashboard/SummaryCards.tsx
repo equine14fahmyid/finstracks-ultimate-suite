@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, DollarSign, Wallet, BarChart3, PiggyBank } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
@@ -16,8 +17,8 @@ interface SummaryCardsProps {
 }
 
 const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
-  // Provide safe defaults when data is null
-  const safeData = data || {
+  // Use actual data from props, no dummy data
+  const summaryData = data || {
     total_penjualan: 0,
     total_pengeluaran: 0,
     laba_bersih: 0,
@@ -27,39 +28,39 @@ const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
   const cards = [
     {
       title: 'Total Penjualan',
-      value: safeData.total_penjualan,
+      value: summaryData.total_penjualan,
       icon: TrendingUp,
       gradient: 'from-success to-success-light',
       textColor: 'text-success',
       bgColor: 'bg-success/10',
-      description: 'Penjualan periode ini'
+      description: summaryData.total_penjualan === 0 ? 'Belum ada penjualan' : 'Penjualan periode ini'
     },
     {
       title: 'Total Pengeluaran',
-      value: safeData.total_pengeluaran,
+      value: summaryData.total_pengeluaran,
       icon: TrendingDown,
       gradient: 'from-warning to-warning-light',
       textColor: 'text-warning',
       bgColor: 'bg-warning/10',
-      description: 'Pengeluaran periode ini'
+      description: summaryData.total_pengeluaran === 0 ? 'Belum ada pengeluaran' : 'Pengeluaran periode ini'
     },
     {
       title: 'Laba Bersih',
-      value: safeData.laba_bersih,
+      value: summaryData.laba_bersih,
       icon: BarChart3,
-      gradient: safeData.laba_bersih >= 0 ? 'from-primary to-primary-light' : 'from-error to-error-light',
-      textColor: safeData.laba_bersih >= 0 ? 'text-primary' : 'text-error',
-      bgColor: safeData.laba_bersih >= 0 ? 'bg-primary/10' : 'bg-error/10',
-      description: safeData.laba_bersih >= 0 ? 'Keuntungan bersih' : 'Kerugian bersih'
+      gradient: summaryData.laba_bersih >= 0 ? 'from-primary to-primary-light' : 'from-error to-error-light',
+      textColor: summaryData.laba_bersih >= 0 ? 'text-primary' : 'text-error',
+      bgColor: summaryData.laba_bersih >= 0 ? 'bg-primary/10' : 'bg-error/10',
+      description: summaryData.laba_bersih === 0 ? 'Belum ada keuntungan' : summaryData.laba_bersih >= 0 ? 'Keuntungan bersih' : 'Kerugian bersih'
     },
     {
       title: 'Saldo Kas & Bank',
-      value: safeData.saldo_kas_bank,
+      value: summaryData.saldo_kas_bank,
       icon: Wallet,
       gradient: 'from-secondary to-secondary-light',
       textColor: 'text-secondary',
       bgColor: 'bg-secondary/10',
-      description: 'Total saldo tersedia'
+      description: summaryData.saldo_kas_bank === 0 ? 'Belum ada saldo' : 'Total saldo tersedia'
     }
   ];
 
@@ -103,7 +104,7 @@ const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
                 className={cn(
                   "h-full rounded-full bg-gradient-to-r transition-all duration-1000",
                   card.gradient,
-                  loading ? "w-0" : "w-full"
+                  loading ? "w-0" : card.value > 0 ? "w-full" : "w-1"
                 )}
                 style={{ 
                   animationDelay: `${(index * 100) + 500}ms`,
