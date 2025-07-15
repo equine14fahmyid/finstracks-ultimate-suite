@@ -71,6 +71,21 @@ const Suppliers = () => {
     }
   };
 
+  const handleEdit = (supplier: any) => {
+    // Edit functionality - placeholder for now
+    toast({
+      title: "Info",
+      description: "Fitur edit akan ditambahkan pada versi berikutnya",
+    });
+  };
+
+  const handleDelete = (id: string) => {
+    // Delete functionality - placeholder for now
+    toast({
+      title: "Info", 
+      description: "Fitur hapus akan ditambahkan pada versi berikutnya",
+    });
+  };
   const columns = [
     {
       key: "nama_supplier",
@@ -80,53 +95,63 @@ const Suppliers = () => {
       ),
     },
     {
-      accessorKey: "alamat",
-      header: "Alamat",
-      cell: ({ row }) => (
+      key: "alamat",
+      title: "Alamat",
+      render: (supplier: any) => (
         <div className="text-muted-foreground">
-          {row.getValue("alamat") || "-"}
+          {supplier.alamat || "-"}
         </div>
       ),
     },
     {
-      accessorKey: "no_hp",
-      header: "No. HP",
-      cell: ({ row }) => (
+      key: "no_hp",
+      title: "No. HP",
+      render: (supplier: any) => (
         <div className="text-muted-foreground">
-          {row.getValue("no_hp") || "-"}
+          {supplier.no_hp || "-"}
         </div>
       ),
     },
     {
-      accessorKey: "email",
-      header: "Email",
-      cell: ({ row }) => (
+      key: "email",
+      title: "Email",
+      render: (supplier: any) => (
         <div className="text-muted-foreground">
-          {row.getValue("email") || "-"}
+          {supplier.email || "-"}
         </div>
       ),
     },
     {
-      accessorKey: "created_at",
-      header: "Tgl Dibuat",
-      cell: ({ row }) => (
+      key: "created_at",
+      title: "Tgl Dibuat",
+      render: (supplier: any) => (
         <div className="text-sm text-muted-foreground">
-          {formatDate(row.getValue("created_at"))}
+          {formatDate(supplier.created_at)}
         </div>
       ),
     },
     {
-      id: "actions",
-      header: "Aksi",
-      cell: ({ row }) => (
+      key: "actions",
+      title: "Aksi",
+      render: (supplier: any) => (
         <div className="flex items-center gap-2">
           {hasPermission('suppliers.update') && (
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0"
+              onClick={() => handleEdit(supplier)}
+            >
               <Edit className="h-4 w-4" />
             </Button>
           )}
           {hasPermission('suppliers.delete') && (
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-600 hover:text-red-700">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+              onClick={() => handleDelete(supplier.id)}
+            >
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
@@ -316,11 +341,9 @@ const Suppliers = () => {
         columns={columns}
         data={suppliers}
         loading={loading}
-        title="Daftar Supplier"
-        description="Data semua supplier yang terdaftar dalam sistem"
-        searchKey="nama_supplier"
+        searchable={true}
+        searchPlaceholder="Cari supplier..."
         onExport={() => {
-          // Export functionality can be added here
           toast({
             title: "Info",
             description: "Fitur export akan ditambahkan pada versi berikutnya",
