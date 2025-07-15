@@ -9,24 +9,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Lock, Mail, TrendingUp, User, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import heroImage from '@/assets/hero-fintracks.jpg';
-
 const Login = () => {
-  const { signIn, signUp, resetPassword, user, loading: authLoading } = useAuth();
+  const {
+    signIn,
+    signUp,
+    resetPassword,
+    user,
+    loading: authLoading
+  } = useAuth();
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'reset'>('login');
-  
+
   // Login form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
+
   // Register form state
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  
+
   // Reset password state
   const [resetEmail, setResetEmail] = useState('');
-  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -35,54 +39,47 @@ const Login = () => {
   if (user && !authLoading) {
     return <Navigate to="/" replace />;
   }
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     setLoading(true);
-
     if (!email || !password) {
       setError('Email dan password wajib diisi');
       setLoading(false);
       return;
     }
-
-    const { error } = await signIn(email, password);
-    
+    const {
+      error
+    } = await signIn(email, password);
     if (error) {
       setError(error.message);
     }
-    
     setLoading(false);
   };
-
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     setLoading(true);
-
     if (!regEmail || !regPassword || !regConfirmPassword || !fullName) {
       setError('Semua field wajib diisi');
       setLoading(false);
       return;
     }
-
     if (regPassword !== regConfirmPassword) {
       setError('Password dan konfirmasi password tidak sama');
       setLoading(false);
       return;
     }
-
     if (regPassword.length < 6) {
       setError('Password minimal 6 karakter');
       setLoading(false);
       return;
     }
-
-    const { error } = await signUp(regEmail, regPassword, fullName);
-    
+    const {
+      error
+    } = await signUp(regEmail, regPassword, fullName);
     if (error) {
       setError(error.message);
     } else {
@@ -93,53 +90,43 @@ const Login = () => {
       setRegConfirmPassword('');
       setFullName('');
     }
-    
     setLoading(false);
   };
-
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     setLoading(true);
-
     if (!resetEmail) {
       setError('Email wajib diisi');
       setLoading(false);
       return;
     }
-
-    const { error } = await resetPassword(resetEmail);
-    
+    const {
+      error
+    } = await resetPassword(resetEmail);
     if (error) {
       setError(error.message);
     } else {
       setSuccess('Email reset password telah dikirim. Silakan cek email Anda.');
       setResetEmail('');
     }
-    
     setLoading(false);
   };
-
   if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
+    return <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Memuat aplikasi...</p>
         </div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="min-h-screen flex">
+  return <div className="min-h-screen flex">
       {/* Left Side - Hero Image */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <div 
-          className="w-full h-full bg-cover bg-center relative"
-          style={{ backgroundImage: `url(${heroImage})` }}
-        >
+        <div className="w-full h-full bg-cover bg-center relative" style={{
+        backgroundImage: `url(${heroImage})`
+      }}>
           <div className="absolute inset-0 bg-gradient-hero opacity-90"></div>
           <div className="absolute inset-0 flex flex-col justify-center items-center text-white p-12">
             <div className="max-w-md text-center">
@@ -202,18 +189,16 @@ const Login = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
+              <Tabs value={activeTab} onValueChange={value => setActiveTab(value as any)}>
                 <TabsList className="grid w-full grid-cols-3 mb-6">
                   <TabsTrigger value="login">Masuk</TabsTrigger>
                   <TabsTrigger value="register">Daftar</TabsTrigger>
                   <TabsTrigger value="reset">Reset</TabsTrigger>
                 </TabsList>
 
-                {(error || success) && (
-                  <Alert variant={error ? "destructive" : "default"} className="mb-4">
+                {(error || success) && <Alert variant={error ? "destructive" : "default"} className="mb-4">
                     <AlertDescription>{error || success}</AlertDescription>
-                  </Alert>
-                )}
+                  </Alert>}
 
                 <TabsContent value="login">
                   <form onSubmit={handleLogin} className="space-y-6">
@@ -221,15 +206,7 @@ const Login = () => {
                       <Label htmlFor="login-email" className="text-sm font-medium">Email</Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="login-email"
-                          type="email"
-                          placeholder="nama@perusahaan.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="pl-10 glass-card border-0"
-                          required
-                        />
+                        <Input id="login-email" type="email" placeholder="nama@perusahaan.com" value={email} onChange={e => setEmail(e.target.value)} className="pl-10 glass-card border-0" required />
                       </div>
                     </div>
 
@@ -237,31 +214,15 @@ const Login = () => {
                       <Label htmlFor="login-password" className="text-sm font-medium">Password</Label>
                       <div className="relative">
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="login-password"
-                          type="password"
-                          placeholder="••••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="pl-10 glass-card border-0"
-                          required
-                        />
+                        <Input id="login-password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="pl-10 glass-card border-0" required />
                       </div>
                     </div>
 
-                    <Button
-                      type="submit"
-                      className="w-full gradient-primary hover:opacity-90 font-medium py-3"
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <>
+                    <Button type="submit" className="w-full gradient-primary hover:opacity-90 font-medium py-3" disabled={loading}>
+                      {loading ? <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Memproses...
-                        </>
-                      ) : (
-                        'Masuk ke Dashboard'
-                      )}
+                        </> : 'Masuk ke Dashboard'}
                     </Button>
                   </form>
                 </TabsContent>
@@ -272,15 +233,7 @@ const Login = () => {
                       <Label htmlFor="full-name" className="text-sm font-medium">Nama Lengkap</Label>
                       <div className="relative">
                         <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="full-name"
-                          type="text"
-                          placeholder="Nama lengkap Anda"
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          className="pl-10 glass-card border-0"
-                          required
-                        />
+                        <Input id="full-name" type="text" placeholder="Nama lengkap Anda" value={fullName} onChange={e => setFullName(e.target.value)} className="pl-10 glass-card border-0" required />
                       </div>
                     </div>
 
@@ -288,15 +241,7 @@ const Login = () => {
                       <Label htmlFor="reg-email" className="text-sm font-medium">Email</Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="reg-email"
-                          type="email"
-                          placeholder="nama@perusahaan.com"
-                          value={regEmail}
-                          onChange={(e) => setRegEmail(e.target.value)}
-                          className="pl-10 glass-card border-0"
-                          required
-                        />
+                        <Input id="reg-email" type="email" placeholder="nama@perusahaan.com" value={regEmail} onChange={e => setRegEmail(e.target.value)} className="pl-10 glass-card border-0" required />
                       </div>
                     </div>
 
@@ -304,15 +249,7 @@ const Login = () => {
                       <Label htmlFor="reg-password" className="text-sm font-medium">Password</Label>
                       <div className="relative">
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="reg-password"
-                          type="password"
-                          placeholder="Minimal 6 karakter"
-                          value={regPassword}
-                          onChange={(e) => setRegPassword(e.target.value)}
-                          className="pl-10 glass-card border-0"
-                          required
-                        />
+                        <Input id="reg-password" type="password" placeholder="Minimal 6 karakter" value={regPassword} onChange={e => setRegPassword(e.target.value)} className="pl-10 glass-card border-0" required />
                       </div>
                     </div>
 
@@ -320,31 +257,15 @@ const Login = () => {
                       <Label htmlFor="confirm-password" className="text-sm font-medium">Konfirmasi Password</Label>
                       <div className="relative">
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="confirm-password"
-                          type="password"
-                          placeholder="Ulangi password"
-                          value={regConfirmPassword}
-                          onChange={(e) => setRegConfirmPassword(e.target.value)}
-                          className="pl-10 glass-card border-0"
-                          required
-                        />
+                        <Input id="confirm-password" type="password" placeholder="Ulangi password" value={regConfirmPassword} onChange={e => setRegConfirmPassword(e.target.value)} className="pl-10 glass-card border-0" required />
                       </div>
                     </div>
 
-                    <Button
-                      type="submit"
-                      className="w-full gradient-primary hover:opacity-90 font-medium py-3"
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <>
+                    <Button type="submit" className="w-full gradient-primary hover:opacity-90 font-medium py-3" disabled={loading}>
+                      {loading ? <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Mendaftar...
-                        </>
-                      ) : (
-                        'Daftar Akun'
-                      )}
+                        </> : 'Daftar Akun'}
                     </Button>
                   </form>
                 </TabsContent>
@@ -355,39 +276,18 @@ const Login = () => {
                       <Label htmlFor="reset-email" className="text-sm font-medium">Email</Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="reset-email"
-                          type="email"
-                          placeholder="nama@perusahaan.com"
-                          value={resetEmail}
-                          onChange={(e) => setResetEmail(e.target.value)}
-                          className="pl-10 glass-card border-0"
-                          required
-                        />
+                        <Input id="reset-email" type="email" placeholder="nama@perusahaan.com" value={resetEmail} onChange={e => setResetEmail(e.target.value)} className="pl-10 glass-card border-0" required />
                       </div>
                     </div>
 
-                    <Button
-                      type="submit"
-                      className="w-full gradient-primary hover:opacity-90 font-medium py-3"
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <>
+                    <Button type="submit" className="w-full gradient-primary hover:opacity-90 font-medium py-3" disabled={loading}>
+                      {loading ? <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Mengirim...
-                        </>
-                      ) : (
-                        'Kirim Email Reset'
-                      )}
+                        </> : 'Kirim Email Reset'}
                     </Button>
 
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="w-full"
-                      onClick={() => setActiveTab('login')}
-                    >
+                    <Button type="button" variant="ghost" className="w-full" onClick={() => setActiveTab('login')}>
                       <ArrowLeft className="mr-2 h-4 w-4" />
                       Kembali ke Login
                     </Button>
@@ -396,18 +296,7 @@ const Login = () => {
               </Tabs>
 
               {/* Demo Credentials - Show only on login tab */}
-              {activeTab === 'login' && (
-                <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground text-center mb-2">
-                    Demo Credentials (untuk testing):
-                  </p>
-                  <div className="text-xs space-y-1">
-                    <div>Superadmin: admin@fintracks.com</div>
-                    <div>Staff: staff@fintracks.com</div>
-                    <div>Password: password123</div>
-                  </div>
-                </div>
-              )}
+              {activeTab === 'login'}
             </CardContent>
           </Card>
 
@@ -416,8 +305,6 @@ const Login = () => {
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default Login;
