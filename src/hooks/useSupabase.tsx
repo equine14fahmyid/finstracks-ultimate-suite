@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
 
 // Type definitions for better type safety
@@ -1983,5 +1984,132 @@ export const useReports = () => {
     loading,
     generateProfitLossReport,
     generateBalanceSheet,
+  };
+};
+
+// User Profiles Management Hook
+export const useUserProfiles = () => {
+  const [userProfiles, setUserProfiles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const fetchUserProfiles = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setUserProfiles(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal memuat data pengguna: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createUserProfile = async (userData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .insert(userData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Sukses",
+        description: "Pengguna berhasil dibuat",
+      });
+
+      await fetchUserProfiles();
+      return data;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal membuat pengguna: ${error.message}`,
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateUserProfile = async (id: string, userData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .update(userData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Sukses",
+        description: "Pengguna berhasil diperbarui",
+      });
+
+      await fetchUserProfiles();
+      return data;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal memperbarui pengguna: ${error.message}`,
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteUserProfile = async (id: string) => {
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sukses",
+        description: "Pengguna berhasil dihapus",
+      });
+
+      await fetchUserProfiles();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menghapus pengguna: ${error.message}`,
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    userProfiles,
+    loading,
+    fetchUserProfiles,
+    createUserProfile,
+    updateUserProfile,
+    deleteUserProfile,
   };
 };

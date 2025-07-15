@@ -22,7 +22,7 @@ import {
 interface SimpleColumn {
   key: string;
   title: string;
-  render?: (item: any) => React.ReactNode;
+  render?: (value: any, record: any) => React.ReactNode;
 }
 
 interface DataTableProps {
@@ -114,7 +114,7 @@ export function DataTable({
                 <TableRow key={index} className="hover:bg-muted/50 transition-colors">
                   {columns.map((column) => (
                     <TableCell key={column.key}>
-                      {column.render ? column.render(item) : item[column.key]}
+                      {column.render ? column.render(item[column.key], item) : item[column.key]}
                     </TableCell>
                   ))}
                 </TableRow>
