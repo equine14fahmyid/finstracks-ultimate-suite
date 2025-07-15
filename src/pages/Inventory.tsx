@@ -64,20 +64,23 @@ const Inventory = () => {
     {
       key: 'stock',
       title: 'Stok',
-      render: (item: any) => (
-        <div className="flex items-center gap-2">
-          <span className={`font-medium ${item.stok <= 5 ? 'text-red-600' : item.stok <= 10 ? 'text-yellow-600' : 'text-green-600'}`}>
-            {item.stok}
-          </span>
-          <span className="text-sm text-muted-foreground">{item.product?.satuan}</span>
-          {item.stok <= 5 && (
-            <Badge variant="destructive" className="text-xs">
-              <AlertTriangle className="h-3 w-3 mr-1" />
-              Stok Rendah
-            </Badge>
-          )}
-        </div>
-      )
+      render: (item: any) => {
+        const stok = item?.stok ?? 0;
+        return (
+          <div className="flex items-center gap-2">
+            <span className={`font-medium ${stok <= 5 ? 'text-red-600' : stok <= 10 ? 'text-yellow-600' : 'text-green-600'}`}>
+              {stok}
+            </span>
+            <span className="text-sm text-muted-foreground">{item?.product?.satuan}</span>
+            {stok <= 5 && (
+              <Badge variant="destructive" className="text-xs">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Stok Rendah
+              </Badge>
+            )}
+          </div>
+        );
+      }
     },
     {
       key: 'value',
@@ -85,10 +88,10 @@ const Inventory = () => {
       render: (item: any) => (
         <div>
           <div className="font-medium">
-            {formatCurrency((item.stok || 0) * (item.product?.harga_beli || 0))}
+            {formatCurrency((item?.stok || 0) * (item?.product?.harga_beli || 0))}
           </div>
           <div className="text-sm text-muted-foreground">
-            @ {formatCurrency(item.product?.harga_beli || 0)}
+            @ {formatCurrency(item?.product?.harga_beli || 0)}
           </div>
         </div>
       )
@@ -102,7 +105,7 @@ const Inventory = () => {
           variant="outline"
           onClick={() => {
             setSelectedVariant(item);
-            setAdjustmentData({ quantity: item.stok || 0, notes: '' });
+            setAdjustmentData({ quantity: item?.stok || 0, notes: '' });
             setDialogOpen(true);
           }}
         >
@@ -174,11 +177,14 @@ const Inventory = () => {
     }
   ];
 
-  const totalStockValue = stock.reduce((total, item) => 
-    total + ((item.stok || 0) * (item.product?.harga_beli || 0)), 0
-  );
+  const totalStockValue = stock?.reduce((total, item) => 
+    total + ((item?.stok || 0) * (item?.product?.harga_beli || 0)), 0
+  ) || 0;
 
-  const lowStockItems = stock.filter(item => (item.stok || 0) <= 5);
+  const lowStockItems = stock?.filter(item => (item?.stok || 0) <= 5) || [];
+
+  // Add safe access for summary calculations
+  const totalStock = stock?.reduce((total, item) => total + (item?.stok || 0), 0) || 0;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -194,7 +200,7 @@ const Inventory = () => {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stock.length}</div>
+            <div className="text-2xl font-bold">{stock?.length || 0}</div>
             <p className="text-xs text-muted-foreground">Varian produk</p>
           </CardContent>
         </Card>
@@ -206,7 +212,7 @@ const Inventory = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {stock.reduce((total, item) => total + (item.stok || 0), 0)}
+              {totalStock}
             </div>
             <p className="text-xs text-muted-foreground">Unit tersedia</p>
           </CardContent>
@@ -283,7 +289,7 @@ const Inventory = () => {
                   <div className="text-sm text-muted-foreground">
                     {selectedVariant.warna} - {selectedVariant.size}
                   </div>
-                  <div className="text-sm">Stok saat ini: {selectedVariant.stok}</div>
+                  <div className="text-sm">Stok saat ini: {selectedVariant?.stok || 0}</div>
                 </div>
               </div>
               
