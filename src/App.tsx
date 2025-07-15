@@ -70,6 +70,18 @@ const App = () => (
               </AppLayout>
             } />
             
+            {/* Master Data Products Routes */}
+            <Route path="/master-data/products" element={
+              <AppLayout>
+                <Products />
+              </AppLayout>
+            } />
+            <Route path="/master/products" element={
+              <AppLayout>
+                <Products />
+              </AppLayout>
+            } />
+            
             <Route path="/suppliers" element={
               <AppLayout>
                 <Suppliers />
