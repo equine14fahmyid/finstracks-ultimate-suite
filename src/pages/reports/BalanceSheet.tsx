@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Download } from 'lucide-react';
+import { CalendarIcon, Download, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
+import { Link } from 'react-router-dom';
 import { id } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/utils/format';
@@ -200,8 +201,14 @@ const BalanceSheet = () => {
           {/* Left Side - Assets */}
           <div className="space-y-6">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-green-600">ASET</CardTitle>
+                <Link to="/master/assets">
+                  <Button variant="ghost" size="sm">
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Kelola Aset
+                  </Button>
+                </Link>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Current Assets */}
@@ -285,8 +292,14 @@ const BalanceSheet = () => {
 
             {/* Equity */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-blue-600">EKUITAS</CardTitle>
+                <Link to="/reports/profit-loss">
+                  <Button variant="ghost" size="sm">
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Lihat Laba Rugi
+                  </Button>
+                </Link>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
