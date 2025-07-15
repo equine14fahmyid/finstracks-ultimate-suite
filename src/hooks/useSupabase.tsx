@@ -688,12 +688,19 @@ export const useStock = () => {
         .from('product_variants')
         .select(`
           *,
-          product:products (*)
+          products!inner (
+            id,
+            nama_produk,
+            satuan,
+            harga_beli,
+            harga_jual_default
+          )
         `)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      console.log('Stock data fetched:', data);
       setStock(data || []);
     } catch (error: any) {
       console.error('Fetch stock error:', error);
@@ -714,15 +721,23 @@ export const useStock = () => {
         .from('stock_movements')
         .select(`
           *,
-          product_variant:product_variants (
-            *,
-            product:products (*)
+          product_variants!inner (
+            id,
+            warna,
+            size,
+            sku,
+            products!inner (
+              id,
+              nama_produk,
+              satuan
+            )
           )
         `)
         .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
+      console.log('Stock movements data fetched:', data);
       setMovements(data || []);
     } catch (error: any) {
       console.error('Fetch stock movements error:', error);
