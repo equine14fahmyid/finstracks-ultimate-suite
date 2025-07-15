@@ -149,7 +149,12 @@ const Analytics = () => {
 
         const topProducts = Object.values(productSales)
           .sort((a: any, b: any) => b.total_revenue - a.total_revenue)
-          .slice(0, 10);
+          .slice(0, 10) as Array<{
+            product_name: string;
+            variant_display: string;
+            quantity_sold: number;
+            total_revenue: number;
+          }>;
 
         // Process low stock items
         const lowStockItems = lowStockData?.map(item => ({
@@ -334,7 +339,7 @@ const Analytics = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-600">
                 <TrendingDown className="h-5 w-5" />
-                Peringatan Stok Rendah (< 10 pcs)
+                Peringatan Stok Rendah (&lt; 10 pcs)
               </CardTitle>
             </CardHeader>
             <CardContent>
