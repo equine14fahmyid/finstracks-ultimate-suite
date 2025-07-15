@@ -2,95 +2,156 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* ============================================================================
+   FINTRACKS ULTIMATE - MODERN DESIGN SYSTEM
+   Glassmorphism & Gradient Design for UMKM Tasikmalaya
+   ============================================================================ */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
+    /* ========== PRIMARY BRAND COLORS ========== */
+    --primary: 217 91% 60%; /* Blue #3B82F6 */
+    --primary-dark: 224 76% 48%; /* Dark Blue #1E40AF */
+    --primary-light: 213 93% 68%; /* Light Blue #60A5FA */
+    --primary-foreground: 0 0% 100%; /* White */
+    
+    /* ========== SECONDARY ACCENT ========== */
+    --secondary: 262 83% 58%; /* Purple #8B5CF6 */
+    --secondary-dark: 258 90% 36%; /* Dark Purple #7C3AED */
+    --secondary-light: 266 85% 68%; /* Light Purple #A78BFA */
+    --secondary-foreground: 0 0% 100%;
+    
+    /* ========== STATUS COLORS ========== */
+    --success: 142 76% 36%; /* Green #10B981 */
+    --success-light: 141 69% 58%; /* Light Green #34D399 */
+    --warning: 38 92% 50%; /* Yellow #F59E0B */
+    --warning-light: 45 93% 58%; /* Light Yellow #FCD34D */
+    --error: 0 84% 60%; /* Red #EF4444 */
+    --error-light: 0 93% 70%; /* Light Red #FCA5A5 */
+    
+    /* ========== NEUTRAL COLORS ========== */
+    --background: 0 0% 100%; /* Pure White */
+    --background-muted: 210 40% 98%; /* Very Light Gray */
+    --background-subtle: 210 40% 96%; /* Subtle Gray */
+    
+    --foreground: 222 84% 5%; /* Almost Black */
+    --foreground-muted: 215 16% 47%; /* Medium Gray */
+    --foreground-subtle: 220 9% 46%; /* Light Gray */
+    
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
+    --card-foreground: 222 84% 5%;
+    
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
+    --popover-foreground: 222 84% 5%;
+    
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 217 91% 60%;
+    
+    /* ========== GLASSMORPHISM EFFECTS ========== */
+    --glass-bg: hsla(217, 91%, 60%, 0.1);
+    --glass-border: hsla(217, 91%, 60%, 0.2);
+    --glass-shadow: hsla(217, 91%, 60%, 0.1);
+    
+    /* ========== GRADIENTS ========== */
+    --gradient-primary: linear-gradient(135deg, hsl(217, 91%, 60%), hsl(224, 76%, 48%));
+    --gradient-secondary: linear-gradient(135deg, hsl(262, 83%, 58%), hsl(258, 90%, 36%));
+    --gradient-hero: linear-gradient(135deg, hsl(217, 91%, 60%), hsl(262, 83%, 58%));
+    --gradient-card: linear-gradient(145deg, hsla(217, 91%, 60%, 0.05), hsla(262, 83%, 58%, 0.05));
+    --gradient-button: linear-gradient(135deg, hsl(217, 91%, 60%), hsl(213, 93%, 68%));
+    
+    /* ========== SHADOWS ========== */
+    --shadow-sm: 0 2px 4px hsla(217, 91%, 60%, 0.1);
+    --shadow-md: 0 4px 12px hsla(217, 91%, 60%, 0.15);
+    --shadow-lg: 0 10px 30px hsla(217, 91%, 60%, 0.2);
+    --shadow-glow: 0 0 40px hsla(217, 91%, 60%, 0.3);
+    
+    /* ========== ANIMATIONS ========== */
+    --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* ========== LAYOUT ========== */
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 16px;
+    --radius-full: 9999px;
+    
+    /* ========== SIDEBAR ========== */
+    --sidebar-background: hsl(217, 91%, 60%, 0.05);
+    --sidebar-foreground: 222 84% 5%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 222 84% 5%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 217 91% 60%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
+    /* ========== DARK MODE COLORS ========== */
+    --background: 222 84% 5%; /* Dark Background */
+    --background-muted: 217 33% 8%; /* Dark Muted */
+    --background-subtle: 217 33% 12%; /* Dark Subtle */
+    
+    --foreground: 210 40% 98%; /* Light Text */
+    --foreground-muted: 215 20% 65%; /* Muted Text */
+    --foreground-subtle: 220 15% 55%; /* Subtle Text */
+    
+    --card: 222 84% 5%;
     --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
+    
+    --popover: 222 84% 5%;
     --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
+    
+    --primary: 213 93% 68%; /* Lighter blue for dark mode */
+    --primary-foreground: 222 84% 5%;
+    
+    --secondary: 266 85% 68%; /* Lighter purple for dark mode */
+    --secondary-foreground: 222 84% 5%;
+    
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    
+    --accent: 217 33% 17%;
     --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
+    
+    --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 213 93% 68%;
+    
+    /* ========== DARK GLASSMORPHISM ========== */
+    --glass-bg: hsla(213, 93%, 68%, 0.1);
+    --glass-border: hsla(213, 93%, 68%, 0.2);
+    --glass-shadow: hsla(213, 93%, 68%, 0.15);
+    
+    /* ========== DARK GRADIENTS ========== */
+    --gradient-primary: linear-gradient(135deg, hsl(213, 93%, 68%), hsl(217, 91%, 60%));
+    --gradient-secondary: linear-gradient(135deg, hsl(266, 85%, 68%), hsl(262, 83%, 58%));
+    --gradient-hero: linear-gradient(135deg, hsl(213, 93%, 68%), hsl(266, 85%, 68%));
+    --gradient-card: linear-gradient(145deg, hsla(213, 93%, 68%, 0.05), hsla(266, 85%, 68%, 0.05));
+    
+    /* ========== DARK SIDEBAR ========== */
+    --sidebar-background: hsl(222, 84%, 5%);
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 213 93% 68%;
+    --sidebar-primary-foreground: 222 84% 5%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 213 93% 68%;
   }
 }
 
@@ -100,6 +161,174 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    background: var(--gradient-hero);
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  /* ========== GLASSMORPHISM COMPONENTS ========== */
+  .glass-card {
+    @apply backdrop-blur-lg border border-white/20 rounded-lg;
+    background: var(--glass-bg);
+    border-color: var(--glass-border);
+    box-shadow: var(--shadow-md);
+  }
+  
+  .glass-button {
+    @apply backdrop-blur-md border border-white/30 rounded-lg px-4 py-2 font-medium;
+    background: var(--glass-bg);
+    transition: var(--transition-smooth);
+  }
+  
+  .glass-button:hover {
+    background: var(--glass-border);
+    box-shadow: var(--shadow-lg);
+  }
+  
+  /* ========== GRADIENT COMPONENTS ========== */
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-secondary {
+    background: var(--gradient-secondary);
+  }
+  
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+  
+  .gradient-card {
+    background: var(--gradient-card);
+  }
+  
+  .gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* ========== ANIMATION COMPONENTS ========== */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+  
+  /* ========== CUSTOM SHADOWS ========== */
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+  
+  .shadow-glass {
+    box-shadow: var(--shadow-md);
+  }
+  
+  /* ========== INTERACTIVE STATES ========== */
+  .hover-lift {
+    transition: var(--transition-smooth);
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+  
+  /* ========== UTILITY CLASSES ========== */
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .border-gradient {
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    background-image: var(--gradient-primary);
+  }
+}
+
+@layer utilities {
+  /* ========== CUSTOM ANIMATIONS ========== */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes glow {
+    from {
+      box-shadow: 0 0 20px var(--glass-shadow);
+    }
+    to {
+      box-shadow: 0 0 30px var(--glass-border), 0 0 40px var(--glass-shadow);
+    }
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+  
+  /* ========== RESPONSIVE UTILITIES ========== */
+  .mobile-only {
+    @apply block md:hidden;
+  }
+  
+  .desktop-only {
+    @apply hidden md:block;
+  }
+  
+  /* ========== SCROLLBAR STYLING ========== */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary)) transparent;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--primary));
+    border-radius: 3px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--primary-dark));
   }
 }
