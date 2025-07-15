@@ -100,16 +100,16 @@ const Settlements = () => {
     {
       key: 'tanggal',
       title: 'Tanggal',
-      render: (settlement: any) => formatShortDate(settlement.tanggal)
+      render: (settlement: any) => settlement ? formatShortDate(settlement.tanggal) : '-'
     },
     {
       key: 'store',
       title: 'Toko',
       render: (settlement: any) => (
         <div>
-          <div className="font-medium">{settlement.store?.nama_toko}</div>
+          <div className="font-medium">{settlement?.store?.nama_toko || '-'}</div>
           <div className="text-sm text-muted-foreground">
-            {settlement.store?.platform?.nama_platform}
+            {settlement?.store?.platform?.nama_platform || '-'}
           </div>
         </div>
       )
@@ -119,7 +119,7 @@ const Settlements = () => {
       title: 'Jumlah Dicairkan',
       render: (settlement: any) => (
         <span className="font-medium text-green-600">
-          {formatCurrency(settlement.jumlah_dicairkan)}
+          {settlement ? formatCurrency(settlement.jumlah_dicairkan || 0) : '-'}
         </span>
       )
     },
@@ -128,7 +128,7 @@ const Settlements = () => {
       title: 'Biaya Admin',
       render: (settlement: any) => (
         <span className="text-red-600">
-          {formatCurrency(settlement.biaya_admin || 0)}
+          {settlement ? formatCurrency(settlement.biaya_admin || 0) : '-'}
         </span>
       )
     },
@@ -137,7 +137,7 @@ const Settlements = () => {
       title: 'Diterima',
       render: (settlement: any) => (
         <span className="font-medium">
-          {formatCurrency(settlement.jumlah_dicairkan - (settlement.biaya_admin || 0))}
+          {settlement ? formatCurrency((settlement.jumlah_dicairkan || 0) - (settlement.biaya_admin || 0)) : '-'}
         </span>
       )
     },
@@ -145,13 +145,13 @@ const Settlements = () => {
       key: 'bank',
       title: 'Ke Bank',
       render: (settlement: any) => (
-        <span>{settlement.bank?.nama_bank || 'Kas'}</span>
+        <span>{settlement?.bank?.nama_bank || 'Kas'}</span>
       )
     },
     {
       key: 'actions',
       title: 'Aksi',
-      render: (settlement: any) => (
+      render: (settlement: any) => settlement ? (
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => handleEdit(settlement)}>
             Edit
@@ -160,12 +160,14 @@ const Settlements = () => {
             Hapus
           </Button>
         </div>
-      )
+      ) : null
     }
   ];
 
-  const totalSettlements = settlements.reduce((total, settlement) => total + settlement.jumlah_dicairkan, 0);
-  const totalFees = settlements.reduce((total, settlement) => total + (settlement.biaya_admin || 0), 0);
+  // Filter out any undefined/null settlements and calculate totals safely
+  const validSettlements = settlements.filter(settlement => settlement && typeof settlement.jumlah_dicairkan === 'number');
+  const totalSettlements = validSettlements.reduce((total, settlement) => total + (settlement.jumlah_dicairkan || 0), 0);
+  const totalFees = validSettlements.reduce((total, settlement) => total + (settlement.biaya_admin || 0), 0);
   const netReceived = totalSettlements - totalFees;
 
   return (
@@ -337,7 +339,7 @@ const Settlements = () => {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{settlements.length}</div>
+            <div className="text-2xl font-bold">{validSettlements.length}</div>
             <p className="text-xs text-muted-foreground">Total pencairan</p>
           </CardContent>
         </Card>
@@ -351,7 +353,7 @@ const Settlements = () => {
         <CardContent>
           <DataTable
             columns={columns}
-            data={settlements}
+            data={validSettlements}
             loading={loading}
             searchable={true}
             searchPlaceholder="Cari pencairan..."
