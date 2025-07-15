@@ -684,11 +684,16 @@ export const useStock = () => {
   const fetchStock = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data: variants, error } = await supabase
         .from('product_variants')
         .select(`
-          *,
-          products!inner (
+          id,
+          warna,
+          size,
+          stok,
+          sku,
+          is_active,
+          product:products!inner(
             id,
             nama_produk,
             satuan,
@@ -697,11 +702,12 @@ export const useStock = () => {
           )
         `)
         .eq('is_active', true)
+        .eq('product.is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      console.log('Stock data fetched:', data);
-      setStock(data || []);
+      console.log('Stock data fetched:', variants);
+      setStock(variants || []);
     } catch (error: any) {
       console.error('Fetch stock error:', error);
       toast({
@@ -716,29 +722,27 @@ export const useStock = () => {
 
   const fetchStockMovements = async () => {
     try {
-      setLoading(true);
-      const { data, error } = await supabase
+      const { data: movements, error } = await supabase
         .from('stock_movements')
         .select(`
-          *,
-          product_variants!inner (
-            id,
+          id,
+          movement_type,
+          quantity,
+          reference_type,
+          notes,
+          created_at,
+          product_variant:product_variants(
             warna,
             size,
-            sku,
-            products!inner (
-              id,
-              nama_produk,
-              satuan
-            )
+            product:products(nama_produk)
           )
         `)
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(20);
 
       if (error) throw error;
-      console.log('Stock movements data fetched:', data);
-      setMovements(data || []);
+      console.log('Stock movements data fetched:', movements);
+      setMovements(movements || []);
     } catch (error: any) {
       console.error('Fetch stock movements error:', error);
       toast({
@@ -746,28 +750,12 @@ export const useStock = () => {
         description: `Gagal memuat riwayat stok: ${error.message}`,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
   const adjustStock = async (variantId: string, newStock: number, notes: string) => {
     try {
-      setLoading(true);
-      
-      // Get current stock
-      const { data: currentVariant, error: fetchError } = await supabase
-        .from('product_variants')
-        .select('stok')
-        .eq('id', variantId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      const currentStock = currentVariant?.stok || 0;
-      const difference = newStock - currentStock;
-
-      // Update stock
+      // Update stock in product_variants
       const { error: updateError } = await supabase
         .from('product_variants')
         .update({ stok: newStock })
@@ -775,26 +763,27 @@ export const useStock = () => {
 
       if (updateError) throw updateError;
 
-      // Record movement
+      // Record stock movement
       const { error: movementError } = await supabase
         .from('stock_movements')
         .insert({
           product_variant_id: variantId,
-          movement_type: difference > 0 ? 'in' : 'out',
-          quantity: Math.abs(difference),
+          movement_type: 'adjustment',
+          quantity: newStock,
           reference_type: 'adjustment',
           notes: notes
         });
 
       if (movementError) throw movementError;
 
-      toast({
-        title: "Sukses",
-        description: "Stok berhasil disesuaikan",
-      });
-
+      // Refresh data
       await fetchStock();
       await fetchStockMovements();
+      
+      toast({
+        title: "Sukses",
+        description: "Stok berhasil disesuaikan!",
+      });
     } catch (error: any) {
       console.error('Adjust stock error:', error);
       toast({

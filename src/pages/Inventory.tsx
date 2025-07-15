@@ -180,7 +180,7 @@ const Inventory = () => {
         
         return (
           <div>
-            <div className="font-medium">{item?.products?.nama_produk || 'N/A'}</div>
+            <div className="font-medium">{item?.product?.nama_produk || 'Unknown Product'}</div>
             <div className="text-sm text-muted-foreground">
               {item?.warna || 'N/A'} - {item?.size || 'N/A'}
             </div>
@@ -203,7 +203,7 @@ const Inventory = () => {
             <span className={`font-medium ${stok <= 5 ? 'text-red-600' : stok <= 10 ? 'text-yellow-600' : 'text-green-600'}`}>
               {stok}
             </span>
-            <span className="text-sm text-muted-foreground">{item?.products?.satuan || 'pcs'}</span>
+            <span className="text-sm text-muted-foreground">{item?.product?.satuan || 'pcs'}</span>
             {stok <= 5 && (
               <Badge variant="destructive" className="text-xs">
                 <AlertTriangle className="h-3 w-3 mr-1" />
@@ -223,10 +223,10 @@ const Inventory = () => {
         return (
           <div>
             <div className="font-medium">
-              {formatCurrency((item?.stok || 0) * (item?.products?.harga_beli || 0))}
+              {formatCurrency((item?.stok || 0) * (item?.product?.harga_beli || 0))}
             </div>
             <div className="text-sm text-muted-foreground">
-              @ {formatCurrency(item?.products?.harga_beli || 0)}
+              @ {formatCurrency(item?.product?.harga_beli || 0)}
             </div>
           </div>
         );
@@ -291,10 +291,10 @@ const Inventory = () => {
         return (
           <div>
             <div className="font-medium">
-              {movement.product_variants?.products?.nama_produk || 'Produk tidak diketahui'}
+              {movement.product_variant?.product?.nama_produk || 'Produk tidak diketahui'}
             </div>
             <div className="text-sm text-muted-foreground">
-              {movement.product_variants?.warna || 'N/A'} - {movement.product_variants?.size || 'N/A'}
+              {movement.product_variant?.warna || 'N/A'} - {movement.product_variant?.size || 'N/A'}
             </div>
           </div>
         );
@@ -355,12 +355,20 @@ const Inventory = () => {
   ];
 
   const totalStockValue = stock?.reduce((total, item) => 
-    total + ((item?.stok || 0) * (item?.products?.harga_beli || 0)), 0
+    total + ((item?.stok || 0) * (item?.product?.harga_beli || 0)), 0
   ) || 0;
 
   const lowStockItems = stock?.filter(item => (item?.stok || 0) <= 5) || [];
   const totalStock = stock?.reduce((total, item) => total + (item?.stok || 0), 0) || 0;
   const filteredMovements = movements?.filter(movement => movement != null) || [];
+
+  if (loading) return <div className="p-6">Loading stock data...</div>;
+  if (!stock?.length) return (
+    <div className="container mx-auto p-6 space-y-6">
+      <h1 className="text-3xl font-bold">Manajemen Stok</h1>
+      <div className="p-6 text-center">Belum ada data stok</div>
+    </div>
+  );
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -575,7 +583,7 @@ const Inventory = () => {
           <DialogHeader>
             <DialogTitle>Penyesuaian Stok</DialogTitle>
             <DialogDescription>
-              Sesuaikan stok untuk {selectedVariant?.products?.nama_produk} - {selectedVariant?.warna} {selectedVariant?.size}
+              Sesuaikan stok untuk {selectedVariant?.product?.nama_produk} - {selectedVariant?.warna} {selectedVariant?.size}
             </DialogDescription>
           </DialogHeader>
           
@@ -584,7 +592,7 @@ const Inventory = () => {
               <div>
                 <Label>Produk</Label>
                 <div className="p-3 bg-muted rounded-md">
-                  <div className="font-medium">{selectedVariant.products?.nama_produk || 'N/A'}</div>
+                  <div className="font-medium">{selectedVariant.product?.nama_produk || 'N/A'}</div>
                   <div className="text-sm text-muted-foreground">
                     {selectedVariant.warna} - {selectedVariant.size}
                   </div>
