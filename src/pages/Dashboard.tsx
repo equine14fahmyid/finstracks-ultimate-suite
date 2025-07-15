@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Download, Eye } from 'lucide-react';
+import { RefreshCw, Download, Eye, Plus, ShoppingCart, CreditCard, FileText } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import DateFilter from '@/components/dashboard/DateFilter';
@@ -31,6 +32,7 @@ interface SalesData {
 
 const Dashboard = () => {
   const { profile, hasPermission } = useAuth();
+  const navigate = useNavigate();
   const [dateRange, setDateRange] = useState<DateRange>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // First day of current month
     to: new Date() // Today
@@ -173,23 +175,55 @@ const Dashboard = () => {
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {hasPermission('sales.create') && (
-              <Button variant="outline" className="glass-button justify-start">
-                Tambah Penjualan
+              <Button 
+                variant="outline" 
+                className="glass-button justify-start h-auto p-4 flex-col items-start gap-2"
+                onClick={() => navigate('/sales')}
+              >
+                <Plus className="h-5 w-5 text-success" />
+                <div className="text-left">
+                  <div className="font-medium">Tambah Penjualan</div>
+                  <div className="text-xs text-muted-foreground">Input transaksi penjualan</div>
+                </div>
               </Button>
             )}
             {hasPermission('purchases.create') && (
-              <Button variant="outline" className="glass-button justify-start">
-                Tambah Pembelian
+              <Button 
+                variant="outline" 
+                className="glass-button justify-start h-auto p-4 flex-col items-start gap-2"
+                onClick={() => navigate('/purchases')}
+              >
+                <ShoppingCart className="h-5 w-5 text-primary" />
+                <div className="text-left">
+                  <div className="font-medium">Tambah Pembelian</div>
+                  <div className="text-xs text-muted-foreground">Input pembelian barang</div>
+                </div>
               </Button>
             )}
             {hasPermission('finance.create') && (
-              <Button variant="outline" className="glass-button justify-start">
-                Catat Pengeluaran
+              <Button 
+                variant="outline" 
+                className="glass-button justify-start h-auto p-4 flex-col items-start gap-2"
+                onClick={() => navigate('/expenses')}
+              >
+                <CreditCard className="h-5 w-5 text-warning" />
+                <div className="text-left">
+                  <div className="font-medium">Catat Pengeluaran</div>
+                  <div className="text-xs text-muted-foreground">Input biaya operasional</div>
+                </div>
               </Button>
             )}
             {hasPermission('reports.read') && (
-              <Button variant="outline" className="glass-button justify-start">
-                Lihat Laporan
+              <Button 
+                variant="outline" 
+                className="glass-button justify-start h-auto p-4 flex-col items-start gap-2"
+                onClick={() => navigate('/reports/analytics')}
+              >
+                <FileText className="h-5 w-5 text-secondary" />
+                <div className="text-left">
+                  <div className="font-medium">Lihat Laporan</div>
+                  <div className="text-xs text-muted-foreground">Analisis & laporan</div>
+                </div>
               </Button>
             )}
           </div>
