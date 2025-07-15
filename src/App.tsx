@@ -57,6 +57,110 @@ const App = () => (
               </AppLayout>
             } />
             
+            {/* Sales Routes */}
+            <Route path="/sales/create" element={
+              <AppLayout>
+                <Sales />
+              </AppLayout>
+            } />
+            
+            {/* Purchase Routes */}
+            <Route path="/purchases" element={
+              <AppLayout>
+                <div className="p-6"><h1>Purchases - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            <Route path="/purchases/create" element={
+              <AppLayout>
+                <div className="p-6"><h1>Create Purchase - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            
+            {/* Inventory Routes */}
+            <Route path="/inventory" element={
+              <AppLayout>
+                <div className="p-6"><h1>Stock Management - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            
+            {/* Finance Routes */}
+            <Route path="/incomes" element={
+              <AppLayout>
+                <div className="p-6"><h1>Incomes - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            <Route path="/expenses" element={
+              <AppLayout>
+                <div className="p-6"><h1>Expenses - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            <Route path="/banks" element={
+              <AppLayout>
+                <div className="p-6"><h1>Banks - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            <Route path="/settlements" element={
+              <AppLayout>
+                <div className="p-6"><h1>Settlements - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            
+            {/* Master Data Routes */}
+            <Route path="/platforms" element={
+              <AppLayout>
+                <div className="p-6"><h1>Platforms - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            <Route path="/stores" element={
+              <AppLayout>
+                <div className="p-6"><h1>Stores - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            <Route path="/expeditions" element={
+              <AppLayout>
+                <div className="p-6"><h1>Expeditions - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            <Route path="/categories" element={
+              <AppLayout>
+                <div className="p-6"><h1>Categories - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            
+            {/* Report Routes */}
+            <Route path="/reports/profit-loss" element={
+              <AppLayout>
+                <div className="p-6"><h1>Profit Loss Report - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            <Route path="/reports/balance-sheet" element={
+              <AppLayout>
+                <div className="p-6"><h1>Balance Sheet - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            <Route path="/reports/cash-flow" element={
+              <AppLayout>
+                <div className="p-6"><h1>Cash Flow Report - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            <Route path="/reports/analytics" element={
+              <AppLayout>
+                <div className="p-6"><h1>Analytics - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            
+            {/* Admin Routes */}
+            <Route path="/users" element={
+              <AppLayout>
+                <div className="p-6"><h1>User Management - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            <Route path="/settings" element={
+              <AppLayout>
+                <div className="p-6"><h1>Settings - Coming Soon</h1></div>
+              </AppLayout>
+            } />
+            
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
