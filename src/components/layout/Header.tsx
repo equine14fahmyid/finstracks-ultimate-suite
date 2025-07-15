@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from 'next-themes';
+import { NotificationCenter } from '@/components/common/NotificationCenter';
 
 interface HeaderProps {
   onToggleSidebar?: () => void;
@@ -94,14 +95,7 @@ const Header = ({ onToggleSidebar }: HeaderProps) => {
         {/* Right Section - Actions & Profile */}
         <div className="flex items-center gap-2">
           {/* Notifications */}
-          <Button variant="ghost" size="icon" className="hover-lift relative">
-            <Bell className="h-5 w-5" />
-            {notifications > 0 && (
-              <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs bg-error text-white border-0">
-                {notifications}
-              </Badge>
-            )}
-          </Button>
+          <NotificationCenter />
 
           {/* Theme Toggle */}
           <Button 

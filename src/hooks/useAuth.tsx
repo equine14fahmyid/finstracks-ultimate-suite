@@ -10,7 +10,9 @@ interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   hasPermission: (permission: string) => boolean;
   userRole: UserRole | null;
 }
@@ -129,6 +131,85 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  const signUp = async (email: string, password: string, fullName: string) => {
+    try {
+      setLoading(true);
+      
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            full_name: fullName,
+          }
+        }
+      });
+
+      if (error) {
+        let message = 'Terjadi kesalahan saat mendaftar';
+        
+        if (error.message.includes('User already registered')) {
+          message = 'Email sudah terdaftar. Silakan gunakan email lain atau login.';
+        } else if (error.message.includes('Password should be at least')) {
+          message = 'Password minimal 6 karakter';
+        } else if (error.message.includes('Invalid email')) {
+          message = 'Format email tidak valid';
+        }
+
+        return { error: { message } };
+      }
+
+      toast({
+        title: "Registrasi Berhasil",
+        description: "Silakan cek email Anda untuk konfirmasi akun",
+      });
+
+      return { error: null };
+    } catch (error: any) {
+      return { 
+        error: { 
+          message: error.message || 'Terjadi kesalahan yang tidak terduga' 
+        } 
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      setLoading(true);
+      
+      const redirectUrl = `${window.location.origin}/reset-password`;
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) {
+        return { error: { message: 'Gagal mengirim email reset password' } };
+      }
+
+      toast({
+        title: "Email Terkirim",
+        description: "Silakan cek email Anda untuk reset password",
+      });
+
+      return { error: null };
+    } catch (error: any) {
+      return { 
+        error: { 
+          message: error.message || 'Terjadi kesalahan yang tidak terduga' 
+        } 
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const signOut = async () => {
     try {
       setLoading(true);
@@ -186,7 +267,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     profile,
     loading,
     signIn,
+    signUp,
     signOut,
+    resetPassword,
     hasPermission,
     userRole: profile?.role || null,
   };

@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: unknown | null
+          new_values: Json | null
+          old_values: Json | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       assets: {
         Row: {
           akumulasi_penyusutan: number | null
@@ -250,6 +289,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notifications: {
+        Row: {
+          action_url: string | null
+          created_at: string | null
+          id: string
+          message: string
+          read: boolean | null
+          title: string
+          type: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action_url?: string | null
+          created_at?: string | null
+          id?: string
+          message: string
+          read?: boolean | null
+          title: string
+          type: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action_url?: string | null
+          created_at?: string | null
+          id?: string
+          message?: string
+          read?: boolean | null
+          title?: string
+          type?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       platforms: {
         Row: {
@@ -636,6 +711,44 @@ export type Database = {
           },
         ]
       }
+      stock_alerts: {
+        Row: {
+          alert_enabled: boolean | null
+          created_at: string | null
+          id: string
+          last_alert_sent: string | null
+          min_stock_threshold: number
+          product_variant_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          alert_enabled?: boolean | null
+          created_at?: string | null
+          id?: string
+          last_alert_sent?: string | null
+          min_stock_threshold?: number
+          product_variant_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          alert_enabled?: boolean | null
+          created_at?: string | null
+          id?: string
+          last_alert_sent?: string | null
+          min_stock_threshold?: number
+          product_variant_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_alerts_product_variant_id_fkey"
+            columns: ["product_variant_id"]
+            isOneToOne: true
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_movements: {
         Row: {
           created_at: string | null
@@ -793,12 +906,108 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          company_address: string | null
+          company_email: string | null
+          company_name: string | null
+          company_phone: string | null
+          company_website: string | null
+          created_at: string | null
+          currency: string | null
+          daily_reports: boolean | null
+          date_format: string | null
+          email_notifications: boolean | null
+          id: string
+          language: string | null
+          login_attempts: number | null
+          logo_url: string | null
+          low_stock_alerts: boolean | null
+          monthly_reports: boolean | null
+          password_expiry: number | null
+          payment_reminders: boolean | null
+          push_notifications: boolean | null
+          session_timeout: number | null
+          sms_notifications: boolean | null
+          tax_number: string | null
+          theme: string | null
+          timezone: string | null
+          two_factor_auth: boolean | null
+          updated_at: string | null
+          user_id: string | null
+          weekly_reports: boolean | null
+        }
+        Insert: {
+          company_address?: string | null
+          company_email?: string | null
+          company_name?: string | null
+          company_phone?: string | null
+          company_website?: string | null
+          created_at?: string | null
+          currency?: string | null
+          daily_reports?: boolean | null
+          date_format?: string | null
+          email_notifications?: boolean | null
+          id?: string
+          language?: string | null
+          login_attempts?: number | null
+          logo_url?: string | null
+          low_stock_alerts?: boolean | null
+          monthly_reports?: boolean | null
+          password_expiry?: number | null
+          payment_reminders?: boolean | null
+          push_notifications?: boolean | null
+          session_timeout?: number | null
+          sms_notifications?: boolean | null
+          tax_number?: string | null
+          theme?: string | null
+          timezone?: string | null
+          two_factor_auth?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+          weekly_reports?: boolean | null
+        }
+        Update: {
+          company_address?: string | null
+          company_email?: string | null
+          company_name?: string | null
+          company_phone?: string | null
+          company_website?: string | null
+          created_at?: string | null
+          currency?: string | null
+          daily_reports?: boolean | null
+          date_format?: string | null
+          email_notifications?: boolean | null
+          id?: string
+          language?: string | null
+          login_attempts?: number | null
+          logo_url?: string | null
+          low_stock_alerts?: boolean | null
+          monthly_reports?: boolean | null
+          password_expiry?: number | null
+          payment_reminders?: boolean | null
+          push_notifications?: boolean | null
+          session_timeout?: number | null
+          sms_notifications?: boolean | null
+          tax_number?: string | null
+          theme?: string | null
+          timezone?: string | null
+          two_factor_auth?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+          weekly_reports?: boolean | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_low_stock: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       category_type: "income" | "expense"
