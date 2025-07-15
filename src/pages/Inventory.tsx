@@ -179,10 +179,10 @@ const Inventory = () => {
       if (!result?.error) {
         setVariantDialogOpen(false);
         resetVariantForm();
-        toast({
-          title: "Sukses",
-          description: isEditMode ? "Varian berhasil diperbarui" : "Varian berhasil ditambahkan",
-        });
+        // Force refresh all data to sync
+        await fetchStock();
+        await fetchStockMovements();
+        await fetchProducts();
       }
     } catch (error) {
       console.error('Variant submit error:', error);
@@ -229,17 +229,13 @@ const Inventory = () => {
     if (confirm('Apakah Anda yakin ingin menghapus varian produk ini?')) {
       try {
         await deleteProductVariant(id);
-        toast({
-          title: "Sukses",
-          description: "Varian berhasil dihapus",
-        });
+        // Force refresh all data to sync
+        await fetchStock();
+        await fetchStockMovements();
+        await fetchProducts();
       } catch (error) {
         console.error('Delete variant error:', error);
-        toast({
-          title: "Error",
-          description: "Gagal menghapus varian produk",
-          variant: "destructive",
-        });
+        // Error handling is done in the hook
       }
     }
   };
@@ -253,7 +249,7 @@ const Inventory = () => {
         
         return (
           <div>
-            <div className="font-medium">{item?.product?.nama_produk || 'Unknown Product'}</div>
+            <div className="font-medium">{item?.products?.nama_produk || 'Unknown Product'}</div>
             <div className="text-sm text-muted-foreground">
               {item?.warna || 'N/A'} - {item?.size || 'N/A'}
             </div>
@@ -276,7 +272,7 @@ const Inventory = () => {
             <span className={`font-medium ${stok <= 5 ? 'text-red-600' : stok <= 10 ? 'text-yellow-600' : 'text-green-600'}`}>
               {stok}
             </span>
-            <span className="text-sm text-muted-foreground">{item?.product?.satuan || 'pcs'}</span>
+            <span className="text-sm text-muted-foreground">{item?.products?.satuan || 'pcs'}</span>
             {stok <= 5 && (
               <Badge variant="destructive" className="text-xs">
                 <AlertTriangle className="h-3 w-3 mr-1" />
@@ -296,10 +292,10 @@ const Inventory = () => {
         return (
           <div>
             <div className="font-medium">
-              {formatCurrency((item?.stok || 0) * (item?.product?.harga_beli || 0))}
+              {formatCurrency((item?.stok || 0) * (item?.products?.harga_beli || 0))}
             </div>
             <div className="text-sm text-muted-foreground">
-              @ {formatCurrency(item?.product?.harga_beli || 0)}
+              @ {formatCurrency(item?.products?.harga_beli || 0)}
             </div>
           </div>
         );
@@ -429,7 +425,7 @@ const Inventory = () => {
 
   // Calculate real totals from actual database data
   const totalStockValue = stock?.reduce((total, item) => 
-    total + ((item?.stok || 0) * (item?.product?.harga_beli || 0)), 0
+    total + ((item?.stok || 0) * (item?.products?.harga_beli || 0)), 0
   ) || 0;
 
   const lowStockItems = stock?.filter(item => (item?.stok || 0) <= 5) || [];

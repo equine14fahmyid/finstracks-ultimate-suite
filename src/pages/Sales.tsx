@@ -190,10 +190,10 @@ const Sales = () => {
           // Auto-fill price when product is selected
           if (field === 'product_variant_id' && value) {
             const product = stockProducts?.find(p => p?.id === value);
-            if (product) {
-              updatedItem.harga_satuan = product?.products?.harga_jual_default || 0;
-              updatedItem.product_name = product?.products?.nama_produk || '';
-              updatedItem.variant_display = `${product?.warna || ''} - ${product?.size || ''}`;
+            if (product?.products) {
+              updatedItem.harga_satuan = product.products.harga_jual_default || 0;
+              updatedItem.product_name = product.products.nama_produk || '';
+              updatedItem.variant_display = `${product.warna || ''} - ${product.size || ''}`;
             }
           }
           
@@ -444,7 +444,7 @@ const Sales = () => {
                               <SelectValue placeholder="Pilih produk" />
                             </SelectTrigger>
                             <SelectContent>
-                              {stockProducts?.map((product) => (
+                            {stockProducts?.map((product) => (
                                 <SelectItem key={product.id} value={product.id}>
                                   {product?.products?.nama_produk || 'Produk tidak diketahui'} - {product?.warna || '-'} {product?.size || '-'} (Stok: {product?.stok || 0})
                                 </SelectItem>

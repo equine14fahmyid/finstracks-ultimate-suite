@@ -99,7 +99,9 @@ export const useProducts = () => {
         if (variantError) throw variantError;
       }
 
+      // Force refresh to sync all data
       await fetchProducts();
+      
       toast({
         title: "Berhasil",
         description: "Produk berhasil ditambahkan",
@@ -311,10 +313,21 @@ export const useStock = () => {
 
       if (error) throw error;
 
+      // Force refresh to sync all data
       await fetchStock();
+      
+      toast({
+        title: "Berhasil",
+        description: "Varian produk berhasil ditambahkan",
+      });
       return { data, error: null };
     } catch (error: any) {
       console.error('Create variant error:', error);
+      toast({
+        title: "Error",
+        description: "Gagal menambahkan varian produk",
+        variant: "destructive",
+      });
       return { data: null, error };
     }
   };
@@ -329,10 +342,21 @@ export const useStock = () => {
 
       if (error) throw error;
 
+      // Force refresh to sync all data
       await fetchStock();
+      
+      toast({
+        title: "Berhasil",
+        description: "Varian produk berhasil diperbarui",
+      });
       return { data, error: null };
     } catch (error: any) {
       console.error('Update variant error:', error);
+      toast({
+        title: "Error",
+        description: "Gagal memperbarui varian produk",
+        variant: "destructive",
+      });
       return { data: null, error };
     }
   };
@@ -346,9 +370,20 @@ export const useStock = () => {
 
       if (error) throw error;
 
+      // Force refresh to sync all data
       await fetchStock();
+      
+      toast({
+        title: "Berhasil",
+        description: "Varian produk berhasil dihapus",
+      });
     } catch (error: any) {
       console.error('Delete variant error:', error);
+      toast({
+        title: "Error",
+        description: "Gagal menghapus varian produk",
+        variant: "destructive",
+      });
       throw error;
     }
   };

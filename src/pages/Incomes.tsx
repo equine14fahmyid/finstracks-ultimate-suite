@@ -112,7 +112,7 @@ const Incomes = () => {
       key: 'category',
       title: 'Kategori',
       render: (income: any) => (
-        <span className="font-medium">{income.category?.nama_kategori || 'Tidak dikategorikan'}</span>
+        <span className="font-medium">{income?.category?.nama_kategori || 'Tidak dikategorikan'}</span>
       )
     },
     {
@@ -126,7 +126,7 @@ const Incomes = () => {
       key: 'bank',
       title: 'Ke Bank',
       render: (income: any) => (
-        <span>{income.bank?.nama_bank || 'Kas'}</span>
+        <span>{income?.bank?.nama_bank || 'Kas'}</span>
       )
     },
     {
