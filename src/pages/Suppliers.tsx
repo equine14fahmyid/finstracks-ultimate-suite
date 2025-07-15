@@ -20,6 +20,7 @@ import { useSuppliers } from '@/hooks/useSupabase';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { ColumnDef } from '@tanstack/react-table';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Supplier {
   id: string;
@@ -33,8 +34,10 @@ interface Supplier {
 
 const Suppliers = () => {
   const { hasPermission } = useAuth();
-  const { suppliers, loading, fetchSuppliers, createSupplier } = useSuppliers();
+  const { suppliers, loading, fetchSuppliers, createSupplier, updateSupplier, deleteSupplier } = useSuppliers();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     nama_supplier: '',
     alamat: '',
@@ -45,6 +48,17 @@ const Suppliers = () => {
   useEffect(() => {
     fetchSuppliers();
   }, []);
+
+  const resetForm = () => {
+    setFormData({
+      nama_supplier: '',
+      alamat: '',
+      no_hp: '',
+      email: '',
+    });
+    setIsEditMode(false);
+    setEditingId(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,33 +72,61 @@ const Suppliers = () => {
       return;
     }
 
-    const { error } = await createSupplier(formData);
+    let result;
+    if (isEditMode && editingId) {
+      result = await updateSupplier(editingId, formData);
+    } else {
+      result = await createSupplier(formData);
+    }
     
-    if (!error) {
+    if (!result?.error) {
       setIsDialogOpen(false);
-      setFormData({
-        nama_supplier: '',
-        alamat: '',
-        no_hp: '',
-        email: '',
-      });
+      resetForm();
     }
   };
 
   const handleEdit = (supplier: any) => {
-    // Edit functionality - placeholder for now
-    toast({
-      title: "Info",
-      description: "Fitur edit akan ditambahkan pada versi berikutnya",
+    setFormData({
+      nama_supplier: supplier.nama_supplier,
+      alamat: supplier.alamat || '',
+      no_hp: supplier.no_hp || '',
+      email: supplier.email || '',
     });
+    setIsEditMode(true);
+    setEditingId(supplier.id);
+    setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    // Delete functionality - placeholder for now
-    toast({
-      title: "Info", 
-      description: "Fitur hapus akan ditambahkan pada versi berikutnya",
-    });
+  const handleDelete = async (id: string) => {
+    // Check if supplier is being used in any purchases
+    try {
+      const { data: purchases, error } = await supabase
+        .from('purchases')
+        .select('id')
+        .eq('supplier_id', id)
+        .limit(1);
+
+      if (error) throw error;
+
+      if (purchases && purchases.length > 0) {
+        toast({
+          title: "Tidak dapat menghapus",
+          description: "Supplier ini masih memiliki transaksi pembelian terkait",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (confirm('Apakah Anda yakin ingin menghapus supplier ini?')) {
+        await deleteSupplier(id);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal memeriksa data: ${error.message}`,
+        variant: "destructive",
+      });
+    }
   };
   const columns = [
     {
@@ -186,7 +228,10 @@ const Suppliers = () => {
         </div>
 
         {hasPermission('suppliers.create') && (
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) resetForm();
+          }}>
             <DialogTrigger asChild>
               <Button className="gradient-primary">
                 <Plus className="h-4 w-4 mr-2" />
@@ -196,9 +241,14 @@ const Suppliers = () => {
             <DialogContent className="glass-card">
               <form onSubmit={handleSubmit}>
                 <DialogHeader>
-                  <DialogTitle>Tambah Supplier Baru</DialogTitle>
+                  <DialogTitle>
+                    {isEditMode ? 'Edit Supplier' : 'Tambah Supplier Baru'}
+                  </DialogTitle>
                   <DialogDescription>
-                    Lengkapi informasi supplier yang akan ditambahkan
+                    {isEditMode 
+                      ? 'Perbarui informasi supplier' 
+                      : 'Lengkapi informasi supplier yang akan ditambahkan'
+                    }
                   </DialogDescription>
                 </DialogHeader>
                 
@@ -269,13 +319,16 @@ const Suppliers = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setIsDialogOpen(false)}
+                    onClick={() => {
+                      setIsDialogOpen(false);
+                      resetForm();
+                    }}
                     className="glass-button"
                   >
                     Batal
                   </Button>
                   <Button type="submit" className="gradient-primary">
-                    Simpan
+                    {isEditMode ? 'Perbarui' : 'Simpan'}
                   </Button>
                 </DialogFooter>
               </form>
