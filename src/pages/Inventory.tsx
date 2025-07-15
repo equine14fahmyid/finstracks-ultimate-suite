@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,11 +50,11 @@ const Inventory = () => {
       title: 'Produk',
       render: (item: any) => (
         <div>
-          <div className="font-medium">{item.product?.nama_produk}</div>
+          <div className="font-medium">{item?.product?.nama_produk || 'N/A'}</div>
           <div className="text-sm text-muted-foreground">
-            {item.warna} - {item.size}
+            {item?.warna || 'N/A'} - {item?.size || 'N/A'}
           </div>
-          {item.sku && (
+          {item?.sku && (
             <div className="text-xs text-muted-foreground">SKU: {item.sku}</div>
           )}
         </div>
@@ -71,7 +70,7 @@ const Inventory = () => {
             <span className={`font-medium ${stok <= 5 ? 'text-red-600' : stok <= 10 ? 'text-yellow-600' : 'text-green-600'}`}>
               {stok}
             </span>
-            <span className="text-sm text-muted-foreground">{item?.product?.satuan}</span>
+            <span className="text-sm text-muted-foreground">{item?.product?.satuan || 'pcs'}</span>
             {stok <= 5 && (
               <Badge variant="destructive" className="text-xs">
                 <AlertTriangle className="h-3 w-3 mr-1" />
@@ -126,54 +125,72 @@ const Inventory = () => {
     {
       key: 'product',
       title: 'Produk',
-      render: (movement: any) => (
-        <div>
-          <div className="font-medium">{movement.product_variant?.product?.nama_produk}</div>
-          <div className="text-sm text-muted-foreground">
-            {movement.product_variant?.warna} - {movement.product_variant?.size}
+      render: (movement: any) => {
+        if (!movement) return <div>Data tidak tersedia</div>;
+        
+        return (
+          <div>
+            <div className="font-medium">
+              {movement.product_variant?.product?.nama_produk || 'Produk tidak diketahui'}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {movement.product_variant?.warna || 'N/A'} - {movement.product_variant?.size || 'N/A'}
+            </div>
           </div>
-        </div>
-      )
+        );
+      }
     },
     {
       key: 'type',
       title: 'Jenis',
-      render: (movement: any) => (
-        <Badge variant={movement.movement_type === 'in' ? 'default' : 'secondary'}>
-          {movement.movement_type === 'in' ? (
-            <>
-              <TrendingUp className="h-3 w-3 mr-1" />
-              Masuk
-            </>
-          ) : (
-            <>
-              <TrendingDown className="h-3 w-3 mr-1" />
-              Keluar
-            </>
-          )}
-        </Badge>
-      )
+      render: (movement: any) => {
+        if (!movement) return <Badge variant="secondary">N/A</Badge>;
+        
+        return (
+          <Badge variant={movement.movement_type === 'in' ? 'default' : 'secondary'}>
+            {movement.movement_type === 'in' ? (
+              <>
+                <TrendingUp className="h-3 w-3 mr-1" />
+                Masuk
+              </>
+            ) : (
+              <>
+                <TrendingDown className="h-3 w-3 mr-1" />
+                Keluar
+              </>
+            )}
+          </Badge>
+        );
+      }
     },
     {
       key: 'quantity',
       title: 'Jumlah',
-      render: (movement: any) => (
-        <span className={`font-medium ${movement.movement_type === 'in' ? 'text-green-600' : 'text-red-600'}`}>
-          {movement.movement_type === 'in' ? '+' : '-'}{movement.quantity}
-        </span>
-      )
+      render: (movement: any) => {
+        if (!movement) return <span>0</span>;
+        
+        return (
+          <span className={`font-medium ${movement.movement_type === 'in' ? 'text-green-600' : 'text-red-600'}`}>
+            {movement.movement_type === 'in' ? '+' : '-'}{movement.quantity || 0}
+          </span>
+        );
+      }
     },
     {
       key: 'reference',
       title: 'Referensi',
-      render: (movement: any) => (
-        <div className="text-sm">
-          <div className="capitalize">{movement.reference_type}</div>
-          {movement.notes && (
-            <div className="text-muted-foreground">{movement.notes}</div>
-          )}
-        </div>
-      )
+      render: (movement: any) => {
+        if (!movement) return <div className="text-sm">N/A</div>;
+        
+        return (
+          <div className="text-sm">
+            <div className="capitalize">{movement.reference_type || 'Manual'}</div>
+            {movement.notes && (
+              <div className="text-muted-foreground">{movement.notes}</div>
+            )}
+          </div>
+        );
+      }
     }
   ];
 
@@ -185,6 +202,9 @@ const Inventory = () => {
 
   // Add safe access for summary calculations
   const totalStock = stock?.reduce((total, item) => total + (item?.stok || 0), 0) || 0;
+
+  // Filter out any null/undefined movements to prevent errors
+  const filteredMovements = movements?.filter(movement => movement != null) || [];
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -249,7 +269,7 @@ const Inventory = () => {
         <CardContent>
           <DataTable
             columns={stockColumns}
-            data={stock}
+            data={stock || []}
             loading={loading}
             searchable={true}
             searchPlaceholder="Cari produk..."
@@ -265,7 +285,7 @@ const Inventory = () => {
         <CardContent>
           <DataTable
             columns={movementColumns}
-            data={movements}
+            data={filteredMovements}
             loading={loading}
             searchable={true}
             searchPlaceholder="Cari riwayat..."
