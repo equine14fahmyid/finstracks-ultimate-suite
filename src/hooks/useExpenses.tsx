@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -19,7 +20,14 @@ export const useExpenses = () => {
         .order('tanggal', { ascending: false });
 
       if (error) throw error;
-      setExpenses(data || []);
+      
+      // Ensure we handle cases where bank might be null
+      const processedData = (data || []).map(expense => ({
+        ...expense,
+        bank: expense.bank || null // Explicitly handle null bank
+      }));
+      
+      setExpenses(processedData);
     } catch (error: any) {
       console.error('Fetch expenses error:', error);
       toast({
