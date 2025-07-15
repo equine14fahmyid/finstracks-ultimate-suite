@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,6 +37,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Clear all auth state
+  const clearAuthState = () => {
+    setUser(null);
+    setSession(null);
+    setProfile(null);
+  };
 
   // Fetch user profile data
   const fetchUserProfile = async (userId: string) => {
@@ -213,26 +221,56 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const signOut = async () => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signOut();
       
-      if (error) {
-        toast({
-          title: "Error",
-          description: "Gagal logout: " + error.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Logout Berhasil",
-          description: "Anda telah keluar dari sistem",
-        });
+      // Check if there's a current session before attempting logout
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
+      if (currentSession) {
+        // Attempt to sign out from Supabase
+        const { error } = await supabase.auth.signOut();
+        
+        if (error) {
+          console.error('Supabase signOut error:', error);
+          // Don't show error to user, just log it and continue with manual cleanup
+        }
       }
-    } catch (error: any) {
+
+      // Always clear local state regardless of Supabase signOut result
+      clearAuthState();
+      
+      // Clear any cached data in localStorage
+      try {
+        localStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('sb-' + supabase.supabaseUrl.split('//')[1] + '-auth-token');
+      } catch (e) {
+        console.error('Error clearing localStorage:', e);
+      }
+
       toast({
-        title: "Error",
-        description: "Terjadi kesalahan saat logout",
-        variant: "destructive",
+        title: "Logout Berhasil",
+        description: "Anda telah keluar dari sistem",
       });
+
+      // Force redirect to login page
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
+
+    } catch (error: any) {
+      console.error('SignOut error:', error);
+      
+      // Even if there's an error, clear local state and redirect
+      clearAuthState();
+      
+      toast({
+        title: "Logout",
+        description: "Anda telah keluar dari sistem",
+      });
+      
+      // Force redirect even on error
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
     } finally {
       setLoading(false);
     }
