@@ -528,7 +528,7 @@ export const useSuppliers = () => {
 
       toast({
         title: "Berhasil",
-        description: "Data supplier berhasil disimpan",
+        description: "Supplier berhasil ditambahkan",
       });
 
       fetchSuppliers();
@@ -559,7 +559,7 @@ export const useSuppliers = () => {
 
       toast({
         title: "Berhasil",
-        description: "Data supplier berhasil diupdate",
+        description: "Supplier berhasil diupdate",
       });
 
       fetchSuppliers();
@@ -645,10 +645,7 @@ export const useBanks = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('banks')
-        .insert({
-          ...bankData,
-          saldo_akhir: bankData.saldo_awal || 0,
-        })
+        .insert(bankData)
         .select()
         .single();
 
@@ -656,7 +653,7 @@ export const useBanks = () => {
 
       toast({
         title: "Berhasil",
-        description: "Data bank berhasil disimpan",
+        description: "Bank berhasil ditambahkan",
       });
 
       fetchBanks();
@@ -687,7 +684,7 @@ export const useBanks = () => {
 
       toast({
         title: "Berhasil",
-        description: "Data bank berhasil diupdate",
+        description: "Bank berhasil diupdate",
       });
 
       fetchBanks();
@@ -746,20 +743,14 @@ export const useCategories = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchCategories = async (type?: 'income' | 'expense') => {
+  const fetchCategories = async () => {
     try {
       setLoading(true);
-      let query = supabase
+      const { data, error } = await supabase
         .from('categories')
         .select('*')
         .eq('is_active', true)
         .order('nama_kategori');
-
-      if (type) {
-        query = query.eq('tipe_kategori', type);
-      }
-
-      const { data, error } = await query;
 
       if (error) throw error;
       setCategories(data || []);
@@ -804,11 +795,324 @@ export const useCategories = () => {
     }
   };
 
+  const updateCategory = async (id: string, categoryData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('categories')
+        .update(categoryData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Kategori berhasil diupdate",
+      });
+
+      fetchCategories();
+      return { data, error: null };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal mengupdate kategori: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('categories')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Kategori berhasil dihapus",
+      });
+
+      fetchCategories();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menghapus kategori: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     categories,
     loading,
     fetchCategories,
     createCategory,
+    updateCategory,
+    deleteCategory,
+  };
+};
+
+// Platforms Management Hook
+export const usePlatforms = () => {
+  const [platforms, setPlatforms] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchPlatforms = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('platforms')
+        .select('*')
+        .eq('is_active', true)
+        .order('nama_platform');
+
+      if (error) throw error;
+      setPlatforms(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal memuat data platform: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createPlatform = async (platformData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('platforms')
+        .insert(platformData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Platform berhasil ditambahkan",
+      });
+
+      fetchPlatforms();
+      return { data, error: null };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menyimpan platform: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updatePlatform = async (id: string, platformData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('platforms')
+        .update(platformData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Platform berhasil diupdate",
+      });
+
+      fetchPlatforms();
+      return { data, error: null };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal mengupdate platform: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deletePlatform = async (id: string) => {
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('platforms')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Platform berhasil dihapus",
+      });
+
+      fetchPlatforms();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menghapus platform: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    platforms,
+    loading,
+    fetchPlatforms,
+    createPlatform,
+    updatePlatform,
+    deletePlatform,
+  };
+};
+
+// Stores Management Hook
+export const useStores = () => {
+  const [stores, setStores] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchStores = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('stores')
+        .select(`
+          *,
+          platform:platforms(nama_platform)
+        `)
+        .eq('is_active', true)
+        .order('nama_toko');
+
+      if (error) throw error;
+      setStores(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal memuat data toko: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createStore = async (storeData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('stores')
+        .insert(storeData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Toko berhasil ditambahkan",
+      });
+
+      fetchStores();
+      return { data, error: null };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menyimpan toko: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateStore = async (id: string, storeData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('stores')
+        .update(storeData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Toko berhasil diupdate",
+      });
+
+      fetchStores();
+      return { data, error: null };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal mengupdate toko: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteStore = async (id: string) => {
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('stores')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Toko berhasil dihapus",
+      });
+
+      fetchStores();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menghapus toko: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    stores,
+    loading,
+    fetchStores,
+    createStore,
+    updateStore,
+    deleteStore,
   };
 };
 
@@ -869,37 +1173,533 @@ export const useExpeditions = () => {
     }
   };
 
+  const updateExpedition = async (id: string, expeditionData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('expeditions')
+        .update(expeditionData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Ekspedisi berhasil diupdate",
+      });
+
+      fetchExpeditions();
+      return { data, error: null };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal mengupdate ekspedisi: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteExpedition = async (id: string) => {
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('expeditions')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Ekspedisi berhasil dihapus",
+      });
+
+      fetchExpeditions();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menghapus ekspedisi: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     expeditions,
     loading,
     fetchExpeditions,
     createExpedition,
+    updateExpedition,
+    deleteExpedition,
   };
 };
 
-// Stock Management Hook with real-time updates
-export const useStockManagement = () => {
-  const [products, setProducts] = useState<any[]>([]);
+// Incomes Management Hook
+export const useIncomes = () => {
+  const [incomes, setIncomes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchProducts = async () => {
+  const fetchIncomes = async (filters?: Record<string, any>) => {
+    try {
+      setLoading(true);
+      let query = supabase
+        .from('incomes')
+        .select(`
+          *,
+          category:categories(nama_kategori),
+          bank:banks(nama_bank)
+        `)
+        .order('tanggal', { ascending: false });
+
+      if (filters?.date_from) {
+        query = query.gte('tanggal', filters.date_from);
+      }
+      if (filters?.date_to) {
+        query = query.lte('tanggal', filters.date_to);
+      }
+      if (filters?.category_id) {
+        query = query.eq('category_id', filters.category_id);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setIncomes(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal memuat data pemasukan: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createIncome = async (incomeData: any) => {
+    try {
+      setLoading(true);
+      const completeData = {
+        ...incomeData,
+        created_by: (await supabase.auth.getUser()).data.user?.id,
+      };
+
+      const { data, error } = await supabase
+        .from('incomes')
+        .insert(completeData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Pemasukan berhasil dicatat",
+      });
+
+      fetchIncomes();
+      return { data, error: null };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menyimpan pemasukan: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateIncome = async (id: string, incomeData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('incomes')
+        .update(incomeData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Pemasukan berhasil diupdate",
+      });
+
+      fetchIncomes();
+      return { data, error: null };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal mengupdate pemasukan: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteIncome = async (id: string) => {
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('incomes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Pemasukan berhasil dihapus",
+      });
+
+      fetchIncomes();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menghapus pemasukan: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    incomes,
+    loading,
+    fetchIncomes,
+    createIncome,
+    updateIncome,
+    deleteIncome,
+  };
+};
+
+// Expenses Management Hook
+export const useExpenses = () => {
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchExpenses = async (filters?: Record<string, any>) => {
+    try {
+      setLoading(true);
+      let query = supabase
+        .from('expenses')
+        .select(`
+          *,
+          category:categories(nama_kategori),
+          bank:banks(nama_bank)
+        `)
+        .order('tanggal', { ascending: false });
+
+      if (filters?.date_from) {
+        query = query.gte('tanggal', filters.date_from);
+      }
+      if (filters?.date_to) {
+        query = query.lte('tanggal', filters.date_to);
+      }
+      if (filters?.category_id) {
+        query = query.eq('category_id', filters.category_id);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setExpenses(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal memuat data pengeluaran: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createExpense = async (expenseData: any) => {
+    try {
+      setLoading(true);
+      const completeData = {
+        ...expenseData,
+        created_by: (await supabase.auth.getUser()).data.user?.id,
+      };
+
+      const { data, error } = await supabase
+        .from('expenses')
+        .insert(completeData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Pengeluaran berhasil dicatat",
+      });
+
+      fetchExpenses();
+      return { data, error: null };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menyimpan pengeluaran: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateExpense = async (id: string, expenseData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('expenses')
+        .update(expenseData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Pengeluaran berhasil diupdate",
+      });
+
+      fetchExpenses();
+      return { data, error: null };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal mengupdate pengeluaran: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteExpense = async (id: string) => {
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Pengeluaran berhasil dihapus",
+      });
+
+      fetchExpenses();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menghapus pengeluaran: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    expenses,
+    loading,
+    fetchExpenses,
+    createExpense,
+    updateExpense,
+    deleteExpense,
+  };
+};
+
+// Settlements Management Hook
+export const useSettlements = () => {
+  const [settlements, setSettlements] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchSettlements = async (filters?: Record<string, any>) => {
+    try {
+      setLoading(true);
+      let query = supabase
+        .from('settlements')
+        .select(`
+          *,
+          store:stores(nama_toko, platform:platforms(nama_platform)),
+          bank:banks(nama_bank)
+        `)
+        .order('tanggal', { ascending: false });
+
+      if (filters?.date_from) {
+        query = query.gte('tanggal', filters.date_from);
+      }
+      if (filters?.date_to) {
+        query = query.lte('tanggal', filters.date_to);
+      }
+      if (filters?.store_id) {
+        query = query.eq('store_id', filters.store_id);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setSettlements(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal memuat data pencairan: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createSettlement = async (settlementData: any) => {
+    try {
+      setLoading(true);
+      const completeData = {
+        ...settlementData,
+        created_by: (await supabase.auth.getUser()).data.user?.id,
+      };
+
+      const { data, error } = await supabase
+        .from('settlements')
+        .insert(completeData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Pencairan berhasil dicatat",
+      });
+
+      fetchSettlements();
+      return { data, error: null };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menyimpan pencairan: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateSettlement = async (id: string, settlementData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('settlements')
+        .update(settlementData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Pencairan berhasil diupdate",
+      });
+
+      fetchSettlements();
+      return { data, error: null };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal mengupdate pencairan: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteSettlement = async (id: string) => {
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('settlements')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Pencairan berhasil dihapus",
+      });
+
+      fetchSettlements();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menghapus pencairan: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    settlements,
+    loading,
+    fetchSettlements,
+    createSettlement,
+    updateSettlement,
+    deleteSettlement,
+  };
+};
+
+// Stock Management Hook
+export const useStock = () => {
+  const [stock, setStock] = useState<any[]>([]);
+  const [movements, setMovements] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchStock = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('product_variants')
         .select(`
           *,
-          product:products(nama_produk, satuan, harga_beli, harga_jual_default)
+          product:products(nama_produk, satuan)
         `)
         .eq('is_active', true)
-        .order('stok', { ascending: true });
+        .order('stok');
 
       if (error) throw error;
-      setProducts(data || []);
+      setStock(data || []);
     } catch (error: any) {
       toast({
         title: "Error",
-        description: `Gagal memuat data produk: ${error.message}`,
+        description: `Gagal memuat data stok: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -907,38 +1707,76 @@ export const useStockManagement = () => {
     }
   };
 
-  const updateStock = async (variantId: string, newStock: number, notes?: string) => {
+  const fetchStockMovements = async (filters?: Record<string, any>) => {
     try {
       setLoading(true);
+      let query = supabase
+        .from('stock_movements')
+        .select(`
+          *,
+          product_variant:product_variants(
+            warna,
+            size,
+            product:products(nama_produk)
+          )
+        `)
+        .order('created_at', { ascending: false });
 
-      const { error } = await supabase
-        .from('product_variants')
-        .update({ stok: newStock })
-        .eq('id', variantId);
+      if (filters?.product_variant_id) {
+        query = query.eq('product_variant_id', filters.product_variant_id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
-
-      // Record stock movement
-      await supabase
-        .from('stock_movements')
-        .insert({
-          product_variant_id: variantId,
-          movement_type: 'adjustment',
-          quantity: newStock,
-          reference_type: 'adjustment',
-          notes: notes || 'Manual stock adjustment',
-        });
-
-      toast({
-        title: "Berhasil",
-        description: "Stok berhasil diupdate",
-      });
-
-      fetchProducts(); // Refresh data
+      setMovements(data || []);
     } catch (error: any) {
       toast({
         title: "Error",
-        description: `Gagal mengupdate stok: ${error.message}`,
+        description: `Gagal memuat data pergerakan stok: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const adjustStock = async (productVariantId: string, quantity: number, notes: string) => {
+    try {
+      setLoading(true);
+
+      // Update stock
+      const { error: updateError } = await supabase
+        .from('product_variants')
+        .update({ stok: quantity })
+        .eq('id', productVariantId);
+
+      if (updateError) throw updateError;
+
+      // Record movement
+      const { error: movementError } = await supabase
+        .from('stock_movements')
+        .insert({
+          product_variant_id: productVariantId,
+          movement_type: 'adjustment',
+          quantity: quantity,
+          reference_type: 'adjustment',
+          notes: notes,
+        });
+
+      if (movementError) throw movementError;
+
+      toast({
+        title: "Berhasil",
+        description: "Stok berhasil disesuaikan",
+      });
+
+      fetchStock();
+      fetchStockMovements();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menyesuaikan stok: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -947,9 +1785,143 @@ export const useStockManagement = () => {
   };
 
   return {
-    products,
+    stock,
+    movements,
     loading,
-    fetchProducts,
-    updateStock,
+    fetchStock,
+    fetchStockMovements,
+    adjustStock,
+  };
+};
+
+// Reports Hook
+export const useReports = () => {
+  const [loading, setLoading] = useState(false);
+
+  const generateProfitLossReport = async (dateFrom: string, dateTo: string) => {
+    try {
+      setLoading(true);
+
+      // Fetch sales revenue
+      const { data: salesData } = await supabase
+        .from('sales')
+        .select('total')
+        .gte('tanggal', dateFrom)
+        .lte('tanggal', dateTo)
+        .eq('status', 'delivered');
+
+      // Fetch expenses
+      const { data: expensesData } = await supabase
+        .from('expenses')
+        .select(`
+          jumlah,
+          category:categories(nama_kategori)
+        `)
+        .gte('tanggal', dateFrom)
+        .lte('tanggal', dateTo);
+
+      const totalRevenue = salesData?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
+      const totalExpenses = expensesData?.reduce((sum, expense) => sum + (expense.jumlah || 0), 0) || 0;
+
+      return {
+        periode: `${dateFrom} s/d ${dateTo}`,
+        revenue: {
+          total_penjualan: totalRevenue,
+        },
+        expenses: {
+          total_expenses: totalExpenses,
+          expenses_by_category: expensesData?.reduce((acc, expense) => {
+            const categoryName = expense.category?.nama_kategori || 'Uncategorized';
+            if (!acc[categoryName]) {
+              acc[categoryName] = 0;
+            }
+            acc[categoryName] += expense.jumlah || 0;
+            return acc;
+          }, {} as Record<string, number>) || {},
+        },
+        net_profit: totalRevenue - totalExpenses,
+        gross_margin: totalRevenue > 0 ? ((totalRevenue - totalExpenses) / totalRevenue) * 100 : 0,
+      };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal membuat laporan laba rugi: ${error.message}`,
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateBalanceSheet = async (asOfDate: string) => {
+    try {
+      setLoading(true);
+
+      // Fetch bank balances (current assets)
+      const { data: banksData } = await supabase
+        .from('banks')
+        .select('saldo_akhir')
+        .eq('is_active', true);
+
+      // Fetch inventory value (current assets)
+      const { data: stockData } = await supabase
+        .from('product_variants')
+        .select(`
+          stok,
+          product:products(harga_beli)
+        `)
+        .eq('is_active', true);
+
+      const kasBank = banksData?.reduce((sum, bank) => sum + (bank.saldo_akhir || 0), 0) || 0;
+      const persediaan = stockData?.reduce((sum, variant) => {
+        return sum + ((variant.stok || 0) * (variant.product?.harga_beli || 0));
+      }, 0) || 0;
+
+      return {
+        periode: asOfDate,
+        assets: {
+          current_assets: {
+            kas_bank: kasBank,
+            piutang: 0, // TODO: Implement receivables
+            persediaan: persediaan,
+            total: kasBank + persediaan,
+          },
+          fixed_assets: {
+            equipment: 0, // TODO: Implement from assets table
+            accumulated_depreciation: 0,
+            total: 0,
+          },
+          total_assets: kasBank + persediaan,
+        },
+        liabilities: {
+          current_liabilities: {
+            hutang_usaha: 0, // TODO: Implement payables
+            total: 0,
+          },
+          total_liabilities: 0,
+        },
+        equity: {
+          modal_awal: 0, // TODO: Implement capital tracking
+          laba_ditahan: kasBank + persediaan, // Simplified calculation
+          total: kasBank + persediaan,
+        },
+      };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal membuat neraca: ${error.message}`,
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    loading,
+    generateProfitLossReport,
+    generateBalanceSheet,
   };
 };
