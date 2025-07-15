@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -24,6 +23,10 @@ import Purchases from '@/pages/Purchases';
 import Users from '@/pages/Users';
 import Settings from '@/pages/Settings';
 import NotFound from "./pages/NotFound";
+import ProfitLoss from '@/pages/reports/ProfitLoss';
+import BalanceSheet from '@/pages/reports/BalanceSheet';
+import CashFlow from '@/pages/reports/CashFlow';
+import Analytics from '@/pages/reports/Analytics';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -143,22 +146,22 @@ const App = () => (
             {/* Report Routes */}
             <Route path="/reports/profit-loss" element={
               <AppLayout>
-                <div className="p-6"><h1>Profit Loss Report - Coming Soon</h1></div>
+                <ProfitLoss />
               </AppLayout>
             } />
             <Route path="/reports/balance-sheet" element={
               <AppLayout>
-                <div className="p-6"><h1>Balance Sheet - Coming Soon</h1></div>
+                <BalanceSheet />
               </AppLayout>
             } />
             <Route path="/reports/cash-flow" element={
               <AppLayout>
-                <div className="p-6"><h1>Cash Flow Report - Coming Soon</h1></div>
+                <CashFlow />
               </AppLayout>
             } />
             <Route path="/reports/analytics" element={
               <AppLayout>
-                <div className="p-6"><h1>Analytics - Coming Soon</h1></div>
+                <Analytics />
               </AppLayout>
             } />
             
