@@ -4,26 +4,50 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, Package, TrendingDown, TrendingUp } from 'lucide-react';
-import { useStock } from '@/hooks/useSupabase';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertTriangle, Package, TrendingDown, TrendingUp, Plus, Edit, Trash2 } from 'lucide-react';
+import { useStock, useProducts } from '@/hooks/useSupabase';
 import { DataTable } from '@/components/common/DataTable';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/utils/format';
 
 const Inventory = () => {
-  const { stock, movements, loading, fetchStock, fetchStockMovements, adjustStock } = useStock();
+  const { stock, movements, loading, fetchStock, fetchStockMovements, adjustStock, createProductVariant, updateProductVariant, deleteProductVariant } = useStock();
+  const { products, fetchProducts } = useProducts();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [variantDialogOpen, setVariantDialogOpen] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [adjustmentData, setAdjustmentData] = useState({
     quantity: 0,
     notes: ''
+  });
+  const [variantFormData, setVariantFormData] = useState({
+    product_id: '',
+    warna: '',
+    size: '',
+    stok: 0,
+    sku: ''
   });
 
   useEffect(() => {
     fetchStock();
     fetchStockMovements();
+    fetchProducts();
   }, []);
+
+  const resetVariantForm = () => {
+    setVariantFormData({
+      product_id: '',
+      warna: '',
+      size: '',
+      stok: 0,
+      sku: ''
+    });
+    setIsEditMode(false);
+    setSelectedVariant(null);
+  };
 
   const handleStockAdjustment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +69,50 @@ const Inventory = () => {
       setAdjustmentData({ quantity: 0, notes: '' });
     } catch (error) {
       console.error('Stock adjustment error:', error);
+    }
+  };
+
+  const handleVariantSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!variantFormData.product_id || !variantFormData.warna || !variantFormData.size) {
+      toast({
+        title: "Error",
+        description: "Mohon lengkapi semua field yang wajib diisi",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let result;
+    if (isEditMode && selectedVariant) {
+      result = await updateProductVariant(selectedVariant.id, variantFormData);
+    } else {
+      result = await createProductVariant(variantFormData);
+    }
+    
+    if (!result?.error) {
+      setVariantDialogOpen(false);
+      resetVariantForm();
+    }
+  };
+
+  const handleEditVariant = (variant: any) => {
+    setVariantFormData({
+      product_id: variant.product_id || '',
+      warna: variant.warna || '',
+      size: variant.size || '',
+      stok: variant.stok || 0,
+      sku: variant.sku || ''
+    });
+    setSelectedVariant(variant);
+    setIsEditMode(true);
+    setVariantDialogOpen(true);
+  };
+
+  const handleDeleteVariant = async (id: string) => {
+    if (confirm('Apakah Anda yakin ingin menghapus varian produk ini?')) {
+      await deleteProductVariant(id);
     }
   };
 
@@ -103,17 +171,36 @@ const Inventory = () => {
       key: 'actions',
       title: 'Aksi',
       render: (item: any) => (
-        <Button 
-          size="sm" 
-          variant="outline"
-          onClick={() => {
-            setSelectedVariant(item);
-            setAdjustmentData({ quantity: item?.stok || 0, notes: '' });
-            setDialogOpen(true);
-          }}
-        >
-          Sesuaikan Stok
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 w-8 p-0"
+            onClick={() => {
+              setSelectedVariant(item);
+              setAdjustmentData({ quantity: item?.stok || 0, notes: '' });
+              setDialogOpen(true);
+            }}
+          >
+            <Package className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 w-8 p-0"
+            onClick={() => handleEditVariant(item)}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+            onClick={() => handleDeleteVariant(item.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       )
     }
   ];
@@ -267,8 +354,130 @@ const Inventory = () => {
 
       {/* Stock Level Table */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Level Stok Saat Ini</CardTitle>
+          <Dialog open={variantDialogOpen} onOpenChange={(open) => {
+            setVariantDialogOpen(open);
+            if (!open) resetVariantForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Item Stok
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <form onSubmit={handleVariantSubmit}>
+                <DialogHeader>
+                  <DialogTitle>
+                    {isEditMode ? 'Edit Varian Produk' : 'Tambah Varian Produk Baru'}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {isEditMode ? 'Perbarui informasi varian produk' : 'Lengkapi informasi varian produk yang akan ditambahkan'}
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="product_id">Produk *</Label>
+                    <Select
+                      value={variantFormData.product_id}
+                      onValueChange={(value) => setVariantFormData(prev => ({
+                        ...prev,
+                        product_id: value
+                      }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih produk" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {products?.map((product: any) => (
+                          <SelectItem key={product.id} value={product.id}>
+                            {product.nama_produk}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="warna">Warna *</Label>
+                      <Input
+                        id="warna"
+                        value={variantFormData.warna}
+                        onChange={(e) => setVariantFormData(prev => ({
+                          ...prev,
+                          warna: e.target.value
+                        }))}
+                        placeholder="Merah, Biru, dll"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="size">Size *</Label>
+                      <Input
+                        id="size"
+                        value={variantFormData.size}
+                        onChange={(e) => setVariantFormData(prev => ({
+                          ...prev,
+                          size: e.target.value
+                        }))}
+                        placeholder="S, M, L, XL, dll"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="stok">Stok Awal</Label>
+                      <Input
+                        id="stok"
+                        type="number"
+                        value={variantFormData.stok}
+                        onChange={(e) => setVariantFormData(prev => ({
+                          ...prev,
+                          stok: parseInt(e.target.value) || 0
+                        }))}
+                        min="0"
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="sku">SKU</Label>
+                      <Input
+                        id="sku"
+                        value={variantFormData.sku}
+                        onChange={(e) => setVariantFormData(prev => ({
+                          ...prev,
+                          sku: e.target.value
+                        }))}
+                        placeholder="Kode produk"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setVariantDialogOpen(false);
+                      resetVariantForm();
+                    }}
+                  >
+                    Batal
+                  </Button>
+                  <Button type="submit">
+                    {isEditMode ? 'Perbarui' : 'Simpan'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </CardHeader>
         <CardContent>
           <DataTable

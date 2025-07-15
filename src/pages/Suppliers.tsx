@@ -138,10 +138,18 @@ const Suppliers = () => {
     },
     {
       key: "alamat",
-      title: "Alamat",
+      title: "Alamat/Keterangan",
       render: (supplier: any) => (
-        <div className="text-muted-foreground">
-          {supplier.alamat || "-"}
+        <div className="max-w-xs">
+          <div className="text-sm text-foreground font-medium">
+            {supplier.alamat ? (
+              <div className="line-clamp-2 break-words">
+                {supplier.alamat}
+              </div>
+            ) : (
+              <span className="text-muted-foreground italic">-</span>
+            )}
+          </div>
         </div>
       ),
     },

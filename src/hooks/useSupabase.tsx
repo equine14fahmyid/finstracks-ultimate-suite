@@ -792,6 +792,124 @@ export const useStock = () => {
     }
   };
 
+  const createProductVariant = async (variantData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('product_variants')
+        .insert(variantData)
+        .select(`
+          *,
+          product:products (*)
+        `)
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Sukses",
+        description: "Varian produk berhasil dibuat",
+      });
+
+      await fetchStock();
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Create product variant error:', error);
+      toast({
+        title: "Error",
+        description: `Gagal membuat varian produk: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateProductVariant = async (id: string, variantData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('product_variants')
+        .update(variantData)
+        .eq('id', id)
+        .select(`
+          *,
+          product:products (*)
+        `)
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Sukses",
+        description: "Varian produk berhasil diperbarui",
+      });
+
+      await fetchStock();
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Update product variant error:', error);
+      toast({
+        title: "Error",
+        description: `Gagal memperbarui varian produk: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteProductVariant = async (id: string) => {
+    try {
+      setLoading(true);
+      
+      // Check if variant has stock movements
+      const { data: movements, error: movementError } = await supabase
+        .from('stock_movements')
+        .select('id')
+        .eq('product_variant_id', id)
+        .limit(1);
+
+      if (movementError) throw movementError;
+
+      if (movements && movements.length > 0) {
+        toast({
+          title: "Tidak dapat menghapus",
+          description: "Varian produk ini memiliki riwayat pergerakan stok",
+          variant: "destructive",
+        });
+        return { data: null, error: new Error("Has stock movements") };
+      }
+
+      const { error } = await supabase
+        .from('product_variants')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sukses",
+        description: "Varian produk berhasil dihapus",
+      });
+
+      await fetchStock();
+      return { data: true, error: null };
+    } catch (error: any) {
+      console.error('Delete product variant error:', error);
+      toast({
+        title: "Error",
+        description: `Gagal menghapus varian produk: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     stock,
     movements,
@@ -799,6 +917,9 @@ export const useStock = () => {
     fetchStock,
     fetchStockMovements,
     adjustStock,
+    createProductVariant,
+    updateProductVariant,
+    deleteProductVariant,
   };
 };
 
