@@ -37,11 +37,15 @@ const Inventory = () => {
       return;
     }
 
-    await adjustStock(selectedVariant.id, adjustmentData.quantity, adjustmentData.notes);
-    
-    setDialogOpen(false);
-    setSelectedVariant(null);
-    setAdjustmentData({ quantity: 0, notes: '' });
+    try {
+      await adjustStock(selectedVariant.id, adjustmentData.quantity, adjustmentData.notes);
+      
+      setDialogOpen(false);
+      setSelectedVariant(null);
+      setAdjustmentData({ quantity: 0, notes: '' });
+    } catch (error) {
+      console.error('Stock adjustment error:', error);
+    }
   };
 
   const stockColumns = [

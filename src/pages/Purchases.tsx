@@ -112,13 +112,15 @@ const Purchases = () => {
       payment_method: purchase.payment_method,
       payment_status: purchase.payment_status,
       notes: purchase.notes || '',
-      items: purchase.purchase_items?.map((item: any) => ({
-        product_variant_id: item.product_variant_id,
-        quantity: item.quantity,
-        harga_beli_satuan: item.harga_beli_satuan,
-        product_name: item.product_variant?.product?.nama_produk,
-        variant_display: `${item.product_variant?.warna} - ${item.product_variant?.size}`
-      })) || [{ product_variant_id: '', quantity: 1, harga_beli_satuan: 0 }]
+      items: purchase.purchase_items && purchase.purchase_items.length > 0 
+        ? purchase.purchase_items.map((item: any) => ({
+            product_variant_id: item.product_variant_id || '',
+            quantity: item.quantity || 1,
+            harga_beli_satuan: item.harga_beli_satuan || 0,
+            product_name: item.product_variant?.product?.nama_produk || '',
+            variant_display: `${item.product_variant?.warna || ''} - ${item.product_variant?.size || ''}`
+          }))
+        : [{ product_variant_id: '', quantity: 1, harga_beli_satuan: 0 }]
     });
     setDialogOpen(true);
   };
