@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,6 +11,11 @@ import Login from "@/pages/Login";
 import Suppliers from '@/pages/Suppliers';
 import Products from '@/pages/Products';
 import Sales from '@/pages/Sales';
+import Inventory from '@/pages/Inventory';
+import Incomes from '@/pages/Incomes';
+import Expenses from '@/pages/Expenses';
+import Banks from '@/pages/Banks';
+import Settlements from '@/pages/Settlements';
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -79,29 +85,29 @@ const App = () => (
             {/* Inventory Routes */}
             <Route path="/inventory" element={
               <AppLayout>
-                <div className="p-6"><h1>Stock Management - Coming Soon</h1></div>
+                <Inventory />
               </AppLayout>
             } />
             
             {/* Finance Routes */}
             <Route path="/incomes" element={
               <AppLayout>
-                <div className="p-6"><h1>Incomes - Coming Soon</h1></div>
+                <Incomes />
               </AppLayout>
             } />
             <Route path="/expenses" element={
               <AppLayout>
-                <div className="p-6"><h1>Expenses - Coming Soon</h1></div>
+                <Expenses />
               </AppLayout>
             } />
             <Route path="/banks" element={
               <AppLayout>
-                <div className="p-6"><h1>Banks - Coming Soon</h1></div>
+                <Banks />
               </AppLayout>
             } />
             <Route path="/settlements" element={
               <AppLayout>
-                <div className="p-6"><h1>Settlements - Coming Soon</h1></div>
+                <Settlements />
               </AppLayout>
             } />
             
