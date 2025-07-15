@@ -894,6 +894,7 @@ export type Database = {
         Row: {
           alamat: string | null
           created_at: string | null
+          deskripsi: string | null
           email: string | null
           id: string
           is_active: boolean | null
@@ -904,6 +905,7 @@ export type Database = {
         Insert: {
           alamat?: string | null
           created_at?: string | null
+          deskripsi?: string | null
           email?: string | null
           id?: string
           is_active?: boolean | null
@@ -914,6 +916,7 @@ export type Database = {
         Update: {
           alamat?: string | null
           created_at?: string | null
+          deskripsi?: string | null
           email?: string | null
           id?: string
           is_active?: boolean | null

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertTriangle, Package, TrendingDown, TrendingUp, Plus, Edit, Trash2 } from 'lucide-react';
+import { StockAdjustmentDialog } from '@/components/inventory/StockAdjustmentDialog';
 import { useStock, useProducts } from '@/hooks/useSupabase';
 import { DataTable } from '@/components/common/DataTable';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';

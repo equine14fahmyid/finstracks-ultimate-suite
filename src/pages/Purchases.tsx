@@ -117,7 +117,7 @@ const Purchases = () => {
             product_variant_id: item.product_variant_id || '',
             quantity: item.quantity || 1,
             harga_beli_satuan: item.harga_beli_satuan || 0,
-            product_name: item.product_variant?.product?.nama_produk || '',
+            product_name: item.product_variant?.products?.nama_produk || '',
             variant_display: `${item.product_variant?.warna || ''} - ${item.product_variant?.size || ''}`
           }))
         : [{ product_variant_id: '', quantity: 1, harga_beli_satuan: 0 }]
@@ -167,8 +167,8 @@ const Purchases = () => {
           if (field === 'product_variant_id' && value) {
             const product = stockProducts?.find(p => p?.id === value);
             if (product) {
-              updatedItem.harga_beli_satuan = product?.product?.harga_beli || 0;
-              updatedItem.product_name = product?.product?.nama_produk || '';
+              updatedItem.harga_beli_satuan = product?.products?.harga_beli || 0;
+              updatedItem.product_name = product?.products?.nama_produk || '';
               updatedItem.variant_display = `${product?.warna || ''} - ${product?.size || ''}`;
             }
           }
@@ -209,7 +209,7 @@ const Purchases = () => {
         <div className="space-y-1">
           {purchase?.purchase_items?.slice(0, 2).map((item: any, index: number) => (
             <div key={index} className="text-sm">
-              {item?.product_variant?.product?.nama_produk || 'Produk tidak diketahui'} 
+              {item?.product_variant?.products?.nama_produk || 'Produk tidak diketahui'} 
               <span className="text-muted-foreground">
                 ({item?.product_variant?.warna || '-'} - {item?.product_variant?.size || '-'})
               </span>
@@ -413,7 +413,7 @@ const Purchases = () => {
                             <SelectContent>
                               {stockProducts?.map((product) => (
                                 <SelectItem key={product.id} value={product.id}>
-                                  {product?.product?.nama_produk || 'Produk tidak diketahui'} - {product?.warna || '-'} {product?.size || '-'}
+                                  {product?.products?.nama_produk || 'Produk tidak diketahui'} - {product?.warna || '-'} {product?.size || '-'}
                                 </SelectItem>
                               )) || <SelectItem value="" disabled>Tidak ada produk tersedia</SelectItem>}
                             </SelectContent>

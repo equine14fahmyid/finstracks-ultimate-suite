@@ -2139,7 +2139,7 @@ export const usePurchases = () => {
             *,
             product_variant:product_variants (
               *,
-              product:products (*)
+              products!inner (*)
             )
           )
         `)

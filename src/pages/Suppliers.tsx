@@ -43,6 +43,7 @@ const Suppliers = () => {
     alamat: '',
     no_hp: '',
     email: '',
+    deskripsi: '',
   });
 
   useEffect(() => {
@@ -55,6 +56,7 @@ const Suppliers = () => {
       alamat: '',
       no_hp: '',
       email: '',
+      deskripsi: '',
     });
     setIsEditMode(false);
     setEditingId(null);
@@ -91,6 +93,7 @@ const Suppliers = () => {
       alamat: supplier.alamat || '',
       no_hp: supplier.no_hp || '',
       email: supplier.email || '',
+      deskripsi: supplier.deskripsi || '',
     });
     setIsEditMode(true);
     setEditingId(supplier.id);
@@ -137,11 +140,28 @@ const Suppliers = () => {
       ),
     },
     {
-      key: "alamat",
-      title: "Alamat/Keterangan",
+      key: "deskripsi",
+      title: "Deskripsi",
       render: (supplier: any) => (
         <div className="max-w-xs">
           <div className="text-sm text-foreground font-medium">
+            {supplier.deskripsi ? (
+              <div className="line-clamp-2 break-words">
+                {supplier.deskripsi}
+              </div>
+            ) : (
+              <span className="text-muted-foreground italic">-</span>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "alamat",
+      title: "Alamat",
+      render: (supplier: any) => (
+        <div className="max-w-xs">
+          <div className="text-sm text-foreground">
             {supplier.alamat ? (
               <div className="line-clamp-2 break-words">
                 {supplier.alamat}
@@ -277,6 +297,21 @@ const Suppliers = () => {
                   </div>
 
                   <div className="grid gap-2">
+                    <Label htmlFor="deskripsi">Deskripsi</Label>
+                    <Textarea
+                      id="deskripsi"
+                      value={formData.deskripsi}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        deskripsi: e.target.value
+                      }))}
+                      placeholder="Masukkan deskripsi supplier"
+                      className="glass-input"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
                     <Label htmlFor="alamat">Alamat</Label>
                     <Textarea
                       id="alamat"
@@ -287,7 +322,7 @@ const Suppliers = () => {
                       }))}
                       placeholder="Masukkan alamat lengkap"
                       className="glass-input"
-                      rows={3}
+                      rows={2}
                     />
                   </div>
 
