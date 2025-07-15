@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, ShoppingCart, Eye, Calendar } from 'lucide-react';
+import { Plus, ShoppingCart, Eye, Edit, Trash2, Calendar } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSales, useStock, useExpeditions, useStores } from '@/hooks/useSupabase';
 import { DataTable } from '@/components/common/DataTable';
@@ -14,6 +13,7 @@ import { formatCurrency, formatShortDate } from '@/utils/format';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 interface SaleFormData {
   tanggal: string;
@@ -38,11 +38,12 @@ interface SaleFormData {
 
 const Sales = () => {
   const { hasPermission } = useAuth();
-  const { sales, loading, fetchSales, createSale } = useSales();
+  const { sales, loading, fetchSales, createSale, updateSale, deleteSale } = useSales();
   const { stock: stockProducts, fetchStock } = useStock();
   const { expeditions, fetchExpeditions } = useExpeditions();
   const { stores, fetchStores } = useStores();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingSale, setEditingSale] = useState<any>(null);
   const [formData, setFormData] = useState<SaleFormData>({
     tanggal: new Date().toISOString().split('T')[0],
     no_pesanan_platform: '',
@@ -105,14 +106,50 @@ const Sales = () => {
       notes: formData.notes || null,
     };
 
-    const { error } = await createSale(saleData, validItems);
-    if (!error) {
+    let result;
+    if (editingSale) {
+      result = await updateSale(editingSale.id, saleData, validItems);
+    } else {
+      result = await createSale(saleData, validItems);
+    }
+
+    if (!result.error) {
       setDialogOpen(false);
       resetForm();
     }
   };
 
+  const handleEdit = (sale: any) => {
+    setEditingSale(sale);
+    setFormData({
+      tanggal: sale.tanggal,
+      no_pesanan_platform: sale.no_pesanan_platform,
+      store_id: sale.store_id,
+      customer_name: sale.customer_name,
+      customer_phone: sale.customer_phone || '',
+      customer_address: sale.customer_address || '',
+      ongkir: sale.ongkir || 0,
+      diskon: sale.diskon || 0,
+      no_resi: sale.no_resi || '',
+      status: sale.status,
+      notes: sale.notes || '',
+      items: sale.sale_items?.map((item: any) => ({
+        product_variant_id: item.product_variant_id,
+        quantity: item.quantity,
+        harga_satuan: item.harga_satuan,
+        product_name: item.product_variant?.product?.nama_produk,
+        variant_display: `${item.product_variant?.warna} - ${item.product_variant?.size}`
+      })) || [{ product_variant_id: '', quantity: 1, harga_satuan: 0 }]
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteSale(id);
+  };
+
   const resetForm = () => {
+    setEditingSale(null);
     setFormData({
       tanggal: new Date().toISOString().split('T')[0],
       no_pesanan_platform: '',
@@ -260,9 +297,32 @@ const Sales = () => {
       key: 'actions',
       title: 'Aksi',
       render: (value: any, sale: any) => (
-        <Button size="sm" variant="outline">
-          <Eye className="h-4 w-4" />
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => handleEdit(sale)}>
+            <Edit className="h-4 w-4" />
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="outline">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Hapus Penjualan</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Apakah Anda yakin ingin menghapus penjualan ini? Tindakan ini tidak dapat dibatalkan.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Batal</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleDelete(sale.id)} className="bg-destructive text-destructive-foreground">
+                  Hapus
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       )
     }
   ];
@@ -283,12 +343,12 @@ const Sales = () => {
             <DialogTrigger asChild>
               <Button className="gradient-primary" onClick={resetForm}>
                 <Plus className="h-4 w-4 mr-2" />
-                Tambah Penjualan
+                {editingSale ? 'Edit Penjualan' : 'Tambah Penjualan'}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Tambah Penjualan Baru</DialogTitle>
+                <DialogTitle>{editingSale ? 'Edit Penjualan' : 'Tambah Penjualan Baru'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Basic Info */}
@@ -500,7 +560,7 @@ const Sales = () => {
 
                 <div className="flex gap-2 pt-4">
                   <Button type="submit" disabled={loading} className="gradient-primary">
-                    {loading ? 'Menyimpan...' : 'Simpan Penjualan'}
+                    {loading ? 'Menyimpan...' : editingSale ? 'Update Penjualan' : 'Simpan Penjualan'}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                     Batal
