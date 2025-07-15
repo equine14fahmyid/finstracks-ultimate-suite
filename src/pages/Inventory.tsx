@@ -178,6 +178,8 @@ const Inventory = () => {
       render: (item: any) => {
         if (!item) return <div>Data tidak tersedia</div>;
         
+        console.log('Rendering item:', item); // Debug log
+        
         return (
           <div>
             <div className="font-medium">{item?.product?.nama_produk || 'Unknown Product'}</div>
@@ -361,6 +363,12 @@ const Inventory = () => {
   const lowStockItems = stock?.filter(item => (item?.stok || 0) <= 5) || [];
   const totalStock = stock?.reduce((total, item) => total + (item?.stok || 0), 0) || 0;
   const filteredMovements = movements?.filter(movement => movement != null) || [];
+
+  // Debug log to see what stock data looks like
+  console.log('=== INVENTORY COMPONENT DEBUG ===');
+  console.log('Stock array:', stock);
+  console.log('Sample stock item:', stock?.[0]);
+  console.log('Sample product data:', stock?.[0]?.product);
 
   if (loading) return <div className="p-6">Loading stock data...</div>;
   if (!stock?.length) return (

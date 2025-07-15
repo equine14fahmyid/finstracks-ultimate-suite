@@ -684,6 +684,8 @@ export const useStock = () => {
   const fetchStock = async () => {
     try {
       setLoading(true);
+      console.log('=== DEBUGGING STOCK FETCH ===');
+      
       const { data: variants, error } = await supabase
         .from('product_variants')
         .select(`
@@ -705,8 +707,15 @@ export const useStock = () => {
         .eq('product.is_active', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      console.log('Stock data fetched:', variants);
+      if (error) {
+        console.error('Stock fetch error:', error);
+        throw error;
+      }
+      
+      console.log('Raw variants data:', variants);
+      console.log('First item structure:', variants?.[0]);
+      console.log('Product nested data:', variants?.[0]?.product);
+      
       setStock(variants || []);
     } catch (error: any) {
       console.error('Fetch stock error:', error);
