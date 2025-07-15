@@ -12,29 +12,7 @@ import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/utils/format';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-
-interface ProfitLossData {
-  revenue: {
-    total_penjualan: number;
-    penjualan_by_platform: Array<{
-      platform: string;
-      amount: number;
-    }>;
-  };
-  cogs: {
-    total_hpp: number;
-  };
-  expenses: {
-    total_expenses: number;
-    expenses_by_category: Array<{
-      category: string;
-      amount: number;
-    }>;
-  };
-  gross_profit: number;
-  net_profit: number;
-  gross_margin: number;
-}
+import { calculateProfitLoss, ProfitLossCalculation } from '@/utils/financialCalculations';
 
 const ProfitLoss = () => {
   const [startDate, setStartDate] = useState<Date>(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
@@ -42,93 +20,9 @@ const ProfitLoss = () => {
 
   const { data: profitLossData, isLoading } = useQuery({
     queryKey: ['profit-loss', startDate, endDate],
-    queryFn: async (): Promise<ProfitLossData> => {
+    queryFn: async (): Promise<ProfitLossCalculation> => {
       try {
-        // Fetch sales data
-        const { data: salesData } = await supabase
-          .from('sales')
-          .select(`
-            total,
-            subtotal,
-            store_id,
-            stores!inner(
-              nama_toko,
-              platforms!inner(nama_platform)
-            )
-          `)
-          .gte('tanggal', format(startDate, 'yyyy-MM-dd'))
-          .lte('tanggal', format(endDate, 'yyyy-MM-dd'));
-
-        // Fetch purchase data for COGS
-        const { data: purchaseData } = await supabase
-          .from('purchases')
-          .select('total')
-          .gte('tanggal', format(startDate, 'yyyy-MM-dd'))
-          .lte('tanggal', format(endDate, 'yyyy-MM-dd'));
-
-        // Fetch expenses data
-        const { data: expensesData } = await supabase
-          .from('expenses')
-          .select(`
-            jumlah,
-            categories(nama_kategori)
-          `)
-          .gte('tanggal', format(startDate, 'yyyy-MM-dd'))
-          .lte('tanggal', format(endDate, 'yyyy-MM-dd'));
-
-        // Calculate revenue
-        const totalPenjualan = salesData?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
-        
-        // Group sales by platform
-        const platformSales = salesData?.reduce((acc: any, sale) => {
-          const platformName = sale.stores?.platforms?.nama_platform || 'Unknown';
-          acc[platformName] = (acc[platformName] || 0) + (sale.total || 0);
-          return acc;
-        }, {}) || {};
-
-        const penjualanByPlatform = Object.entries(platformSales).map(([platform, amount]) => ({
-          platform,
-          amount: amount as number
-        }));
-
-        // Calculate COGS
-        const totalHpp = purchaseData?.reduce((sum, purchase) => sum + (purchase.total || 0), 0) || 0;
-
-        // Calculate expenses
-        const totalExpenses = expensesData?.reduce((sum, expense) => sum + (expense.jumlah || 0), 0) || 0;
-        
-        // Group expenses by category
-        const categoryExpenses = expensesData?.reduce((acc: any, expense) => {
-          const categoryName = expense.categories?.nama_kategori || 'Lainnya';
-          acc[categoryName] = (acc[categoryName] || 0) + (expense.jumlah || 0);
-          return acc;
-        }, {}) || {};
-
-        const expensesByCategory = Object.entries(categoryExpenses).map(([category, amount]) => ({
-          category,
-          amount: amount as number
-        }));
-
-        const grossProfit = totalPenjualan - totalHpp;
-        const netProfit = grossProfit - totalExpenses;
-        const grossMargin = totalPenjualan > 0 ? (grossProfit / totalPenjualan) * 100 : 0;
-
-        return {
-          revenue: {
-            total_penjualan: totalPenjualan,
-            penjualan_by_platform: penjualanByPlatform
-          },
-          cogs: {
-            total_hpp: totalHpp
-          },
-          expenses: {
-            total_expenses: totalExpenses,
-            expenses_by_category: expensesByCategory
-          },
-          gross_profit: grossProfit,
-          net_profit: netProfit,
-          gross_margin: grossMargin
-        };
+        return await calculateProfitLoss(startDate, endDate);
       } catch (error) {
         toast({
           title: "Error",

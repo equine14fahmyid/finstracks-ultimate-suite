@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/utils/format';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { calculateRetainedEarnings, getCompanySettings, calculateAccountsPayable } from '@/utils/financialCalculations';
 
 interface BalanceSheetData {
   assets: {
@@ -93,11 +94,14 @@ const BalanceSheet = () => {
 
         const totalAssets = currentAssetsTotal + fixedAssetsTotal;
 
-        // For this basic implementation, we'll set some default values
-        // In a real implementation, you'd fetch these from appropriate tables
-        const hutangUsaha = 0; // This would come from unpaid purchases
-        const modalAwal = 50000000; // This would be configured or calculated
-        const labaDitahan = totalAssets - modalAwal - hutangUsaha; // Calculated to balance
+        // Get actual company settings and financial data
+        const [companySettings, hutangUsaha, labaDitahan] = await Promise.all([
+          getCompanySettings(),
+          calculateAccountsPayable(reportDate),
+          calculateRetainedEarnings(reportDate)
+        ]);
+        
+        const modalAwal = companySettings.modal_awal;
 
         return {
           assets: {
@@ -322,9 +326,26 @@ const BalanceSheet = () => {
             {/* Total Liabilities + Equity */}
             <Card className="border-2 border-primary">
               <CardContent className="pt-6">
-                <div className="flex justify-between font-bold text-lg">
-                  <span>TOTAL KEWAJIBAN + EKUITAS</span>
-                  <span>{formatCurrency((balanceSheetData?.liabilities.total_liabilities || 0) + (balanceSheetData?.equity.total || 0))}</span>
+                <div className="space-y-3">
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>TOTAL KEWAJIBAN + EKUITAS</span>
+                    <span>{formatCurrency((balanceSheetData?.liabilities.total_liabilities || 0) + (balanceSheetData?.equity.total || 0))}</span>
+                  </div>
+                  
+                  {/* Balance Sheet Validation */}
+                  {balanceSheetData && (
+                    <div className={cn(
+                      "text-sm font-medium p-3 rounded-lg",
+                      Math.abs(balanceSheetData.assets.total_assets - (balanceSheetData.liabilities.total_liabilities + balanceSheetData.equity.total)) < 1 
+                        ? "bg-green-100 text-green-800" 
+                        : "bg-red-100 text-red-800"
+                    )}>
+                      {Math.abs(balanceSheetData.assets.total_assets - (balanceSheetData.liabilities.total_liabilities + balanceSheetData.equity.total)) < 1 
+                        ? "✅ Neraca Seimbang" 
+                        : `⚠️ Neraca Tidak Seimbang (Selisih: ${formatCurrency(Math.abs(balanceSheetData.assets.total_assets - (balanceSheetData.liabilities.total_liabilities + balanceSheetData.equity.total)))})`
+                      }
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
