@@ -11,15 +11,23 @@ interface SummaryData {
 }
 
 interface SummaryCardsProps {
-  data: SummaryData;
+  data: SummaryData | null;
   loading?: boolean;
 }
 
 const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
+  // Provide safe defaults when data is null
+  const safeData = data || {
+    total_penjualan: 0,
+    total_pengeluaran: 0,
+    laba_bersih: 0,
+    saldo_kas_bank: 0
+  };
+
   const cards = [
     {
       title: 'Total Penjualan',
-      value: data.total_penjualan,
+      value: safeData.total_penjualan,
       icon: TrendingUp,
       gradient: 'from-success to-success-light',
       textColor: 'text-success',
@@ -28,7 +36,7 @@ const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
     },
     {
       title: 'Total Pengeluaran',
-      value: data.total_pengeluaran,
+      value: safeData.total_pengeluaran,
       icon: TrendingDown,
       gradient: 'from-warning to-warning-light',
       textColor: 'text-warning',
@@ -37,16 +45,16 @@ const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
     },
     {
       title: 'Laba Bersih',
-      value: data.laba_bersih,
+      value: safeData.laba_bersih,
       icon: BarChart3,
-      gradient: data.laba_bersih >= 0 ? 'from-primary to-primary-light' : 'from-error to-error-light',
-      textColor: data.laba_bersih >= 0 ? 'text-primary' : 'text-error',
-      bgColor: data.laba_bersih >= 0 ? 'bg-primary/10' : 'bg-error/10',
-      description: data.laba_bersih >= 0 ? 'Keuntungan bersih' : 'Kerugian bersih'
+      gradient: safeData.laba_bersih >= 0 ? 'from-primary to-primary-light' : 'from-error to-error-light',
+      textColor: safeData.laba_bersih >= 0 ? 'text-primary' : 'text-error',
+      bgColor: safeData.laba_bersih >= 0 ? 'bg-primary/10' : 'bg-error/10',
+      description: safeData.laba_bersih >= 0 ? 'Keuntungan bersih' : 'Kerugian bersih'
     },
     {
       title: 'Saldo Kas & Bank',
-      value: data.saldo_kas_bank,
+      value: safeData.saldo_kas_bank,
       icon: Wallet,
       gradient: 'from-secondary to-secondary-light',
       textColor: 'text-secondary',
