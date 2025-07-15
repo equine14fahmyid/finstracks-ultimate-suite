@@ -159,6 +159,11 @@ const App = () => (
                 <Assets />
               </AppLayout>
             } />
+            <Route path="/master/assets" element={
+              <AppLayout>
+                <Assets />
+              </AppLayout>
+            } />
             
             {/* Report Routes */}
             <Route path="/reports/profit-loss" element={
