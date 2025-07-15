@@ -27,6 +27,7 @@ import ProfitLoss from '@/pages/reports/ProfitLoss';
 import BalanceSheet from '@/pages/reports/BalanceSheet';
 import CashFlow from '@/pages/reports/CashFlow';
 import Analytics from '@/pages/reports/Analytics';
+import Adjustments from '@/pages/Adjustments';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -118,6 +119,11 @@ const App = () => (
             <Route path="/settlements" element={
               <AppLayout>
                 <Settlements />
+              </AppLayout>
+            } />
+            <Route path="/adjustments" element={
+              <AppLayout>
+                <Adjustments />
               </AppLayout>
             } />
             

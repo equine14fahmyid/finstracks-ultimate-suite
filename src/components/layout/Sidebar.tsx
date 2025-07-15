@@ -92,6 +92,7 @@ const navigationItems: NavItem[] = [
       { title: 'Pengeluaran', href: '/expenses', icon: DollarSign },
       { title: 'Bank', href: '/banks', icon: Wallet },
       { title: 'Pencairan', href: '/settlements', icon: Receipt },
+      { title: 'Penyesuaian', href: '/adjustments', icon: Settings },
     ]
   },
   {

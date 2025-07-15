@@ -581,6 +581,7 @@ export type Database = {
       }
       sales: {
         Row: {
+          adjustment_notes: string | null
           created_at: string | null
           created_by: string | null
           customer_address: string | null
@@ -589,6 +590,7 @@ export type Database = {
           diskon: number | null
           expedition_id: string | null
           id: string
+          needs_adjustment: boolean | null
           no_pesanan_platform: string
           no_resi: string | null
           notes: string | null
@@ -599,8 +601,10 @@ export type Database = {
           tanggal: string
           total: number
           updated_at: string | null
+          validated_at: string | null
         }
         Insert: {
+          adjustment_notes?: string | null
           created_at?: string | null
           created_by?: string | null
           customer_address?: string | null
@@ -609,6 +613,7 @@ export type Database = {
           diskon?: number | null
           expedition_id?: string | null
           id?: string
+          needs_adjustment?: boolean | null
           no_pesanan_platform: string
           no_resi?: string | null
           notes?: string | null
@@ -619,8 +624,10 @@ export type Database = {
           tanggal: string
           total: number
           updated_at?: string | null
+          validated_at?: string | null
         }
         Update: {
+          adjustment_notes?: string | null
           created_at?: string | null
           created_by?: string | null
           customer_address?: string | null
@@ -629,6 +636,7 @@ export type Database = {
           diskon?: number | null
           expedition_id?: string | null
           id?: string
+          needs_adjustment?: boolean | null
           no_pesanan_platform?: string
           no_resi?: string | null
           notes?: string | null
@@ -639,6 +647,7 @@ export type Database = {
           tanggal?: string
           total?: number
           updated_at?: string | null
+          validated_at?: string | null
         }
         Relationships: [
           {
@@ -653,6 +662,47 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_adjustments: {
+        Row: {
+          adjustment_type: Database["public"]["Enums"]["adjustment_type"]
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          id: string
+          notes: string | null
+          sale_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          adjustment_type: Database["public"]["Enums"]["adjustment_type"]
+          amount: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          sale_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          adjustment_type?: Database["public"]["Enums"]["adjustment_type"]
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          sale_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_adjustments_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
             referencedColumns: ["id"]
           },
         ]
@@ -1008,8 +1058,13 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      validate_sale_with_adjustments: {
+        Args: { sale_id_param: string; adjustments?: Json }
+        Returns: undefined
+      }
     }
     Enums: {
+      adjustment_type: "denda" | "selisih_ongkir" | "pinalti"
       category_type: "income" | "expense"
       payment_method: "cash" | "transfer" | "credit"
       transaction_status:
@@ -1147,6 +1202,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      adjustment_type: ["denda", "selisih_ongkir", "pinalti"],
       category_type: ["income", "expense"],
       payment_method: ["cash", "transfer", "credit"],
       transaction_status: [
