@@ -105,27 +105,27 @@ const Expenses = () => {
     {
       key: 'tanggal',
       title: 'Tanggal',
-      render: (expense: any) => formatShortDate(expense.tanggal)
+      render: (expense: any) => formatShortDate(expense?.tanggal)
     },
     {
       key: 'category',
       title: 'Kategori',
       render: (expense: any) => (
-        <span className="font-medium">{expense.category?.nama_kategori || 'Tidak dikategorikan'}</span>
+        <span className="font-medium">{expense?.category?.nama_kategori || 'Tidak dikategorikan'}</span>
       )
     },
     {
       key: 'jumlah',
       title: 'Jumlah',
       render: (expense: any) => (
-        <span className="font-medium text-red-600">-{formatCurrency(expense.jumlah)}</span>
+        <span className="font-medium text-red-600">-{formatCurrency(expense?.jumlah || 0)}</span>
       )
     },
     {
       key: 'bank',
       title: 'Dari Bank',
       render: (expense: any) => (
-        <span>{expense.bank?.nama_bank || 'Kas'}</span>
+        <span>{expense?.bank?.nama_bank || 'Kas'}</span>
       )
     },
     {
@@ -133,7 +133,7 @@ const Expenses = () => {
       title: 'Keterangan',
       render: (expense: any) => (
         <span className="text-sm text-muted-foreground">
-          {expense.keterangan || '-'}
+          {expense?.keterangan || '-'}
         </span>
       )
     },
@@ -145,7 +145,7 @@ const Expenses = () => {
           <Button size="sm" variant="outline" onClick={() => handleEdit(expense)}>
             Edit
           </Button>
-          <Button size="sm" variant="destructive" onClick={() => handleDelete(expense.id)}>
+          <Button size="sm" variant="destructive" onClick={() => handleDelete(expense?.id)}>
             Hapus
           </Button>
         </div>
@@ -153,10 +153,10 @@ const Expenses = () => {
     }
   ];
 
-  const totalExpenses = expenses.reduce((total, expense) => total + expense.jumlah, 0);
+  const totalExpenses = expenses.reduce((total, expense) => total + (expense?.jumlah || 0), 0);
   const thisMonthExpenses = expenses.filter(expense => 
-    new Date(expense.tanggal).getMonth() === new Date().getMonth()
-  ).reduce((total, expense) => total + expense.jumlah, 0);
+    expense?.tanggal && new Date(expense.tanggal).getMonth() === new Date().getMonth()
+  ).reduce((total, expense) => total + (expense?.jumlah || 0), 0);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
