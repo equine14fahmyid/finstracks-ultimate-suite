@@ -69,13 +69,15 @@ const Banks = () => {
   };
 
   const handleEdit = (bank: any) => {
+    if (!bank) return;
+    
     setEditingBank(bank);
     setFormData({
-      nama_bank: bank.nama_bank,
-      nama_pemilik: bank.nama_pemilik,
-      no_rekening: bank.no_rekening,
-      saldo_awal: bank.saldo_awal || 0,
-      saldo_akhir: bank.saldo_akhir || 0
+      nama_bank: bank?.nama_bank || '',
+      nama_pemilik: bank?.nama_pemilik || '',
+      no_rekening: bank?.no_rekening || '',
+      saldo_awal: bank?.saldo_awal || 0,
+      saldo_akhir: bank?.saldo_akhir || 0
     });
     setDialogOpen(true);
   };
@@ -92,9 +94,9 @@ const Banks = () => {
       title: 'Informasi Bank',
       render: (bank: any) => (
         <div>
-          <div className="font-medium">{bank.nama_bank}</div>
-          <div className="text-sm text-muted-foreground">{bank.nama_pemilik}</div>
-          <div className="text-xs text-muted-foreground">{bank.no_rekening}</div>
+          <div className="font-medium">{bank?.nama_bank || '-'}</div>
+          <div className="text-sm text-muted-foreground">{bank?.nama_pemilik || '-'}</div>
+          <div className="text-xs text-muted-foreground">{bank?.no_rekening || '-'}</div>
         </div>
       )
     },
@@ -102,7 +104,7 @@ const Banks = () => {
       key: 'saldo_awal',
       title: 'Saldo Awal',
       render: (bank: any) => (
-        <span className="font-medium">{formatCurrency(bank.saldo_awal || 0)}</span>
+        <span className="font-medium">{formatCurrency(bank?.saldo_awal || 0)}</span>
       )
     },
     {
@@ -110,19 +112,19 @@ const Banks = () => {
       title: 'Saldo Akhir',
       render: (bank: any) => (
         <div>
-          <span className={`font-medium ${(bank.saldo_akhir || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {formatCurrency(bank.saldo_akhir || 0)}
+          <span className={`font-medium ${(bank?.saldo_akhir || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {formatCurrency(bank?.saldo_akhir || 0)}
           </span>
           <div className="text-xs text-muted-foreground mt-1">
-            {(bank.saldo_akhir || 0) >= (bank.saldo_awal || 0) ? (
+            {(bank?.saldo_akhir || 0) >= (bank?.saldo_awal || 0) ? (
               <span className="text-green-600 flex items-center">
                 <TrendingUp className="h-3 w-3 mr-1" />
-                +{formatCurrency((bank.saldo_akhir || 0) - (bank.saldo_awal || 0))}
+                +{formatCurrency((bank?.saldo_akhir || 0) - (bank?.saldo_awal || 0))}
               </span>
             ) : (
               <span className="text-red-600 flex items-center">
                 <TrendingDown className="h-3 w-3 mr-1" />
-                {formatCurrency((bank.saldo_akhir || 0) - (bank.saldo_awal || 0))}
+                {formatCurrency((bank?.saldo_akhir || 0) - (bank?.saldo_awal || 0))}
               </span>
             )}
           </div>
@@ -137,7 +139,7 @@ const Banks = () => {
           <Button size="sm" variant="outline" onClick={() => handleEdit(bank)}>
             Edit
           </Button>
-          <Button size="sm" variant="destructive" onClick={() => handleDelete(bank.id)}>
+          <Button size="sm" variant="destructive" onClick={() => handleDelete(bank?.id)}>
             Hapus
           </Button>
         </div>
@@ -145,8 +147,8 @@ const Banks = () => {
     }
   ];
 
-  const totalSaldoAwal = banks.reduce((total, bank) => total + (bank.saldo_awal || 0), 0);
-  const totalSaldoAkhir = banks.reduce((total, bank) => total + (bank.saldo_akhir || 0), 0);
+  const totalSaldoAwal = banks?.reduce((total, bank) => total + (bank?.saldo_awal || 0), 0) || 0;
+  const totalSaldoAkhir = banks?.reduce((total, bank) => total + (bank?.saldo_akhir || 0), 0) || 0;
   const totalPerubahan = totalSaldoAkhir - totalSaldoAwal;
 
   return (
