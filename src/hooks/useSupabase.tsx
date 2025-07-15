@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -21,6 +22,100 @@ type Income = Database['public']['Tables']['incomes']['Row'];
 type Expense = Database['public']['Tables']['expenses']['Row'];
 type Settlement = Database['public']['Tables']['settlements']['Row'];
 type StockMovement = Database['public']['Tables']['stock_movements']['Row'];
+
+// ============================================================================
+// DASHBOARD ANALYTICS HOOK
+// ============================================================================
+
+export const useDashboardAnalytics = (startDate: string, endDate: string) => {
+  const [data, setData] = useState<any>(null);
+  const [salesChart, setSalesChart] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (startDate && endDate) {
+      fetchDashboardData();
+    }
+  }, [startDate, endDate]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Get sales data
+      const { data: salesData, error: salesError } = await supabase
+        .from('sales')
+        .select('total, tanggal')
+        .gte('tanggal', startDate)
+        .lte('tanggal', endDate);
+
+      if (salesError) throw salesError;
+
+      // Get expenses data
+      const { data: expensesData, error: expensesError } = await supabase
+        .from('expenses')
+        .select('jumlah')
+        .gte('tanggal', startDate)
+        .lte('tanggal', endDate);
+
+      if (expensesError) throw expensesError;
+
+      // Get bank balances
+      const { data: banksData, error: banksError } = await supabase
+        .from('banks')
+        .select('saldo_akhir')
+        .eq('is_active', true);
+
+      if (banksError) throw banksError;
+
+      const totalPenjualan = salesData?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
+      const totalPengeluaran = expensesData?.reduce((sum, expense) => sum + (expense.jumlah || 0), 0) || 0;
+      const saldoKasBank = banksData?.reduce((sum, bank) => sum + (bank.saldo_akhir || 0), 0) || 0;
+
+      setData({
+        total_penjualan: totalPenjualan,
+        total_pengeluaran: totalPengeluaran,
+        laba_bersih: totalPenjualan - totalPengeluaran,
+        saldo_kas_bank: saldoKasBank,
+      });
+
+      // Process sales chart data
+      const chartData = salesData?.reduce((acc: any[], sale) => {
+        const date = sale.tanggal;
+        const existing = acc.find(item => item.date === date);
+        if (existing) {
+          existing.total += sale.total || 0;
+          existing.transaction_count += 1;
+        } else {
+          acc.push({
+            date,
+            total: sale.total || 0,
+            transaction_count: 1,
+          });
+        }
+        return acc;
+      }, []) || [];
+
+      setSalesChart(chartData);
+    } catch (error: any) {
+      console.error('Fetch dashboard data error:', error);
+      toast({
+        title: "Error",
+        description: `Gagal memuat data dashboard: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    data,
+    salesChart,
+    loading,
+  };
+};
 
 // ============================================================================
 // PRODUCTS MANAGEMENT HOOK
@@ -289,6 +384,7 @@ export const useSales = () => {
 
 export const useStock = () => {
   const [stock, setStock] = useState<any[]>([]);
+  const [movements, setMovements] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -318,10 +414,98 @@ export const useStock = () => {
     }
   };
 
+  const fetchStockMovements = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('stock_movements')
+        .select(`
+          *,
+          product_variant:product_variants (
+            *,
+            product:products (*)
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      setMovements(data || []);
+    } catch (error: any) {
+      console.error('Fetch stock movements error:', error);
+      toast({
+        title: "Error",
+        description: `Gagal memuat riwayat stok: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const adjustStock = async (variantId: string, newStock: number, notes: string) => {
+    try {
+      setLoading(true);
+      
+      // Get current stock
+      const { data: currentVariant, error: fetchError } = await supabase
+        .from('product_variants')
+        .select('stok')
+        .eq('id', variantId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const currentStock = currentVariant?.stok || 0;
+      const difference = newStock - currentStock;
+
+      // Update stock
+      const { error: updateError } = await supabase
+        .from('product_variants')
+        .update({ stok: newStock })
+        .eq('id', variantId);
+
+      if (updateError) throw updateError;
+
+      // Record movement
+      const { error: movementError } = await supabase
+        .from('stock_movements')
+        .insert({
+          product_variant_id: variantId,
+          movement_type: difference > 0 ? 'in' : 'out',
+          quantity: Math.abs(difference),
+          reference_type: 'adjustment',
+          notes: notes
+        });
+
+      if (movementError) throw movementError;
+
+      toast({
+        title: "Sukses",
+        description: "Stok berhasil disesuaikan",
+      });
+
+      await fetchStock();
+      await fetchStockMovements();
+    } catch (error: any) {
+      console.error('Adjust stock error:', error);
+      toast({
+        title: "Error",
+        description: `Gagal menyesuaikan stok: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     stock,
+    movements,
     loading,
     fetchStock,
+    fetchStockMovements,
+    adjustStock,
   };
 };
 
@@ -1601,11 +1785,73 @@ export const usePurchases = () => {
     }
   };
 
+  const updatePurchase = async (id: string, purchaseData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('purchases')
+        .update(purchaseData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Sukses",
+        description: "Pembelian berhasil diperbarui",
+      });
+
+      await fetchPurchases();
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Update purchase error:', error);
+      toast({
+        title: "Error",
+        description: `Gagal memperbarui pembelian: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deletePurchase = async (id: string) => {
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('purchases')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sukses",
+        description: "Pembelian berhasil dihapus",
+      });
+
+      await fetchPurchases();
+    } catch (error: any) {
+      console.error('Delete purchase error:', error);
+      toast({
+        title: "Error",
+        description: `Gagal menghapus pembelian: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     purchases,
     loading,
     fetchPurchases,
     createPurchase,
+    updatePurchase,
+    deletePurchase,
   };
 };
 
