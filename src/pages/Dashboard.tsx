@@ -9,6 +9,7 @@ import DateFilter from '@/components/dashboard/DateFilter';
 import SummaryCards from '@/components/dashboard/SummaryCards';
 import SalesChart from '@/components/dashboard/SalesChart';
 import { formatDate } from '@/utils/format';
+import { useDashboardAnalytics } from '@/hooks/useSupabase';
 
 interface DateRange {
   from: Date | undefined;
@@ -34,108 +35,26 @@ const Dashboard = () => {
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // First day of current month
     to: new Date() // Today
   });
-  const [dashboardData, setDashboardData] = useState<DashboardData>({
-    total_penjualan: 0,
-    total_pengeluaran: 0,
-    laba_bersih: 0,
-    saldo_kas_bank: 0
-  });
-  const [salesData, setSalesData] = useState<SalesData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch dashboard summary data
-  const fetchDashboardData = async () => {
-    try {
-      if (!dateRange.from || !dateRange.to) return;
+  // Use the new analytics hook
+  const startDate = dateRange.from?.toISOString().split('T')[0] || '';
+  const endDate = dateRange.to?.toISOString().split('T')[0] || '';
+  
+  const { 
+    data: dashboardData, 
+    salesChart: salesData, 
+    loading: analyticsLoading 
+  } = useDashboardAnalytics(startDate, endDate);
 
-      const startDate = dateRange.from.toISOString().split('T')[0];
-      const endDate = dateRange.to.toISOString().split('T')[0];
-
-      // Fetch sales data
-      const { data: salesData, error: salesError } = await supabase
-        .from('sales')
-        .select('total, tanggal')
-        .gte('tanggal', startDate)
-        .lte('tanggal', endDate)
-        .eq('status', 'delivered');
-
-      if (salesError) throw salesError;
-
-      // Fetch expenses data
-      const { data: expensesData, error: expensesError } = await supabase
-        .from('expenses')
-        .select('jumlah')
-        .gte('tanggal', startDate)
-        .lte('tanggal', endDate);
-
-      if (expensesError) throw expensesError;
-
-      // Fetch bank balances
-      const { data: banksData, error: banksError } = await supabase
-        .from('banks')
-        .select('saldo_akhir')
-        .eq('is_active', true);
-
-      if (banksError) throw banksError;
-
-      // Calculate totals
-      const totalPenjualan = salesData?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
-      const totalPengeluaran = expensesData?.reduce((sum, expense) => sum + (expense.jumlah || 0), 0) || 0;
-      const saldoKasBank = banksData?.reduce((sum, bank) => sum + (bank.saldo_akhir || 0), 0) || 0;
-
-      setDashboardData({
-        total_penjualan: totalPenjualan,
-        total_pengeluaran: totalPengeluaran,
-        laba_bersih: totalPenjualan - totalPengeluaran,
-        saldo_kas_bank: saldoKasBank
-      });
-
-      // Process sales chart data
-      const salesByDate = salesData?.reduce((acc, sale) => {
-        const date = sale.tanggal;
-        if (!acc[date]) {
-          acc[date] = { total: 0, count: 0 };
-        }
-        acc[date].total += sale.total || 0;
-        acc[date].count += 1;
-        return acc;
-      }, {} as Record<string, { total: number; count: number }>);
-
-      const chartData = Object.entries(salesByDate || {})
-        .map(([date, data]) => ({
-          date,
-          total: data.total,
-          transaction_count: data.count
-        }))
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-      setSalesData(chartData);
-
-    } catch (error: any) {
-      console.error('Error fetching dashboard data:', error);
-      toast({
-        title: "Error",
-        description: "Gagal memuat data dashboard: " + error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Initial load and refresh on date change
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await fetchDashboardData();
-      setLoading(false);
-    };
-    loadData();
-  }, [dateRange]);
+  // Set loading based on analytics loading
+  const loading = analyticsLoading;
 
   // Manual refresh
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchDashboardData();
+    // Trigger refresh by changing date range slightly
+    setDateRange(prev => ({ ...prev }));
     setRefreshing(false);
     toast({
       title: "Berhasil",

@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import AppLayout from "@/components/layout/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import Login from "@/pages/Login";
+import Suppliers from "@/pages/Suppliers";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -102,10 +103,7 @@ const App = () => (
             
             <Route path="/suppliers" element={
               <AppLayout>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Supplier</h1>
-                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
-                </div>
+                <Suppliers />
               </AppLayout>
             } />
             
@@ -122,6 +120,15 @@ const App = () => (
               <AppLayout>
                 <div className="p-6">
                   <h1 className="text-2xl font-bold">Toko</h1>
+                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
+                </div>
+              </AppLayout>
+            } />
+            
+            <Route path="/expeditions" element={
+              <AppLayout>
+                <div className="p-6">
+                  <h1 className="text-2xl font-bold">Ekspedisi</h1>
                   <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
                 </div>
               </AppLayout>
