@@ -12,21 +12,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency, formatShortDate } from '@/utils/format';
-
-interface ExpenseFormData {
-  tanggal: string;
-  category_id: string;
-  jumlah: number;
-  bank_id: string;
-  keterangan: string;
-}
+import { ExpenseFormData, Expense, Category, Bank } from '@/types';
 
 const Expenses = () => {
   const { expenses, loading, fetchExpenses, createExpense, updateExpense, deleteExpense } = useExpenses();
   const { categories, fetchCategories } = useCategories();
   const { banks, fetchBanks } = useBanks();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingExpense, setEditingExpense] = useState<any>(null);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [formData, setFormData] = useState<ExpenseFormData>({
     tanggal: new Date().toISOString().split('T')[0],
     category_id: '',
@@ -83,7 +76,7 @@ const Expenses = () => {
     setEditingExpense(null);
   };
 
-  const handleEdit = (expense: any) => {
+  const handleEdit = (expense: Expense) => {
     setEditingExpense(expense);
     setFormData({
       tanggal: expense.tanggal,
@@ -105,33 +98,33 @@ const Expenses = () => {
     {
       key: 'tanggal',
       title: 'Tanggal',
-      render: (expense: any) => formatShortDate(expense?.tanggal)
+      render: (expense: Expense) => formatShortDate(expense?.tanggal)
     },
     {
       key: 'category',
       title: 'Kategori',
-      render: (expense: any) => (
+      render: (expense: Expense) => (
         <span className="font-medium">{expense?.category?.nama_kategori || 'Tidak dikategorikan'}</span>
       )
     },
     {
       key: 'jumlah',
       title: 'Jumlah',
-      render: (expense: any) => (
+      render: (expense: Expense) => (
         <span className="font-medium text-red-600">-{formatCurrency(expense?.jumlah || 0)}</span>
       )
     },
     {
       key: 'bank',
       title: 'Dari Bank',
-      render: (expense: any) => (
+      render: (expense: Expense) => (
         <span>{expense?.bank?.nama_bank || 'Kas'}</span>
       )
     },
     {
       key: 'keterangan',
       title: 'Keterangan',
-      render: (expense: any) => (
+      render: (expense: Expense) => (
         <span className="text-sm text-muted-foreground">
           {expense?.keterangan || '-'}
         </span>
@@ -140,7 +133,7 @@ const Expenses = () => {
     {
       key: 'actions',
       title: 'Aksi',
-      render: (expense: any) => (
+      render: (expense: Expense) => (
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => handleEdit(expense)}>
             Edit
