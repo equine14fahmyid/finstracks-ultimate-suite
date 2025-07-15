@@ -120,7 +120,7 @@ const Inventory = () => {
       key: 'date',
       title: 'Tanggal',
       render: (movement: any) => (
-        new Date(movement.created_at).toLocaleDateString('id-ID')
+        movement?.created_at ? new Date(movement.created_at).toLocaleDateString('id-ID') : '-'
       )
     },
     {

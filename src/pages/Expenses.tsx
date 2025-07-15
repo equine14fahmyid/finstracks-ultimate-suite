@@ -56,11 +56,17 @@ const Expenses = () => {
       return;
     }
 
-    const success = editingExpense 
-      ? await updateExpense(editingExpense.id, formData)
-      : await createExpense(formData);
+    // Clean formData - replace "cash" with null for bank_id
+    const cleanedFormData = {
+      ...formData,
+      bank_id: formData.bank_id === "cash" ? null : formData.bank_id
+    };
 
-    if (success) {
+    const result = editingExpense 
+      ? await updateExpense(editingExpense.id, cleanedFormData)
+      : await createExpense(cleanedFormData);
+
+    if (!result?.error) {
       setDialogOpen(false);
       resetForm();
     }
@@ -231,7 +237,7 @@ const Expenses = () => {
                     <SelectValue placeholder="Pilih bank/kas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Kas</SelectItem>
+                    <SelectItem value="cash">Kas</SelectItem>
                     {banks.map((bank) => (
                       <SelectItem key={bank.id} value={bank.id}>
                         {bank.nama_bank} - {bank.nama_pemilik}

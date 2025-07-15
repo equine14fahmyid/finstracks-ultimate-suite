@@ -539,11 +539,135 @@ export const useSales = () => {
     }
   };
 
+  const updateSale = async (id: string, saleData: any, items: any[]) => {
+    try {
+      setLoading(true);
+      
+      // Calculate subtotal and total
+      const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.harga_satuan), 0);
+      const total = subtotal + (saleData.ongkir || 0) - (saleData.diskon || 0);
+
+      // Update the sale
+      const { data: sale, error: saleError } = await supabase
+        .from('sales')
+        .update({
+          ...saleData,
+          subtotal,
+          total
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (saleError) throw saleError;
+
+      // Delete existing sale items
+      const { error: deleteError } = await supabase
+        .from('sale_items')
+        .delete()
+        .eq('sale_id', id);
+
+      if (deleteError) throw deleteError;
+
+      // Create new sale items
+      const saleItems = items.map(item => ({
+        sale_id: id,
+        product_variant_id: item.product_variant_id,
+        quantity: item.quantity,
+        harga_satuan: item.harga_satuan,
+        subtotal: item.quantity * item.harga_satuan
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('sale_items')
+        .insert(saleItems);
+
+      if (itemsError) throw itemsError;
+
+      toast({
+        title: "Sukses",
+        description: "Penjualan berhasil diperbarui",
+      });
+
+      await fetchSales();
+      return { data: sale, error: null };
+    } catch (error: any) {
+      console.error('Update sale error:', error);
+      toast({
+        title: "Error",
+        description: `Gagal memperbarui penjualan: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteSale = async (id: string) => {
+    try {
+      setLoading(true);
+
+      // Check if sale has adjustments
+      const { data: adjustments, error: adjustmentError } = await supabase
+        .from('sales_adjustments')
+        .select('id')
+        .eq('sale_id', id);
+
+      if (adjustmentError) throw adjustmentError;
+
+      if (adjustments && adjustments.length > 0) {
+        toast({
+          title: "Error",
+          description: "Tidak dapat menghapus penjualan yang sudah memiliki penyesuaian",
+          variant: "destructive",
+        });
+        return { data: null, error: 'Has adjustments' };
+      }
+
+      // Delete sale items first
+      const { error: deleteItemsError } = await supabase
+        .from('sale_items')
+        .delete()
+        .eq('sale_id', id);
+
+      if (deleteItemsError) throw deleteItemsError;
+
+      // Delete the sale
+      const { error: deleteSaleError } = await supabase
+        .from('sales')
+        .delete()
+        .eq('id', id);
+
+      if (deleteSaleError) throw deleteSaleError;
+
+      toast({
+        title: "Sukses",
+        description: "Penjualan berhasil dihapus",
+      });
+
+      await fetchSales();
+      return { data: true, error: null };
+    } catch (error: any) {
+      console.error('Delete sale error:', error);
+      toast({
+        title: "Error",
+        description: `Gagal menghapus penjualan: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     sales,
     loading,
     fetchSales,
     createSale,
+    updateSale,
+    deleteSale,
   };
 };
 
@@ -1954,17 +2078,55 @@ export const usePurchases = () => {
     }
   };
 
-  const updatePurchase = async (id: string, purchaseData: any) => {
+  const updatePurchase = async (id: string, purchaseData: any, items: any[] = []) => {
     try {
       setLoading(true);
+      
+      // Calculate totals if items are provided
+      let updateData = { ...purchaseData };
+      if (items && items.length > 0) {
+        const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.harga_beli_satuan), 0);
+        updateData = {
+          ...purchaseData,
+          subtotal,
+          total: subtotal
+        };
+
+        // Delete existing purchase items
+        const { error: deleteError } = await supabase
+          .from('purchase_items')
+          .delete()
+          .eq('purchase_id', id);
+
+        if (deleteError) throw deleteError;
+      }
+
+      // Update the purchase
       const { data, error } = await supabase
         .from('purchases')
-        .update(purchaseData)
+        .update(updateData)
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
+
+      // Insert new purchase items if provided
+      if (items && items.length > 0) {
+        const purchaseItems = items.map(item => ({
+          purchase_id: id,
+          product_variant_id: item.product_variant_id,
+          quantity: item.quantity,
+          harga_beli_satuan: item.harga_beli_satuan,
+          subtotal: item.quantity * item.harga_beli_satuan
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('purchase_items')
+          .insert(purchaseItems);
+
+        if (itemsError) throw itemsError;
+      }
 
       toast({
         title: "Sukses",
@@ -1989,6 +2151,16 @@ export const usePurchases = () => {
   const deletePurchase = async (id: string) => {
     try {
       setLoading(true);
+      
+      // Delete purchase items first
+      const { error: deleteItemsError } = await supabase
+        .from('purchase_items')
+        .delete()
+        .eq('purchase_id', id);
+
+      if (deleteItemsError) throw deleteItemsError;
+
+      // Delete the purchase
       const { error } = await supabase
         .from('purchases')
         .delete()
