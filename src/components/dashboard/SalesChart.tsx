@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatCurrency, formatShortDate } from '@/utils/format';
@@ -22,10 +23,10 @@ const SalesChart = ({ data, loading }: SalesChartProps) => {
           <p className="text-sm font-medium">{formatShortDate(label)}</p>
           <div className="space-y-1 mt-2">
             <p className="text-sm text-primary">
-              Penjualan: {formatCurrency(payload[0].value)}
+              Penjualan: {formatCurrency(payload[0]?.value)}
             </p>
             <p className="text-xs text-muted-foreground">
-              {payload[0].payload.transaction_count} transaksi
+              {payload[0]?.payload?.transaction_count || 0} transaksi
             </p>
           </div>
         </div>
@@ -67,7 +68,7 @@ const SalesChart = ({ data, loading }: SalesChartProps) => {
         </div>
       </CardHeader>
       <CardContent>
-        {data.length === 0 ? (
+        {!data || data.length === 0 ? (
           <div className="h-80 flex items-center justify-center">
             <div className="text-center">
               <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />

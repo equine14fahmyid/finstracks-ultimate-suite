@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -97,13 +98,13 @@ const Products = () => {
   const handleEdit = (product: any) => {
     setEditingProduct(product);
     setFormData({
-      nama_produk: product.nama_produk,
+      nama_produk: product.nama_produk || '',
       satuan: product.satuan || 'pcs',
-      harga_beli: product.harga_beli,
-      harga_jual_default: product.harga_jual_default,
+      harga_beli: product.harga_beli || 0,
+      harga_jual_default: product.harga_jual_default || 0,
       deskripsi: product.deskripsi || '',
       variants: product.product_variants?.length > 0 
-        ? product.product_variants.map((v: any) => ({ warna: v.warna, size: v.size, stok: v.stok }))
+        ? product.product_variants.map((v: any) => ({ warna: v.warna || '', size: v.size || '', stok: v.stok || 0 }))
         : [{ warna: '', size: '', stok: 0 }]
     });
     setDialogOpen(true);
@@ -142,24 +143,24 @@ const Products = () => {
     {
       key: 'nama_produk',
       title: 'Nama Produk',
-      render: (product: any) => (
+      render: (value: any, product: any) => (
         <div>
-          <div className="font-medium">{product.nama_produk}</div>
-          <div className="text-sm text-muted-foreground">{product.satuan}</div>
+          <div className="font-medium">{product?.nama_produk || '-'}</div>
+          <div className="text-sm text-muted-foreground">{product?.satuan || 'pcs'}</div>
         </div>
       )
     },
     {
       key: 'variants',
       title: 'Varian',
-      render: (product: any) => (
+      render: (value: any, product: any) => (
         <div className="space-y-1">
-          {product.product_variants?.slice(0, 3).map((variant: any, index: number) => (
+          {product?.product_variants?.slice(0, 3).map((variant: any, index: number) => (
             <Badge key={index} variant="outline" className="text-xs">
-              {variant.warna} - {variant.size} ({variant.stok})
+              {variant?.warna || '-'} - {variant?.size || '-'} ({variant?.stok || 0})
             </Badge>
-          ))}
-          {product.product_variants?.length > 3 && (
+          )) || <span className="text-muted-foreground text-sm">Tidak ada varian</span>}
+          {product?.product_variants?.length > 3 && (
             <Badge variant="outline" className="text-xs">
               +{product.product_variants.length - 3} lainnya
             </Badge>
@@ -170,18 +171,18 @@ const Products = () => {
     {
       key: 'harga_beli',
       title: 'Harga Beli',
-      render: (product: any) => formatCurrency(product.harga_beli)
+      render: (value: any, product: any) => formatCurrency(product?.harga_beli)
     },
     {
       key: 'harga_jual_default',
       title: 'Harga Jual',
-      render: (product: any) => formatCurrency(product.harga_jual_default)
+      render: (value: any, product: any) => formatCurrency(product?.harga_jual_default)
     },
     {
       key: 'total_stock',
       title: 'Total Stok',
-      render: (product: any) => {
-        const totalStock = product.product_variants?.reduce((sum: number, v: any) => sum + (v.stok || 0), 0) || 0;
+      render: (value: any, product: any) => {
+        const totalStock = product?.product_variants?.reduce((sum: number, v: any) => sum + (v?.stok || 0), 0) || 0;
         return (
           <Badge variant={totalStock > 10 ? "default" : totalStock > 0 ? "secondary" : "destructive"}>
             {totalStock}
@@ -192,7 +193,7 @@ const Products = () => {
     {
       key: 'actions',
       title: 'Aksi',
-      render: (product: any) => (
+      render: (value: any, product: any) => (
         <div className="flex gap-2">
           {hasPermission('products.update') && (
             <Button 
@@ -207,7 +208,7 @@ const Products = () => {
             <Button 
               size="sm" 
               variant="outline" 
-              onClick={() => handleDelete(product.id)}
+              onClick={() => handleDelete(product?.id)}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -384,7 +385,7 @@ const Products = () => {
         </CardHeader>
         <CardContent>
           <DataTable
-            data={products}
+            data={products || []}
             columns={columns}
             loading={loading}
             searchable={true}

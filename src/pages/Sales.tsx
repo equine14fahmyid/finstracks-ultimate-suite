@@ -152,11 +152,11 @@ const Sales = () => {
           
           // Auto-fill price when product is selected
           if (field === 'product_variant_id' && value) {
-            const product = stockProducts.find(p => p.id === value);
+            const product = stockProducts?.find(p => p?.id === value);
             if (product) {
-              updatedItem.harga_satuan = product.product.harga_jual_default;
-              updatedItem.product_name = product.product.nama_produk;
-              updatedItem.variant_display = `${product.warna} - ${product.size}`;
+              updatedItem.harga_satuan = product?.product?.harga_jual_default || 0;
+              updatedItem.product_name = product?.product?.nama_produk || '';
+              updatedItem.variant_display = `${product?.warna || ''} - ${product?.size || ''}`;
             }
           }
           
@@ -195,43 +195,43 @@ const Sales = () => {
     {
       key: 'tanggal',
       title: 'Tanggal',
-      render: (sale: any) => formatShortDate(sale.tanggal)
+      render: (value: any, sale: any) => formatShortDate(sale?.tanggal)
     },
     {
       key: 'no_pesanan_platform',
       title: 'No. Pesanan',
-      render: (sale: any) => (
+      render: (value: any, sale: any) => (
         <div>
-          <div className="font-medium">{sale.no_pesanan_platform}</div>
-          <div className="text-sm text-muted-foreground">{sale.customer_name}</div>
+          <div className="font-medium">{sale?.no_pesanan_platform || '-'}</div>
+          <div className="text-sm text-muted-foreground">{sale?.customer_name || '-'}</div>
         </div>
       )
     },
     {
       key: 'store',
       title: 'Toko',
-      render: (sale: any) => (
+      render: (value: any, sale: any) => (
         <div>
-          <div className="font-medium">{sale.store?.nama_toko}</div>
-          <div className="text-sm text-muted-foreground">{sale.store?.platform?.nama_platform}</div>
+          <div className="font-medium">{sale?.store?.nama_toko || '-'}</div>
+          <div className="text-sm text-muted-foreground">{sale?.store?.platform?.nama_platform || '-'}</div>
         </div>
       )
     },
     {
       key: 'items',
       title: 'Produk',
-      render: (sale: any) => (
+      render: (value: any, sale: any) => (
         <div className="space-y-1">
-          {sale.sale_items?.slice(0, 2).map((item: any, index: number) => (
+          {sale?.sale_items?.slice(0, 2).map((item: any, index: number) => (
             <div key={index} className="text-sm">
-              {item.product_variant?.product?.nama_produk} 
+              {item?.product_variant?.product?.nama_produk || 'Produk tidak diketahui'} 
               <span className="text-muted-foreground">
-                ({item.product_variant?.warna} - {item.product_variant?.size})
+                ({item?.product_variant?.warna || '-'} - {item?.product_variant?.size || '-'})
               </span>
-              <span className="ml-1">× {item.quantity}</span>
+              <span className="ml-1">× {item?.quantity || 0}</span>
             </div>
-          ))}
-          {sale.sale_items?.length > 2 && (
+          )) || <span className="text-muted-foreground text-sm">Tidak ada item</span>}
+          {sale?.sale_items?.length > 2 && (
             <div className="text-xs text-muted-foreground">
               +{sale.sale_items.length - 2} item lainnya
             </div>
@@ -242,11 +242,11 @@ const Sales = () => {
     {
       key: 'total',
       title: 'Total',
-      render: (sale: any) => (
+      render: (value: any, sale: any) => (
         <div>
-          <div className="font-medium">{formatCurrency(sale.total)}</div>
+          <div className="font-medium">{formatCurrency(sale?.total)}</div>
           <div className="text-sm text-muted-foreground">
-            Subtotal: {formatCurrency(sale.subtotal)}
+            Subtotal: {formatCurrency(sale?.subtotal)}
           </div>
         </div>
       )
@@ -254,12 +254,12 @@ const Sales = () => {
     {
       key: 'status',
       title: 'Status',
-      render: (sale: any) => getStatusBadge(sale.status)
+      render: (value: any, sale: any) => getStatusBadge(sale?.status || 'pending')
     },
     {
       key: 'actions',
       title: 'Aksi',
-      render: (sale: any) => (
+      render: (value: any, sale: any) => (
         <Button size="sm" variant="outline">
           <Eye className="h-4 w-4" />
         </Button>
@@ -323,11 +323,11 @@ const Sales = () => {
                         <SelectValue placeholder="Pilih toko" />
                       </SelectTrigger>
                       <SelectContent>
-                        {stores.map((store) => (
+                        {stores?.map((store) => (
                           <SelectItem key={store.id} value={store.id}>
-                            {store.nama_toko} - {store.platform?.nama_platform}
+                            {store?.nama_toko || 'Toko tidak diketahui'} - {store?.platform?.nama_platform || 'Platform tidak diketahui'}
                           </SelectItem>
-                        ))}
+                        )) || <SelectItem value="" disabled>Tidak ada toko tersedia</SelectItem>}
                       </SelectContent>
                     </Select>
                   </div>
@@ -384,11 +384,11 @@ const Sales = () => {
                               <SelectValue placeholder="Pilih produk" />
                             </SelectTrigger>
                             <SelectContent>
-                              {stockProducts.map((product) => (
+                              {stockProducts?.map((product) => (
                                 <SelectItem key={product.id} value={product.id}>
-                                  {product.product.nama_produk} - {product.warna} {product.size} (Stok: {product.stok})
+                                  {product?.product?.nama_produk || 'Produk tidak diketahui'} - {product?.warna || '-'} {product?.size || '-'} (Stok: {product?.stok || 0})
                                 </SelectItem>
-                              ))}
+                              )) || <SelectItem value="" disabled>Tidak ada produk tersedia</SelectItem>}
                             </SelectContent>
                           </Select>
                         </div>
@@ -522,7 +522,7 @@ const Sales = () => {
         </CardHeader>
         <CardContent>
           <DataTable
-            data={sales}
+            data={sales || []}
             columns={columns}
             loading={loading}
             searchable={true}
