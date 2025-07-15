@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertTriangle, Package, TrendingDown, TrendingUp, Plus, Edit, Trash2 } from 'lucide-react';
-import { StockAdjustmentDialog } from '@/components/inventory/StockAdjustmentDialog';
 import { useStock, useProducts } from '@/hooks/useSupabase';
 import { DataTable } from '@/components/common/DataTable';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -53,23 +53,33 @@ const Inventory = () => {
   const handleStockAdjustment = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedVariant || adjustmentData.quantity <= 0) {
+    if (!selectedVariant || adjustmentData.quantity < 0) {
       toast({
         title: "Error",
-        description: "Mohon isi data penyesuaian stok dengan benar",
+        description: "Mohon isi data penyesuaian stok dengan benar. Stok tidak boleh negatif.",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      await adjustStock(selectedVariant.id, adjustmentData.quantity, adjustmentData.notes);
+      await adjustStock(selectedVariant.id, adjustmentData.quantity, adjustmentData.notes || 'Penyesuaian stok manual');
       
       setDialogOpen(false);
       setSelectedVariant(null);
       setAdjustmentData({ quantity: 0, notes: '' });
+      
+      toast({
+        title: "Sukses",
+        description: "Stok berhasil disesuaikan",
+      });
     } catch (error) {
       console.error('Stock adjustment error:', error);
+      toast({
+        title: "Error",
+        description: "Gagal melakukan penyesuaian stok",
+        variant: "destructive",
+      });
     }
   };
 
@@ -85,20 +95,42 @@ const Inventory = () => {
       return;
     }
 
-    let result;
-    if (isEditMode && selectedVariant) {
-      result = await updateProductVariant(selectedVariant.id, variantFormData);
-    } else {
-      result = await createProductVariant(variantFormData);
-    }
-    
-    if (!result?.error) {
-      setVariantDialogOpen(false);
-      resetVariantForm();
+    try {
+      let result;
+      if (isEditMode && selectedVariant) {
+        result = await updateProductVariant(selectedVariant.id, variantFormData);
+      } else {
+        result = await createProductVariant(variantFormData);
+      }
+      
+      if (!result?.error) {
+        setVariantDialogOpen(false);
+        resetVariantForm();
+        toast({
+          title: "Sukses",
+          description: isEditMode ? "Varian berhasil diperbarui" : "Varian berhasil ditambahkan",
+        });
+      }
+    } catch (error) {
+      console.error('Variant submit error:', error);
+      toast({
+        title: "Error",
+        description: "Gagal menyimpan varian produk",
+        variant: "destructive",
+      });
     }
   };
 
   const handleEditVariant = (variant: any) => {
+    if (!variant) {
+      toast({
+        title: "Error",
+        description: "Data varian tidak ditemukan",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setVariantFormData({
       product_id: variant.product_id || '',
       warna: variant.warna || '',
@@ -112,8 +144,30 @@ const Inventory = () => {
   };
 
   const handleDeleteVariant = async (id: string) => {
+    if (!id) {
+      toast({
+        title: "Error",
+        description: "ID varian tidak valid",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (confirm('Apakah Anda yakin ingin menghapus varian produk ini?')) {
-      await deleteProductVariant(id);
+      try {
+        await deleteProductVariant(id);
+        toast({
+          title: "Sukses",
+          description: "Varian berhasil dihapus",
+        });
+      } catch (error) {
+        console.error('Delete variant error:', error);
+        toast({
+          title: "Error",
+          description: "Gagal menghapus varian produk",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -121,22 +175,28 @@ const Inventory = () => {
     {
       key: 'product',
       title: 'Produk',
-      render: (item: any) => (
-        <div>
-          <div className="font-medium">{item?.products?.nama_produk || 'N/A'}</div>
-          <div className="text-sm text-muted-foreground">
-            {item?.warna || 'N/A'} - {item?.size || 'N/A'}
+      render: (item: any) => {
+        if (!item) return <div>Data tidak tersedia</div>;
+        
+        return (
+          <div>
+            <div className="font-medium">{item?.products?.nama_produk || 'N/A'}</div>
+            <div className="text-sm text-muted-foreground">
+              {item?.warna || 'N/A'} - {item?.size || 'N/A'}
+            </div>
+            {item?.sku && (
+              <div className="text-xs text-muted-foreground">SKU: {item.sku}</div>
+            )}
           </div>
-          {item?.sku && (
-            <div className="text-xs text-muted-foreground">SKU: {item.sku}</div>
-          )}
-        </div>
-      )
+        );
+      }
     },
     {
       key: 'stock',
       title: 'Stok',
       render: (item: any) => {
+        if (!item) return <div>0</div>;
+        
         const stok = item?.stok ?? 0;
         return (
           <div className="flex items-center gap-2">
@@ -157,52 +217,60 @@ const Inventory = () => {
     {
       key: 'value',
       title: 'Nilai Stok',
-      render: (item: any) => (
-        <div>
-          <div className="font-medium">
-            {formatCurrency((item?.stok || 0) * (item?.products?.harga_beli || 0))}
+      render: (item: any) => {
+        if (!item) return <div>Rp 0</div>;
+        
+        return (
+          <div>
+            <div className="font-medium">
+              {formatCurrency((item?.stok || 0) * (item?.products?.harga_beli || 0))}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              @ {formatCurrency(item?.products?.harga_beli || 0)}
+            </div>
           </div>
-          <div className="text-sm text-muted-foreground">
-            @ {formatCurrency(item?.products?.harga_beli || 0)}
-          </div>
-        </div>
-      )
+        );
+      }
     },
     {
       key: 'actions',
       title: 'Aksi',
-      render: (item: any) => (
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-8 w-8 p-0"
-            onClick={() => {
-              setSelectedVariant(item);
-              setAdjustmentData({ quantity: item?.stok || 0, notes: '' });
-              setDialogOpen(true);
-            }}
-          >
-            <Package className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-8 w-8 p-0"
-            onClick={() => handleEditVariant(item)}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-            onClick={() => handleDeleteVariant(item.id)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      )
+      render: (item: any) => {
+        if (!item) return <div>-</div>;
+        
+        return (
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0"
+              onClick={() => {
+                setSelectedVariant(item);
+                setAdjustmentData({ quantity: item?.stok || 0, notes: '' });
+                setDialogOpen(true);
+              }}
+            >
+              <Package className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0"
+              onClick={() => handleEditVariant(item)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+              onClick={() => handleDeleteVariant(item?.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      }
     }
   ];
 
@@ -291,11 +359,7 @@ const Inventory = () => {
   ) || 0;
 
   const lowStockItems = stock?.filter(item => (item?.stok || 0) <= 5) || [];
-
-  // Add safe access for summary calculations
   const totalStock = stock?.reduce((total, item) => total + (item?.stok || 0), 0) || 0;
-
-  // Filter out any null/undefined movements to prevent errors
   const filteredMovements = movements?.filter(movement => movement != null) || [];
 
   return (
@@ -323,9 +387,7 @@ const Inventory = () => {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {totalStock}
-            </div>
+            <div className="text-2xl font-bold">{totalStock}</div>
             <p className="text-xs text-muted-foreground">Unit tersedia</p>
           </CardContent>
         </Card>
@@ -512,6 +574,9 @@ const Inventory = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Penyesuaian Stok</DialogTitle>
+            <DialogDescription>
+              Sesuaikan stok untuk {selectedVariant?.products?.nama_produk} - {selectedVariant?.warna} {selectedVariant?.size}
+            </DialogDescription>
           </DialogHeader>
           
           {selectedVariant && (
@@ -519,7 +584,7 @@ const Inventory = () => {
               <div>
                 <Label>Produk</Label>
                 <div className="p-3 bg-muted rounded-md">
-                  <div className="font-medium">{selectedVariant.product?.nama_produk}</div>
+                  <div className="font-medium">{selectedVariant.products?.nama_produk || 'N/A'}</div>
                   <div className="text-sm text-muted-foreground">
                     {selectedVariant.warna} - {selectedVariant.size}
                   </div>

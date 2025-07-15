@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +41,15 @@ export const StockAdjustmentDialog = ({ variant, onStockUpdated }: StockAdjustme
       return;
     }
 
+    if (!variant?.id) {
+      toast({
+        title: "Error",
+        description: "Data varian tidak valid",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       await adjustStock(variant.id, newStock, notes || 'Penyesuaian stok manual');
@@ -52,10 +62,20 @@ export const StockAdjustmentDialog = ({ variant, onStockUpdated }: StockAdjustme
       });
     } catch (error) {
       console.error('Stock adjustment error:', error);
+      toast({
+        title: "Error",
+        description: "Gagal melakukan penyesuaian stok",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
+
+  // Don't render if variant data is invalid
+  if (!variant) {
+    return null;
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -68,7 +88,7 @@ export const StockAdjustmentDialog = ({ variant, onStockUpdated }: StockAdjustme
         <DialogHeader>
           <DialogTitle>Sesuaikan Stok</DialogTitle>
           <DialogDescription>
-            Sesuaikan stok untuk {variant?.products?.nama_produk} - {variant?.warna} {variant?.size}
+            Sesuaikan stok untuk {variant?.products?.nama_produk || 'N/A'} - {variant?.warna || 'N/A'} {variant?.size || 'N/A'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
