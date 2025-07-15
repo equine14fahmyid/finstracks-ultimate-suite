@@ -241,7 +241,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       // Clear any cached data in localStorage
       try {
         localStorage.removeItem('supabase.auth.token');
-        localStorage.removeItem('sb-' + supabase.supabaseUrl.split('//')[1] + '-auth-token');
+        localStorage.removeItem('sb-xkrtbwecvfdeqfkvrdcb-auth-token');
       } catch (e) {
         console.error('Error clearing localStorage:', e);
       }
