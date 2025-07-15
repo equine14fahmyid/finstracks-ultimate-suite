@@ -45,7 +45,16 @@ export const useProducts = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select(`
+          *,
+          product_variants(
+            id,
+            warna,
+            size,
+            stok,
+            sku
+          )
+        `)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
@@ -66,19 +75,43 @@ export const useProducts = () => {
     }
   };
 
-  const createProduct = async (productData: any) => {
+  const createProduct = async (productData: any, variants: any[] = []) => {
     try {
-      const { data, error } = await supabase
+      const { data: product, error } = await supabase
         .from('products')
         .insert([productData])
-        .select();
+        .select()
+        .single();
 
       if (error) throw error;
 
+      // Create variants if provided
+      if (variants.length > 0) {
+        const variantData = variants.map(variant => ({
+          ...variant,
+          product_id: product.id
+        }));
+
+        const { error: variantError } = await supabase
+          .from('product_variants')
+          .insert(variantData);
+
+        if (variantError) throw variantError;
+      }
+
       await fetchProducts();
-      return { data, error: null };
+      toast({
+        title: "Berhasil",
+        description: "Produk berhasil ditambahkan",
+      });
+      return { data: product, error: null };
     } catch (error: any) {
       console.error('Create product error:', error);
+      toast({
+        title: "Error",
+        description: "Gagal menambahkan produk",
+        variant: "destructive",
+      });
       return { data: null, error };
     }
   };
@@ -94,9 +127,18 @@ export const useProducts = () => {
       if (error) throw error;
 
       await fetchProducts();
+      toast({
+        title: "Berhasil",
+        description: "Produk berhasil diupdate",
+      });
       return { data, error: null };
     } catch (error: any) {
       console.error('Update product error:', error);
+      toast({
+        title: "Error",
+        description: "Gagal mengupdate produk",
+        variant: "destructive",
+      });
       return { data: null, error };
     }
   };
@@ -111,9 +153,17 @@ export const useProducts = () => {
       if (error) throw error;
 
       await fetchProducts();
+      toast({
+        title: "Berhasil",
+        description: "Produk berhasil dihapus",
+      });
     } catch (error: any) {
       console.error('Delete product error:', error);
-      throw error;
+      toast({
+        title: "Error",
+        description: "Gagal menghapus produk",
+        variant: "destructive",
+      });
     }
   };
 
@@ -237,9 +287,18 @@ export const useStock = () => {
       // Refresh data
       await fetchStock();
       await fetchStockMovements();
+      
+      toast({
+        title: "Berhasil",
+        description: "Stok berhasil disesuaikan",
+      });
     } catch (error: any) {
       console.error('Adjust stock error:', error);
-      throw error;
+      toast({
+        title: "Error",
+        description: "Gagal menyesuaikan stok",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1068,10 +1127,21 @@ export const useSales = () => {
         .from('sales')
         .select(`
           *,
-          store:stores(nama_toko),
-          expedition:expeditions(nama_ekspedisi)
+          store:stores(nama_toko, platform:platforms(nama_platform)),
+          expedition:expeditions(nama_ekspedisi),
+          sale_items(
+            id,
+            quantity,
+            harga_satuan,
+            subtotal,
+            product_variant:product_variants(
+              id,
+              warna,
+              size,
+              product:products(nama_produk)
+            )
+          )
         `)
-        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -1087,61 +1157,121 @@ export const useSales = () => {
     }
   };
 
-  const createSale = async (saleData: any) => {
+  const createSale = async (saleData: any, items: any[]) => {
     try {
-      const { data, error } = await supabase
+      // Calculate totals
+      const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.harga_satuan), 0);
+      const total = subtotal + (saleData.ongkir || 0) - (saleData.diskon || 0);
+
+      const { data: sale, error } = await supabase
         .from('sales')
-        .insert([saleData])
-        .select();
+        .insert([{
+          ...saleData,
+          subtotal,
+          total
+        }])
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Create sale items
+      const itemsData = items.map(item => ({
+        sale_id: sale.id,
+        product_variant_id: item.product_variant_id,
+        quantity: item.quantity,
+        harga_satuan: item.harga_satuan,
+        subtotal: item.quantity * item.harga_satuan
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('sale_items')
+        .insert(itemsData);
+
+      if (itemsError) throw itemsError;
 
       await fetchSales();
       toast({
         title: "Berhasil",
         description: "Penjualan berhasil ditambahkan",
       });
-      return true;
+      return { error: null };
     } catch (error: any) {
       toast({
         title: "Error",
         description: "Gagal menambahkan penjualan",
         variant: "destructive",
       });
-      return false;
+      return { error };
     }
   };
 
-  const updateSale = async (id: string, saleData: any) => {
+  const updateSale = async (id: string, saleData: any, items: any[]) => {
     try {
+      // Calculate totals
+      const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.harga_satuan), 0);
+      const total = subtotal + (saleData.ongkir || 0) - (saleData.diskon || 0);
+
       const { error } = await supabase
         .from('sales')
-        .update(saleData)
+        .update({
+          ...saleData,
+          subtotal,
+          total
+        })
         .eq('id', id);
 
       if (error) throw error;
+
+      // Delete existing items
+      await supabase
+        .from('sale_items')
+        .delete()
+        .eq('sale_id', id);
+
+      // Create new items
+      const itemsData = items.map(item => ({
+        sale_id: id,
+        product_variant_id: item.product_variant_id,
+        quantity: item.quantity,
+        harga_satuan: item.harga_satuan,
+        subtotal: item.quantity * item.harga_satuan
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('sale_items')
+        .insert(itemsData);
+
+      if (itemsError) throw itemsError;
 
       await fetchSales();
       toast({
         title: "Berhasil",
         description: "Penjualan berhasil diupdate",
       });
-      return true;
+      return { error: null };
     } catch (error: any) {
       toast({
         title: "Error",
         description: "Gagal mengupdate penjualan",
         variant: "destructive",
       });
-      return false;
+      return { error };
     }
   };
 
   const deleteSale = async (id: string) => {
     try {
+      // Delete sale items first
+      await supabase
+        .from('sale_items')
+        .delete()
+        .eq('sale_id', id);
+
+      // Delete sale
       const { error } = await supabase
         .from('sales')
-        .update({ is_active: false })
+        .delete()
         .eq('id', id);
 
       if (error) throw error;
@@ -1182,9 +1312,20 @@ export const usePurchases = () => {
         .from('purchases')
         .select(`
           *,
-          supplier:suppliers(nama_supplier)
+          supplier:suppliers(nama_supplier),
+          purchase_items(
+            id,
+            quantity,
+            harga_beli_satuan,
+            subtotal,
+            product_variant:product_variants(
+              id,
+              warna,
+              size,
+              products:products(nama_produk)
+            )
+          )
         `)
-        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -1200,28 +1341,52 @@ export const usePurchases = () => {
     }
   };
 
-  const createPurchase = async (purchaseData: any) => {
+  const createPurchase = async (purchaseData: any, items: any[]) => {
     try {
-      const { data, error } = await supabase
+      // Calculate totals
+      const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.harga_beli_satuan), 0);
+      const total = subtotal; // For now, purchases don't have additional fees
+
+      const { data: purchase, error } = await supabase
         .from('purchases')
-        .insert([purchaseData])
-        .select();
+        .insert([{
+          ...purchaseData,
+          subtotal,
+          total
+        }])
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Create purchase items
+      const itemsData = items.map(item => ({
+        purchase_id: purchase.id,
+        product_variant_id: item.product_variant_id,
+        quantity: item.quantity,
+        harga_beli_satuan: item.harga_beli_satuan,
+        subtotal: item.quantity * item.harga_beli_satuan
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('purchase_items')
+        .insert(itemsData);
+
+      if (itemsError) throw itemsError;
 
       await fetchPurchases();
       toast({
         title: "Berhasil",
         description: "Pembelian berhasil ditambahkan",
       });
-      return true;
+      return { error: null };
     } catch (error: any) {
       toast({
         title: "Error",
         description: "Gagal menambahkan pembelian",
         variant: "destructive",
       });
-      return false;
+      return { error };
     }
   };
 
@@ -1239,22 +1404,29 @@ export const usePurchases = () => {
         title: "Berhasil",
         description: "Pembelian berhasil diupdate",
       });
-      return true;
+      return { error: null };
     } catch (error: any) {
       toast({
         title: "Error",
         description: "Gagal mengupdate pembelian",
         variant: "destructive",
       });
-      return false;
+      return { error };
     }
   };
 
   const deletePurchase = async (id: string) => {
     try {
+      // Delete purchase items first
+      await supabase
+        .from('purchase_items')
+        .delete()
+        .eq('purchase_id', id);
+
+      // Delete purchase
       const { error } = await supabase
         .from('purchases')
-        .update({ is_active: false })
+        .delete()
         .eq('id', id);
 
       if (error) throw error;

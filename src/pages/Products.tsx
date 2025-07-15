@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -83,18 +82,6 @@ const Products = () => {
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      nama_produk: '',
-      satuan: 'pcs',
-      harga_beli: 0,
-      harga_jual_default: 0,
-      deskripsi: '',
-      variants: [{ warna: '', size: '', stok: 0 }]
-    });
-    setEditingProduct(null);
-  };
-
   const handleEdit = (product: any) => {
     setEditingProduct(product);
     setFormData({
@@ -114,6 +101,18 @@ const Products = () => {
     if (window.confirm('Yakin ingin menghapus produk ini?')) {
       await deleteProduct(id);
     }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      nama_produk: '',
+      satuan: 'pcs',
+      harga_beli: 0,
+      harga_jual_default: 0,
+      deskripsi: '',
+      variants: [{ warna: '', size: '', stok: 0 }]
+    });
+    setEditingProduct(null);
   };
 
   const addVariant = () => {
