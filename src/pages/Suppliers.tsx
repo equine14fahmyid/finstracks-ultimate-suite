@@ -71,12 +71,12 @@ const Suppliers = () => {
     }
   };
 
-  const columns: ColumnDef<Supplier>[] = [
+  const columns = [
     {
-      accessorKey: "nama_supplier",
-      header: "Nama Supplier",
-      cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("nama_supplier")}</div>
+      key: "nama_supplier",
+      title: "Nama Supplier",
+      render: (supplier: any) => (
+        <div className="font-medium">{supplier.nama_supplier}</div>
       ),
     },
     {

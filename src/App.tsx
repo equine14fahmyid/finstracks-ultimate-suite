@@ -7,7 +7,9 @@ import { AuthProvider } from "@/hooks/useAuth";
 import AppLayout from "@/components/layout/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import Login from "@/pages/Login";
-import Suppliers from "@/pages/Suppliers";
+import Suppliers from '@/pages/Suppliers';
+import Products from '@/pages/Products';
+import Sales from '@/pages/Sales';
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -37,127 +39,21 @@ const App = () => (
               </AppLayout>
             } />
             
-            {/* Placeholder routes for future features */}
             <Route path="/sales" element={
               <AppLayout>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Penjualan</h1>
-                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
-                </div>
-              </AppLayout>
-            } />
-            
-            <Route path="/purchases" element={
-              <AppLayout>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Pembelian</h1>
-                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
-                </div>
+                <Sales />
               </AppLayout>
             } />
             
             <Route path="/products" element={
               <AppLayout>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Produk</h1>
-                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
-                </div>
-              </AppLayout>
-            } />
-            
-            <Route path="/inventory" element={
-              <AppLayout>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Stok</h1>
-                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
-                </div>
-              </AppLayout>
-            } />
-            
-            <Route path="/incomes" element={
-              <AppLayout>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Pemasukan</h1>
-                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
-                </div>
-              </AppLayout>
-            } />
-            
-            <Route path="/expenses" element={
-              <AppLayout>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Pengeluaran</h1>
-                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
-                </div>
-              </AppLayout>
-            } />
-            
-            <Route path="/banks" element={
-              <AppLayout>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Bank</h1>
-                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
-                </div>
+                <Products />
               </AppLayout>
             } />
             
             <Route path="/suppliers" element={
               <AppLayout>
                 <Suppliers />
-              </AppLayout>
-            } />
-            
-            <Route path="/platforms" element={
-              <AppLayout>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Platform</h1>
-                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
-                </div>
-              </AppLayout>
-            } />
-            
-            <Route path="/stores" element={
-              <AppLayout>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Toko</h1>
-                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
-                </div>
-              </AppLayout>
-            } />
-            
-            <Route path="/expeditions" element={
-              <AppLayout>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Ekspedisi</h1>
-                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
-                </div>
-              </AppLayout>
-            } />
-            
-            <Route path="/reports/*" element={
-              <AppLayout>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Laporan</h1>
-                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
-                </div>
-              </AppLayout>
-            } />
-            
-            <Route path="/settings" element={
-              <AppLayout>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Pengaturan</h1>
-                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
-                </div>
-              </AppLayout>
-            } />
-            
-            <Route path="/users" element={
-              <AppLayout>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Pengguna</h1>
-                  <p className="text-muted-foreground">Fitur akan ditambahkan pada versi berikutnya</p>
-                </div>
               </AppLayout>
             } />
             
