@@ -480,11 +480,71 @@ export const usePurchases = () => {
     }
   };
 
+  const updatePurchase = async (id: string, purchaseData: any) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('purchases')
+        .update(purchaseData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Pembelian berhasil diupdate",
+      });
+
+      fetchPurchases();
+      return { data, error: null };
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal mengupdate pembelian: ${error.message}`,
+        variant: "destructive",
+      });
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deletePurchase = async (id: string) => {
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('purchases')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Pembelian berhasil dihapus",
+      });
+
+      fetchPurchases();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal menghapus pembelian: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     purchases,
     loading,
     fetchPurchases,
     createPurchase,
+    updatePurchase,
+    deletePurchase,
   };
 };
 

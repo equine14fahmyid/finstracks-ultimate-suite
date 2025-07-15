@@ -16,6 +16,13 @@ import Incomes from '@/pages/Incomes';
 import Expenses from '@/pages/Expenses';
 import Banks from '@/pages/Banks';
 import Settlements from '@/pages/Settlements';
+import Platforms from '@/pages/Platforms';
+import Stores from '@/pages/Stores';
+import Expeditions from '@/pages/Expeditions';
+import Categories from '@/pages/Categories';
+import Purchases from '@/pages/Purchases';
+import Users from '@/pages/Users';
+import Settings from '@/pages/Settings';
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -73,12 +80,12 @@ const App = () => (
             {/* Purchase Routes */}
             <Route path="/purchases" element={
               <AppLayout>
-                <div className="p-6"><h1>Purchases - Coming Soon</h1></div>
+                <Purchases />
               </AppLayout>
             } />
             <Route path="/purchases/create" element={
               <AppLayout>
-                <div className="p-6"><h1>Create Purchase - Coming Soon</h1></div>
+                <Purchases />
               </AppLayout>
             } />
             
@@ -114,22 +121,22 @@ const App = () => (
             {/* Master Data Routes */}
             <Route path="/platforms" element={
               <AppLayout>
-                <div className="p-6"><h1>Platforms - Coming Soon</h1></div>
+                <Platforms />
               </AppLayout>
             } />
             <Route path="/stores" element={
               <AppLayout>
-                <div className="p-6"><h1>Stores - Coming Soon</h1></div>
+                <Stores />
               </AppLayout>
             } />
             <Route path="/expeditions" element={
               <AppLayout>
-                <div className="p-6"><h1>Expeditions - Coming Soon</h1></div>
+                <Expeditions />
               </AppLayout>
             } />
             <Route path="/categories" element={
               <AppLayout>
-                <div className="p-6"><h1>Categories - Coming Soon</h1></div>
+                <Categories />
               </AppLayout>
             } />
             
@@ -158,12 +165,12 @@ const App = () => (
             {/* Admin Routes */}
             <Route path="/users" element={
               <AppLayout>
-                <div className="p-6"><h1>User Management - Coming Soon</h1></div>
+                <Users />
               </AppLayout>
             } />
             <Route path="/settings" element={
               <AppLayout>
-                <div className="p-6"><h1>Settings - Coming Soon</h1></div>
+                <Settings />
               </AppLayout>
             } />
             
