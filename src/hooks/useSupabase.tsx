@@ -118,6 +118,175 @@ export const useDashboardAnalytics = (startDate: string, endDate: string) => {
 };
 
 // ============================================================================
+// TOP PRODUCTS ANALYTICS HOOK
+// ============================================================================
+
+export const useTopProducts = (startDate: string, endDate: string, limit: number = 5) => {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (startDate && endDate) {
+      fetchTopProducts();
+    }
+  }, [startDate, endDate, limit]);
+
+  const fetchTopProducts = async () => {
+    try {
+      setLoading(true);
+      
+      // Query untuk mendapatkan top products berdasarkan quantity dan revenue
+      const { data: topProductsData, error } = await supabase
+        .from('sale_items')
+        .select(`
+          quantity,
+          harga_satuan,
+          subtotal,
+          product_variant:product_variants (
+            id,
+            warna,
+            size,
+            product:products (
+              nama_produk
+            )
+          ),
+          sale:sales!inner (
+            tanggal
+          )
+        `)
+        .gte('sale.tanggal', startDate)
+        .lte('sale.tanggal', endDate);
+
+      if (error) throw error;
+
+      // Aggregate data by product
+      const productMap = new Map();
+      
+      topProductsData?.forEach(item => {
+        const productName = item.product_variant?.product?.nama_produk || 'Unknown';
+        const variantName = `${item.product_variant?.warna} - ${item.product_variant?.size}`;
+        const key = `${productName} (${variantName})`;
+        
+        if (productMap.has(key)) {
+          const existing = productMap.get(key);
+          existing.quantity += item.quantity;
+          existing.revenue += item.subtotal;
+        } else {
+          productMap.set(key, {
+            name: key,
+            productName,
+            variantName,
+            quantity: item.quantity,
+            revenue: item.subtotal,
+          });
+        }
+      });
+
+      // Convert to array and sort by revenue
+      const aggregatedData = Array.from(productMap.values())
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, limit);
+
+      setData(aggregatedData);
+    } catch (error: any) {
+      console.error('Fetch top products error:', error);
+      toast({
+        title: "Error",
+        description: `Gagal memuat data top produk: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    data,
+    loading,
+  };
+};
+
+// ============================================================================
+// PLATFORM PERFORMANCE ANALYTICS HOOK
+// ============================================================================
+
+export const usePlatformPerformance = (startDate: string, endDate: string) => {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (startDate && endDate) {
+      fetchPlatformPerformance();
+    }
+  }, [startDate, endDate]);
+
+  const fetchPlatformPerformance = async () => {
+    try {
+      setLoading(true);
+      
+      // Query untuk mendapatkan performa platform
+      const { data: salesData, error } = await supabase
+        .from('sales')
+        .select(`
+          total,
+          tanggal,
+          store:stores!inner (
+            nama_toko,
+            platform:platforms!inner (
+              nama_platform
+            )
+          )
+        `)
+        .gte('tanggal', startDate)
+        .lte('tanggal', endDate);
+
+      if (error) throw error;
+
+      // Aggregate data by platform
+      const platformMap = new Map();
+      
+      salesData?.forEach(sale => {
+        const platformName = sale.store?.platform?.nama_platform || 'Unknown';
+        
+        if (platformMap.has(platformName)) {
+          const existing = platformMap.get(platformName);
+          existing.revenue += sale.total;
+          existing.transaction_count += 1;
+        } else {
+          platformMap.set(platformName, {
+            platform: platformName,
+            revenue: sale.total,
+            transaction_count: 1,
+          });
+        }
+      });
+
+      // Convert to array and sort by revenue
+      const aggregatedData = Array.from(platformMap.values())
+        .sort((a, b) => b.revenue - a.revenue);
+
+      setData(aggregatedData);
+    } catch (error: any) {
+      console.error('Fetch platform performance error:', error);
+      toast({
+        title: "Error",
+        description: `Gagal memuat data performa platform: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    data,
+    loading,
+  };
+};
+
+// ============================================================================
 // PRODUCTS MANAGEMENT HOOK
 // ============================================================================
 

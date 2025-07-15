@@ -9,8 +9,10 @@ import { toast } from '@/hooks/use-toast';
 import DateFilter from '@/components/dashboard/DateFilter';
 import SummaryCards from '@/components/dashboard/SummaryCards';
 import SalesChart from '@/components/dashboard/SalesChart';
+import TopProductsChart from '@/components/dashboard/TopProductsChart';
+import PlatformPerformanceChart from '@/components/dashboard/PlatformPerformanceChart';
 import { formatDate } from '@/utils/format';
-import { useDashboardAnalytics } from '@/hooks/useSupabase';
+import { useDashboardAnalytics, useTopProducts, usePlatformPerformance } from '@/hooks/useSupabase';
 
 interface DateRange {
   from: Date | undefined;
@@ -39,7 +41,7 @@ const Dashboard = () => {
   });
   const [refreshing, setRefreshing] = useState(false);
 
-  // Use the new analytics hook
+  // Use the analytics hooks
   const startDate = dateRange.from?.toISOString().split('T')[0] || '';
   const endDate = dateRange.to?.toISOString().split('T')[0] || '';
   
@@ -48,6 +50,16 @@ const Dashboard = () => {
     salesChart: salesData, 
     loading: analyticsLoading 
   } = useDashboardAnalytics(startDate, endDate);
+
+  const { 
+    data: topProductsData, 
+    loading: topProductsLoading 
+  } = useTopProducts(startDate, endDate, 5);
+
+  const { 
+    data: platformData, 
+    loading: platformLoading 
+  } = usePlatformPerformance(startDate, endDate);
 
   // Set loading based on analytics loading
   const loading = analyticsLoading;
@@ -141,29 +153,9 @@ const Dashboard = () => {
         </div>
 
         {/* Additional Charts would go here */}
-        <Card className="glass-card border-0 hover-lift">
-          <CardHeader>
-            <CardTitle className="text-lg">Top Produk</CardTitle>
-            <p className="text-sm text-muted-foreground">Produk terlaris periode ini</p>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Chart akan ditambahkan pada versi berikutnya</p>
-            </div>
-          </CardContent>
-        </Card>
+        <TopProductsChart data={topProductsData} loading={topProductsLoading} />
 
-        <Card className="glass-card border-0 hover-lift">
-          <CardHeader>
-            <CardTitle className="text-lg">Performa Platform</CardTitle>
-            <p className="text-sm text-muted-foreground">Penjualan per platform</p>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Chart akan ditambahkan pada versi berikutnya</p>
-            </div>
-          </CardContent>
-        </Card>
+        <PlatformPerformanceChart data={platformData} loading={platformLoading} />
       </div>
 
       {/* Quick Actions */}
