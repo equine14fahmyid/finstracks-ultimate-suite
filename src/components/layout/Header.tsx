@@ -31,7 +31,6 @@ interface HeaderProps {
 const Header = ({ onToggleSidebar }: HeaderProps) => {
   const { profile, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
-  const [notifications] = useState(3); // Mock notification count
 
   const handleSignOut = async () => {
     await signOut();

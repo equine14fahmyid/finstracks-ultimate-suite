@@ -17,7 +17,7 @@ interface SummaryCardsProps {
 }
 
 const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
-  // Use actual data from props, no dummy data
+  // Use real data from Supabase with safe fallback values
   const summaryData = data || {
     total_penjualan: 0,
     total_pengeluaran: 0,

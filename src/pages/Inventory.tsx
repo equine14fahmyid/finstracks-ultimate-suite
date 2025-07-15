@@ -41,75 +41,6 @@ const Inventory = () => {
     fetchProducts();
   }, []);
 
-  // Function to seed sample data for testing
-  const seedSampleData = async () => {
-    console.log('🌱 Seeding sample data...');
-    
-    try {
-      // Create sample products
-      const products = [
-        {
-          nama_produk: 'Kaos Batik Tasikmalaya',
-          harga_beli: 75000,
-          harga_jual_default: 125000,
-          satuan: 'pcs',
-          deskripsi: 'Kaos batik premium khas Tasikmalaya'
-        },
-        {
-          nama_produk: 'Tas Anyaman Pandan',
-          harga_beli: 45000,
-          harga_jual_default: 85000,
-          satuan: 'pcs',
-          deskripsi: 'Tas anyaman tradisional'
-        }
-      ];
-
-      for (const productData of products) {
-        const { data: product, error } = await supabase
-          .from('products')
-          .insert(productData)
-          .select()
-          .single();
-
-        if (!error && product) {
-          // Create variants for each product
-          const variants = [
-            { warna: 'Biru', size: 'M', stok: 25 },
-            { warna: 'Merah', size: 'L', stok: 15 },
-            { warna: 'Hijau', size: 'S', stok: 30 }
-          ];
-
-          for (const variant of variants) {
-            await supabase
-              .from('product_variants')
-              .insert({
-                product_id: product.id,
-                warna: variant.warna,
-                size: variant.size,
-                stok: variant.stok,
-                sku: `${product.id.slice(0, 4)}-${variant.warna.slice(0, 2)}-${variant.size}`.toUpperCase()
-              });
-          }
-        }
-      }
-
-      toast({
-        title: "Berhasil",
-        description: "Sample data berhasil ditambahkan!",
-      });
-      
-      // Refresh data
-      fetchStock();
-      fetchProducts();
-    } catch (error) {
-      console.error('Error seeding data:', error);
-      toast({
-        title: "Error",
-        description: "Gagal menambahkan sample data",
-        variant: "destructive",
-      });
-    }
-  };
 
   const resetVariantForm = () => {
     setVariantFormData({
@@ -445,20 +376,10 @@ const Inventory = () => {
         <EmptyState
           icon="📦"
           title="Belum Ada Data Stok"
-          description="Mulai dengan menambahkan produk dan varian untuk mengelola stok Anda. Anda juga bisa menambahkan data sample untuk testing."
+          description="Mulai dengan menambahkan produk dan varian untuk mengelola stok Anda. Buka menu Master Data > Produk untuk menambahkan produk baru."
           actionLabel="+ Tambah Produk"
           onAction={() => navigate('/master-data/products')}
         />
-
-        <div className="flex gap-4 justify-center">
-          <Button 
-            onClick={seedSampleData}
-            variant="outline"
-            className="gradient-primary"
-          >
-            🌱 Tambah Data Sample (Testing)
-          </Button>
-        </div>
       </div>
     );
   }
@@ -521,13 +442,6 @@ const Inventory = () => {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Level Stok Saat Ini</CardTitle>
           <div className="flex gap-2">
-            <Button 
-              onClick={seedSampleData}
-              variant="outline"
-              size="sm"
-            >
-              🌱 Tambah Sample Data
-            </Button>
             <Dialog open={variantDialogOpen} onOpenChange={(open) => {
               setVariantDialogOpen(open);
               if (!open) resetVariantForm();
