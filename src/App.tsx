@@ -28,6 +28,7 @@ import BalanceSheet from '@/pages/reports/BalanceSheet';
 import CashFlow from '@/pages/reports/CashFlow';
 import Analytics from '@/pages/reports/Analytics';
 import Adjustments from '@/pages/Adjustments';
+import Assets from '@/pages/Assets';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -99,6 +100,11 @@ const App = () => (
                 <Inventory />
               </AppLayout>
             } />
+            <Route path="/inventori/stok" element={
+              <AppLayout>
+                <Inventory />
+              </AppLayout>
+            } />
             
             {/* Finance Routes */}
             <Route path="/incomes" element={
@@ -146,6 +152,11 @@ const App = () => (
             <Route path="/categories" element={
               <AppLayout>
                 <Categories />
+              </AppLayout>
+            } />
+            <Route path="/master-data/asset" element={
+              <AppLayout>
+                <Assets />
               </AppLayout>
             } />
             

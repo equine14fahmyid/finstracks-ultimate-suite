@@ -79,7 +79,7 @@ const navigationItems: NavItem[] = [
     permission: 'inventory.read',
     children: [
       { title: 'Produk', href: '/products', icon: Package2 },
-      { title: 'Stok', href: '/inventory', icon: BarChart3 },
+      { title: 'Stok', href: '/inventori/stok', icon: BarChart3 },
       { title: 'Supplier', href: '/suppliers', icon: Building2 },
     ]
   },
@@ -104,6 +104,7 @@ const navigationItems: NavItem[] = [
       { title: 'Toko', href: '/stores', icon: Building2 },
       { title: 'Ekspedisi', href: '/expeditions', icon: Truck },
       { title: 'Kategori', href: '/categories', icon: Tags },
+      { title: 'Asset', href: '/master-data/asset', icon: Building2 },
     ]
   },
   {
