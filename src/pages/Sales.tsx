@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, ShoppingCart, Eye, Calendar } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useSales, useStockManagement, useExpeditions } from '@/hooks/useSupabase';
+import { useSales, useStock, useExpeditions, useStores } from '@/hooks/useSupabase';
 import { DataTable } from '@/components/common/DataTable';
 import { formatCurrency, formatShortDate } from '@/utils/format';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -17,6 +18,7 @@ import { toast } from '@/hooks/use-toast';
 interface SaleFormData {
   tanggal: string;
   no_pesanan_platform: string;
+  store_id: string;
   customer_name: string;
   customer_phone: string;
   customer_address: string;
@@ -37,12 +39,14 @@ interface SaleFormData {
 const Sales = () => {
   const { hasPermission } = useAuth();
   const { sales, loading, fetchSales, createSale } = useSales();
-  const { products: stockProducts, fetchProducts } = useStockManagement();
+  const { stock: stockProducts, fetchStock } = useStock();
   const { expeditions, fetchExpeditions } = useExpeditions();
+  const { stores, fetchStores } = useStores();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<SaleFormData>({
     tanggal: new Date().toISOString().split('T')[0],
     no_pesanan_platform: '',
+    store_id: '',
     customer_name: '',
     customer_phone: '',
     customer_address: '',
@@ -56,14 +60,15 @@ const Sales = () => {
 
   useEffect(() => {
     fetchSales();
-    fetchProducts();
+    fetchStock();
     fetchExpeditions();
+    fetchStores();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.no_pesanan_platform || !formData.customer_name || formData.items.length === 0) {
+    if (!formData.no_pesanan_platform || !formData.customer_name || !formData.store_id || formData.items.length === 0) {
       toast({
         title: "Error",
         description: "Mohon lengkapi data penjualan",
@@ -89,6 +94,7 @@ const Sales = () => {
     const saleData = {
       tanggal: formData.tanggal,
       no_pesanan_platform: formData.no_pesanan_platform,
+      store_id: formData.store_id,
       customer_name: formData.customer_name,
       customer_phone: formData.customer_phone || null,
       customer_address: formData.customer_address || null,
@@ -110,6 +116,7 @@ const Sales = () => {
     setFormData({
       tanggal: new Date().toISOString().split('T')[0],
       no_pesanan_platform: '',
+      store_id: '',
       customer_name: '',
       customer_phone: '',
       customer_address: '',
@@ -197,6 +204,16 @@ const Sales = () => {
         <div>
           <div className="font-medium">{sale.no_pesanan_platform}</div>
           <div className="text-sm text-muted-foreground">{sale.customer_name}</div>
+        </div>
+      )
+    },
+    {
+      key: 'store',
+      title: 'Toko',
+      render: (sale: any) => (
+        <div>
+          <div className="font-medium">{sale.store?.nama_toko}</div>
+          <div className="text-sm text-muted-foreground">{sale.store?.platform?.nama_platform}</div>
         </div>
       )
     },
@@ -295,6 +312,24 @@ const Sales = () => {
                       placeholder="TKP12345678"
                       required
                     />
+                  </div>
+                  <div>
+                    <Label htmlFor="store_id">Toko *</Label>
+                    <Select 
+                      value={formData.store_id} 
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, store_id: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih toko" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stores.map((store) => (
+                          <SelectItem key={store.id} value={store.id}>
+                            {store.nama_toko} - {store.platform?.nama_platform}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <Label htmlFor="customer_name">Nama Customer *</Label>
