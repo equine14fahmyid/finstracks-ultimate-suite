@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -262,12 +263,12 @@ const Dashboard = () => {
           <SalesChart data={salesData} loading={loading} />
         </div>
 
-        {/* Interactive Charts with Drill-down */}
+        {/* Interactive Charts with Drill-down - Simplified for now */}
         <InteractiveTopProductsChart 
           data={topProductsData} 
           loading={topProductsLoading}
           onProductClick={fetchProductDrillDown}
-          drillDownData={drillDownData}
+          drillDownData={drillDownData as any}
           drillDownLoading={drillDownLoading}
           selectedProduct={selectedProduct}
           onCloseDrillDown={clearDrillDown}
@@ -277,7 +278,7 @@ const Dashboard = () => {
           data={platformData} 
           loading={platformLoading}
           onPlatformClick={fetchPlatformDrillDown}
-          drillDownData={drillDownData}
+          drillDownData={drillDownData as any}
           drillDownLoading={drillDownLoading}
           selectedPlatform={selectedPlatform}
           onCloseDrillDown={clearDrillDown}

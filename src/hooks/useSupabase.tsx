@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from './use-toast';
@@ -145,7 +146,7 @@ export const useStock = () => {
           sku,
           product_id,
           created_at,
-          product:products!inner(
+          products!inner(
             id,
             nama_produk,
             harga_beli,
@@ -154,7 +155,7 @@ export const useStock = () => {
           )
         `)
         .eq('is_active', true)
-        .eq('product.is_active', true)
+        .eq('products.is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -304,4 +305,997 @@ export const useStock = () => {
     updateProductVariant,
     deleteProductVariant
   };
+};
+
+// Banks hooks
+export const useBanks = () => {
+  const [banks, setBanks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchBanks = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('banks')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setBanks(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal memuat data bank",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createBank = async (bankData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('banks')
+        .insert([bankData])
+        .select();
+
+      if (error) throw error;
+
+      await fetchBanks();
+      toast({
+        title: "Berhasil",
+        description: "Bank berhasil ditambahkan",
+      });
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menambahkan bank",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const updateBank = async (id: string, bankData: any) => {
+    try {
+      const { error } = await supabase
+        .from('banks')
+        .update(bankData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchBanks();
+      toast({
+        title: "Berhasil",
+        description: "Bank berhasil diupdate",
+      });
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal mengupdate bank",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const deleteBank = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('banks')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchBanks();
+      toast({
+        title: "Berhasil",
+        description: "Bank berhasil dihapus",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menghapus bank",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return {
+    banks,
+    loading,
+    fetchBanks,
+    createBank,
+    updateBank,
+    deleteBank
+  };
+};
+
+// Categories hooks
+export const useCategories = () => {
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchCategories = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal memuat data kategori",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createCategory = async (categoryData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .insert([categoryData])
+        .select();
+
+      if (error) throw error;
+
+      await fetchCategories();
+      toast({
+        title: "Berhasil",
+        description: "Kategori berhasil ditambahkan",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menambahkan kategori",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateCategory = async (id: string, categoryData: any) => {
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .update(categoryData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchCategories();
+      toast({
+        title: "Berhasil",
+        description: "Kategori berhasil diupdate",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal mengupdate kategori",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchCategories();
+      toast({
+        title: "Berhasil",
+        description: "Kategori berhasil dihapus",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menghapus kategori",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return {
+    categories,
+    loading,
+    fetchCategories,
+    createCategory,
+    updateCategory,
+    deleteCategory
+  };
+};
+
+// Expeditions hooks
+export const useExpeditions = () => {
+  const [expeditions, setExpeditions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchExpeditions = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('expeditions')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setExpeditions(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal memuat data ekspedisi",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createExpedition = async (expeditionData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('expeditions')
+        .insert([expeditionData])
+        .select();
+
+      if (error) throw error;
+
+      await fetchExpeditions();
+      toast({
+        title: "Berhasil",
+        description: "Ekspedisi berhasil ditambahkan",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menambahkan ekspedisi",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateExpedition = async (id: string, expeditionData: any) => {
+    try {
+      const { error } = await supabase
+        .from('expeditions')
+        .update(expeditionData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchExpeditions();
+      toast({
+        title: "Berhasil",
+        description: "Ekspedisi berhasil diupdate",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal mengupdate ekspedisi",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteExpedition = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('expeditions')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchExpeditions();
+      toast({
+        title: "Berhasil",
+        description: "Ekspedisi berhasil dihapus",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menghapus ekspedisi",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return {
+    expeditions,
+    loading,
+    fetchExpeditions,
+    createExpedition,
+    updateExpedition,
+    deleteExpedition
+  };
+};
+
+// Platforms hooks
+export const usePlatforms = () => {
+  const [platforms, setPlatforms] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchPlatforms = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('platforms')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPlatforms(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal memuat data platform",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createPlatform = async (platformData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('platforms')
+        .insert([platformData])
+        .select();
+
+      if (error) throw error;
+
+      await fetchPlatforms();
+      toast({
+        title: "Berhasil",
+        description: "Platform berhasil ditambahkan",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menambahkan platform",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updatePlatform = async (id: string, platformData: any) => {
+    try {
+      const { error } = await supabase
+        .from('platforms')
+        .update(platformData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchPlatforms();
+      toast({
+        title: "Berhasil",
+        description: "Platform berhasil diupdate",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal mengupdate platform",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deletePlatform = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('platforms')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchPlatforms();
+      toast({
+        title: "Berhasil",
+        description: "Platform berhasil dihapus",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menghapus platform",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return {
+    platforms,
+    loading,
+    fetchPlatforms,
+    createPlatform,
+    updatePlatform,
+    deletePlatform
+  };
+};
+
+// Stores hooks
+export const useStores = () => {
+  const [stores, setStores] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchStores = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('stores')
+        .select(`
+          *,
+          platform:platforms(nama_platform)
+        `)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setStores(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal memuat data toko",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createStore = async (storeData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('stores')
+        .insert([storeData])
+        .select();
+
+      if (error) throw error;
+
+      await fetchStores();
+      toast({
+        title: "Berhasil",
+        description: "Toko berhasil ditambahkan",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menambahkan toko",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateStore = async (id: string, storeData: any) => {
+    try {
+      const { error } = await supabase
+        .from('stores')
+        .update(storeData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchStores();
+      toast({
+        title: "Berhasil",
+        description: "Toko berhasil diupdate",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal mengupdate toko",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteStore = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('stores')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchStores();
+      toast({
+        title: "Berhasil",
+        description: "Toko berhasil dihapus",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menghapus toko",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return {
+    stores,
+    loading,
+    fetchStores,
+    createStore,
+    updateStore,
+    deleteStore
+  };
+};
+
+// Suppliers hooks
+export const useSuppliers = () => {
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchSuppliers = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSuppliers(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal memuat data supplier",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createSupplier = async (supplierData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .insert([supplierData])
+        .select();
+
+      if (error) throw error;
+
+      await fetchSuppliers();
+      toast({
+        title: "Berhasil",
+        description: "Supplier berhasil ditambahkan",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menambahkan supplier",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateSupplier = async (id: string, supplierData: any) => {
+    try {
+      const { error } = await supabase
+        .from('suppliers')
+        .update(supplierData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchSuppliers();
+      toast({
+        title: "Berhasil",
+        description: "Supplier berhasil diupdate",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal mengupdate supplier",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteSupplier = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('suppliers')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchSuppliers();
+      toast({
+        title: "Berhasil",
+        description: "Supplier berhasil dihapus",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menghapus supplier",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return {
+    suppliers,
+    loading,
+    fetchSuppliers,
+    createSupplier,
+    updateSupplier,
+    deleteSupplier
+  };
+};
+
+// User Profiles hooks
+export const useUserProfiles = () => {
+  const [userProfiles, setUserProfiles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchUserProfiles = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setUserProfiles(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal memuat data pengguna",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createUserProfile = async (userData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .insert([userData])
+        .select();
+
+      if (error) throw error;
+
+      await fetchUserProfiles();
+      toast({
+        title: "Berhasil",
+        description: "Pengguna berhasil ditambahkan",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menambahkan pengguna",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateUserProfile = async (id: string, userData: any) => {
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update(userData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchUserProfiles();
+      toast({
+        title: "Berhasil",
+        description: "Pengguna berhasil diupdate",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal mengupdate pengguna",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteUserProfile = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchUserProfiles();
+      toast({
+        title: "Berhasil",
+        description: "Pengguna berhasil dihapus",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menghapus pengguna",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return {
+    userProfiles,
+    loading,
+    fetchUserProfiles,
+    createUserProfile,
+    updateUserProfile,
+    deleteUserProfile
+  };
+};
+
+// Sales hooks  
+export const useSales = () => {
+  const [sales, setSales] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchSales = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('sales')
+        .select(`
+          *,
+          store:stores(nama_toko),
+          expedition:expeditions(nama_ekspedisi)
+        `)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSales(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal memuat data penjualan",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createSale = async (saleData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('sales')
+        .insert([saleData])
+        .select();
+
+      if (error) throw error;
+
+      await fetchSales();
+      toast({
+        title: "Berhasil",
+        description: "Penjualan berhasil ditambahkan",
+      });
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menambahkan penjualan",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const updateSale = async (id: string, saleData: any) => {
+    try {
+      const { error } = await supabase
+        .from('sales')
+        .update(saleData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchSales();
+      toast({
+        title: "Berhasil",
+        description: "Penjualan berhasil diupdate",
+      });
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal mengupdate penjualan",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const deleteSale = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('sales')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchSales();
+      toast({
+        title: "Berhasil",
+        description: "Penjualan berhasil dihapus",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menghapus penjualan",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return {
+    sales,
+    loading,
+    fetchSales,
+    createSale,
+    updateSale,
+    deleteSale
+  };
+};
+
+// Purchases hooks
+export const usePurchases = () => {
+  const [purchases, setPurchases] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchPurchases = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('purchases')
+        .select(`
+          *,
+          supplier:suppliers(nama_supplier)
+        `)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPurchases(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal memuat data pembelian",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createPurchase = async (purchaseData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('purchases')
+        .insert([purchaseData])
+        .select();
+
+      if (error) throw error;
+
+      await fetchPurchases();
+      toast({
+        title: "Berhasil",
+        description: "Pembelian berhasil ditambahkan",
+      });
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menambahkan pembelian",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const updatePurchase = async (id: string, purchaseData: any) => {
+    try {
+      const { error } = await supabase
+        .from('purchases')
+        .update(purchaseData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchPurchases();
+      toast({
+        title: "Berhasil",
+        description: "Pembelian berhasil diupdate",
+      });
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal mengupdate pembelian",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const deletePurchase = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('purchases')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchPurchases();
+      toast({
+        title: "Berhasil",
+        description: "Pembelian berhasil dihapus",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal menghapus pembelian",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return {
+    purchases,
+    loading,
+    fetchPurchases,
+    createPurchase,
+    updatePurchase,
+    deletePurchase
+  };
+};
+
+// Add placeholder functions for missing dashboard hooks
+export const useTopProducts = (startDate: string, endDate: string, limit: number = 5) => {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Placeholder - will be implemented later
+  return { data, loading };
+};
+
+export const usePlatformPerformance = (startDate: string, endDate: string) => {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Placeholder - will be implemented later
+  return { data, loading };
 };
