@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 
 interface UserSettings {
-  modal_awal: number;
+  modal_awal: number; // <-- TAMBAHKAN BARIS INI
   company_name: string;
   company_address: string;
   company_phone: string;
@@ -66,16 +66,22 @@ export const useUserSettings = () => {
     try {
       setLoading(true);
 
+      // Ambil ID dari settings yang ada, karena upsert butuh user_id
+      // dan kita juga perlu memastikan ada baris untuk diupdate
+      const currentSettingsId = settings?.id; 
+
       const { error } = await supabase
         .from('user_settings')
         .upsert({
-          user_id: user.id,
           ...newSettings,
+          user_id: user.id,
+          id: currentSettingsId, // Pastikan ID disertakan untuk update
         });
 
       if (error) throw error;
 
-      setSettings(prev => prev ? { ...prev, ...newSettings } : null);
+      // Refresh data dari server untuk memastikan konsistensi
+      await fetchSettings();
       
       toast({
         title: "Berhasil",
@@ -97,7 +103,9 @@ export const useUserSettings = () => {
   };
 
   useEffect(() => {
-    fetchSettings();
+    if(user) {
+      fetchSettings();
+    }
   }, [user]);
 
   return {
@@ -107,6 +115,3 @@ export const useUserSettings = () => {
     refreshSettings: fetchSettings,
   };
 };
-// file: src/hooks/useUserSettings.tsx
-
-import { useState, useEffect } from 'react';
