@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, Download, ExternalLink, AlertTriangle } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, differenceInCalendarMonths } from 'date-fns'; // PERBAIKAN: Import differenceInCalendarMonths
 import { Link } from 'react-router-dom';
 import { id } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -45,25 +45,12 @@ interface BalanceSheetData {
 const BalanceSheet = () => {
   const [reportDate, setReportDate] = useState<Date>(new Date());
 
-  // Helper function to calculate months between dates (FIXED)
-  const calculateMonthsBetween = (startDate: string, endDate: Date): number => {
+  // PERBAIKAN: Fungsi kalkulasi bulan yang lebih akurat menggunakan date-fns
+  const calculateMonthsUsed = (startDate: string, endDate: Date): number => {
     const start = new Date(startDate);
-    const end = endDate;
-    
-    // Calculate total days difference
-    const daysDiff = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
-    
-    // Convert to months (more accurate)
-    const monthsUsed = daysDiff / 30;
-    
-    console.log(`Asset depreciation calculation:`, {
-      startDate,
-      endDate: end.toISOString().split('T')[0],
-      daysDiff,
-      monthsUsed
-    });
-    
-    return Math.max(0, monthsUsed);
+    // differenceInCalendarMonths akan menghitung jumlah bulan penuh yang telah berlalu.
+    const months = differenceInCalendarMonths(endDate, start);
+    return Math.max(0, months);
   };
 
   const { data: balanceSheetData, isLoading } = useQuery({
@@ -71,7 +58,6 @@ const BalanceSheet = () => {
     queryFn: async (): Promise<BalanceSheetData> => {
       try {
         const reportDateStr = format(reportDate, 'yyyy-MM-dd');
-        
         console.log('Generating Balance Sheet for date:', reportDateStr);
 
         // 1. Fetch bank balances (current balances)
@@ -95,17 +81,16 @@ const BalanceSheet = () => {
           `)
           .eq('is_active', true);
 
-        // 4. Fetch assets data for depreciation calculation (IMPROVED QUERY)
+        // 4. Fetch assets data for depreciation calculation
         const { data: assetsData, error: assetsError } = await supabase
           .from('assets')
-          .select('harga_perolehan, penyusutan_per_bulan, tanggal_perolehan, nama_asset, kode_asset')
+          .select('harga_perolehan, penyusutan_per_bulan, tanggal_perolehan')
           .eq('is_active', true)
-          .lte('tanggal_perolehan', reportDateStr); // Only assets acquired before report date
+          .lte('tanggal_perolehan', reportDateStr);
 
         if (assetsError) {
           console.error('Error fetching assets:', assetsError);
-        } else {
-          console.log('Assets fetched:', assetsData?.length || 0);
+          throw assetsError;
         }
 
         // 5. Fetch pending purchases (hutang usaha)
@@ -128,10 +113,10 @@ const BalanceSheet = () => {
           .eq('status', 'delivered')
           .lte('tanggal', reportDateStr);
 
-        // 8. Fetch modal awal from user settings
+        // 8. Fetch user settings for modal_awal
         const { data: userSettings } = await supabase
           .from('user_settings')
-          .select('*')
+          .select('modal_awal') // PERBAIKAN: Hanya ambil kolom modal_awal
           .limit(1)
           .single();
 
@@ -141,111 +126,55 @@ const BalanceSheet = () => {
         const kasBankTotal = banksData?.reduce((sum, bank) => sum + (bank.saldo_akhir || 0), 0) || 0;
         const piutangTotal = storesData?.reduce((sum, store) => sum + (store.saldo_dashboard || 0), 0) || 0;
         const persediaanTotal = inventoryData?.reduce((sum, variant) => {
-          return sum + ((variant.stok || 0) * (variant.products?.harga_beli || 0));
+          const hargaBeli = Array.isArray(variant.products) ? variant.products[0]?.harga_beli : variant.products?.harga_beli;
+          return sum + ((variant.stok || 0) * (hargaBeli || 0));
         }, 0) || 0;
-
         const currentAssetsTotal = kasBankTotal + piutangTotal + persediaanTotal;
 
-        // Fixed Assets with date-based depreciation calculation (IMPROVED)
+        // Fixed Assets with corrected depreciation calculation
         let equipmentTotal = 0;
         let accumulatedDepreciation = 0;
-        let equipmentNetValue = 0;
 
-        console.log('Processing assets for depreciation:', assetsData?.length || 0);
-
-        if (assetsData && assetsData.length > 0) {
-          for (const asset of assetsData) {
-            const monthsUsed = calculateMonthsBetween(asset.tanggal_perolehan, reportDate);
+        if (assetsData) {
+          assetsData.forEach(asset => {
+            const monthsUsed = calculateMonthsUsed(asset.tanggal_perolehan, reportDate);
             const monthlyDepreciation = asset.penyusutan_per_bulan || 0;
             const assetCost = asset.harga_perolehan || 0;
             
-            // Calculate depreciation (cannot exceed asset cost)
-            const assetDepreciation = Math.min(
-              monthsUsed * monthlyDepreciation,
-              assetCost
-            );
-            
-            const assetNetValue = Math.max(0, assetCost - assetDepreciation);
-            
-            console.log(`Asset ${asset.tanggal_perolehan}:`, {
-              cost: assetCost,
-              monthsUsed,
-              monthlyDepreciation,
-              totalDepreciation: assetDepreciation,
-              netValue: assetNetValue
-            });
+            // Akumulasi penyusutan tidak boleh melebihi harga perolehan
+            const totalDepreciationForAsset = Math.min(monthsUsed * monthlyDepreciation, assetCost);
             
             equipmentTotal += assetCost;
-            accumulatedDepreciation += assetDepreciation;
-            equipmentNetValue += assetNetValue;
-          }
+            accumulatedDepreciation += totalDepreciationForAsset;
+          });
         }
-
-        console.log('Final fixed assets calculation:', {
-          equipmentTotal,
-          accumulatedDepreciation,
-          equipmentNetValue
-        });
-
+        
+        const equipmentNetValue = equipmentTotal - accumulatedDepreciation;
         const totalAssets = currentAssetsTotal + equipmentNetValue;
 
         // Liabilities
         const hutangUsaha = pendingPurchases?.reduce((sum, purchase) => sum + (purchase.total || 0), 0) || 0;
         const totalLiabilities = hutangUsaha;
 
-        // Equity - calculate retained earnings up to report date
+        // Equity
         const totalSales = salesData?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
         const totalExpenses = expensesData?.reduce((sum, expense) => sum + (expense.jumlah || 0), 0) || 0;
-        const labaDitahan = totalSales - totalExpenses;
+        
+        // Akumulasi penyusutan juga merupakan biaya, jadi harus dikurangkan dari laba
+        const labaDitahan = totalSales - totalExpenses - accumulatedDepreciation; 
 
-        // Modal awal from user settings or default
-        const modalAwal = userSettings?.company_name ? 50000000 : 50000000; // Could be configurable in user_settings
+        // PERBAIKAN: Ambil modal awal dari database, beri nilai 0 jika tidak ada
+        const modalAwal = userSettings?.modal_awal || 0;
         const totalEquity = modalAwal + labaDitahan;
-
-        console.log('Balance Sheet Calculations:', {
-          reportDate: reportDateStr,
-          currentAssets: {
-            kas_bank: kasBankTotal,
-            piutang: piutangTotal,
-            persediaan: persediaanTotal,
-            total: currentAssetsTotal
-          },
-          fixedAssets: {
-            equipment: equipmentTotal,
-            accumulated_depreciation: accumulatedDepreciation,
-            net_value: equipmentNetValue
-          },
-          liabilities: {
-            hutang_usaha: hutangUsaha
-          },
-          equity: {
-            modal_awal: modalAwal,
-            laba_ditahan: labaDitahan,
-            sales: totalSales,
-            expenses: totalExpenses
-          }
-        });
 
         return {
           assets: {
-            current_assets: {
-              kas_bank: kasBankTotal,
-              piutang: piutangTotal,
-              persediaan: persediaanTotal,
-              total: currentAssetsTotal
-            },
-            fixed_assets: {
-              equipment: equipmentTotal,
-              accumulated_depreciation: accumulatedDepreciation,
-              total: equipmentNetValue
-            },
+            current_assets: { kas_bank: kasBankTotal, piutang: piutangTotal, persediaan: persediaanTotal, total: currentAssetsTotal },
+            fixed_assets: { equipment: equipmentTotal, accumulated_depreciation: accumulatedDepreciation, total: equipmentNetValue },
             total_assets: totalAssets
           },
           liabilities: {
-            current_liabilities: {
-              hutang_usaha: hutangUsaha,
-              total: hutangUsaha
-            },
+            current_liabilities: { hutang_usaha: hutangUsaha, total: hutangUsaha },
             total_liabilities: hutangUsaha
           },
           equity: {
@@ -273,17 +202,17 @@ const BalanceSheet = () => {
     });
   };
 
-  // Calculate balance validation
-  const isBalanced = balanceSheetData ? 
-    Math.abs(balanceSheetData.assets.total_assets - (balanceSheetData.liabilities.total_liabilities + balanceSheetData.equity.total)) < 1 
+  const isBalanced = balanceSheetData ?
+    Math.abs(balanceSheetData.assets.total_assets - (balanceSheetData.liabilities.total_liabilities + balanceSheetData.equity.total)) < 1
     : true;
 
-  const balanceDifference = balanceSheetData ? 
+  const balanceDifference = balanceSheetData ?
     Math.abs(balanceSheetData.assets.total_assets - (balanceSheetData.liabilities.total_liabilities + balanceSheetData.equity.total))
     : 0;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      {/* ... SISA KODE JSX DI BAWAH INI SAMA, TIDAK PERLU DIUBAH ... */}
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -324,7 +253,7 @@ const BalanceSheet = () => {
                 />
               </PopoverContent>
             </Popover>
-            
+
             <div className="text-sm text-muted-foreground">
               <AlertTriangle className="h-4 w-4 inline mr-1" />
               Data dihitung sampai tanggal yang dipilih
@@ -388,7 +317,7 @@ const BalanceSheet = () => {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Akumulasi Penyusutan</span>
-                      <span>({formatCurrency(balanceSheetData?.assets.fixed_assets.accumulated_depreciation || 0)})</span>
+                      <span className="text-red-600">({formatCurrency(balanceSheetData?.assets.fixed_assets.accumulated_depreciation || 0)})</span>
                     </div>
                     <div className="flex justify-between font-medium border-t pt-2">
                       <span>Total Aset Tetap</span>
@@ -459,7 +388,7 @@ const BalanceSheet = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Laba Ditahan</span>
-                    <span className={balanceSheetData?.equity.laba_ditahan || 0 >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    <span className={(balanceSheetData?.equity.laba_ditahan ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
                       {formatCurrency(balanceSheetData?.equity.laba_ditahan || 0)}
                     </span>
                   </div>
@@ -469,9 +398,8 @@ const BalanceSheet = () => {
                   </div>
                 </div>
 
-                {/* Equity breakdown info */}
                 <div className="text-xs text-muted-foreground bg-gray-50 p-3 rounded">
-                  <div>💡 Laba ditahan dihitung dari seluruh penjualan dan pengeluaran sampai {format(reportDate, 'dd MMM yyyy', { locale: id })}</div>
+                  <div>💡 Laba ditahan dihitung dari (Total Penjualan - Total Biaya - Akumulasi Penyusutan) sampai {format(reportDate, 'dd MMM yyyy', { locale: id })}</div>
                 </div>
               </CardContent>
             </Card>
@@ -484,17 +412,17 @@ const BalanceSheet = () => {
                     <span>TOTAL KEWAJIBAN + EKUITAS</span>
                     <span>{formatCurrency((balanceSheetData?.liabilities.total_liabilities || 0) + (balanceSheetData?.equity.total || 0))}</span>
                   </div>
-                  
+
                   {/* Balance Sheet Validation */}
                   {balanceSheetData && (
                     <div className={cn(
                       "text-sm font-medium p-3 rounded-lg",
-                      isBalanced 
-                        ? "bg-green-100 text-green-800" 
+                      isBalanced
+                        ? "bg-green-100 text-green-800"
                         : "bg-red-100 text-red-800"
                     )}>
-                      {isBalanced 
-                        ? "✅ Neraca Seimbang" 
+                      {isBalanced
+                        ? "✅ Neraca Seimbang"
                         : `⚠️ Neraca Tidak Seimbang (Selisih: ${formatCurrency(balanceDifference)})`
                       }
                     </div>
