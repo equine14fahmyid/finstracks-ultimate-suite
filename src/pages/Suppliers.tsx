@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Building2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Building2, Bug } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,6 @@ import { formatDate, formatCurrency } from '@/utils/format';
 import { useSuppliers } from '@/hooks/useSupabase';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
-import { ColumnDef } from '@tanstack/react-table';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Supplier {
@@ -38,6 +37,7 @@ const Suppliers = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
   const [formData, setFormData] = useState({
     nama_supplier: '',
     alamat: '',
@@ -89,7 +89,7 @@ const Suppliers = () => {
 
   const handleEdit = (supplier: any) => {
     setFormData({
-      nama_supplier: supplier.nama_supplier,
+      nama_supplier: supplier.nama_supplier || '',
       alamat: supplier.alamat || '',
       no_hp: supplier.no_hp || '',
       email: supplier.email || '',
@@ -101,7 +101,6 @@ const Suppliers = () => {
   };
 
   const handleDelete = async (id: string) => {
-    // Check if supplier is being used in any purchases
     try {
       const { data: purchases, error } = await supabase
         .from('purchases')
@@ -131,79 +130,87 @@ const Suppliers = () => {
       });
     }
   };
+
+  // PERBAIKAN: Kolom configuration yang benar
   const columns = [
     {
       key: "nama_supplier",
       title: "Nama Supplier",
-      render: (supplier: any) => (
-        <div className="font-medium">{supplier.nama_supplier}</div>
+      render: (value: any, supplier: any) => (
+        <div className="font-medium">{supplier?.nama_supplier || value || '-'}</div>
       ),
     },
     {
       key: "deskripsi",
       title: "Deskripsi",
-      render: (supplier: any) => (
-        <div className="max-w-xs">
-          <div className="text-sm text-foreground font-medium">
-            {supplier.deskripsi ? (
-              <div className="line-clamp-2 break-words">
-                {supplier.deskripsi}
-              </div>
-            ) : (
-              <span className="text-muted-foreground italic">-</span>
-            )}
+      render: (value: any, supplier: any) => {
+        const deskripsi = supplier?.deskripsi || value;
+        return (
+          <div className="max-w-xs">
+            <div className="text-sm text-foreground font-medium">
+              {deskripsi ? (
+                <div className="line-clamp-2 break-words">
+                  {deskripsi}
+                </div>
+              ) : (
+                <span className="text-muted-foreground italic">-</span>
+              )}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: "alamat",
       title: "Alamat",
-      render: (supplier: any) => (
-        <div className="max-w-xs">
-          <div className="text-sm text-foreground">
-            {supplier.alamat ? (
-              <div className="line-clamp-2 break-words">
-                {supplier.alamat}
-              </div>
-            ) : (
-              <span className="text-muted-foreground italic">-</span>
-            )}
+      render: (value: any, supplier: any) => {
+        const alamat = supplier?.alamat || value;
+        return (
+          <div className="max-w-xs">
+            <div className="text-sm text-foreground">
+              {alamat ? (
+                <div className="line-clamp-2 break-words">
+                  {alamat}
+                </div>
+              ) : (
+                <span className="text-muted-foreground italic">-</span>
+              )}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: "no_hp",
       title: "No. HP",
-      render: (supplier: any) => (
+      render: (value: any, supplier: any) => (
         <div className="text-muted-foreground">
-          {supplier.no_hp || "-"}
+          {supplier?.no_hp || value || "-"}
         </div>
       ),
     },
     {
       key: "email",
       title: "Email",
-      render: (supplier: any) => (
+      render: (value: any, supplier: any) => (
         <div className="text-muted-foreground">
-          {supplier.email || "-"}
+          {supplier?.email || value || "-"}
         </div>
       ),
     },
     {
       key: "created_at",
       title: "Tgl Dibuat",
-      render: (supplier: any) => (
+      render: (value: any, supplier: any) => (
         <div className="text-sm text-muted-foreground">
-          {formatDate(supplier.created_at)}
+          {formatDate(supplier?.created_at || value)}
         </div>
       ),
     },
     {
       key: "actions",
       title: "Aksi",
-      render: (supplier: any) => (
+      render: (value: any, supplier: any) => (
         <div className="flex items-center gap-2">
           {hasPermission('suppliers.update') && (
             <Button 
@@ -220,7 +227,7 @@ const Suppliers = () => {
               variant="ghost" 
               size="sm" 
               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-              onClick={() => handleDelete(supplier.id)}
+              onClick={() => handleDelete(supplier?.id)}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -255,130 +262,164 @@ const Suppliers = () => {
           </p>
         </div>
 
-        {hasPermission('suppliers.create') && (
-          <Dialog open={isDialogOpen} onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) resetForm();
-          }}>
-            <DialogTrigger asChild>
-              <Button className="gradient-primary">
-                <Plus className="h-4 w-4 mr-2" />
-                Tambah Supplier
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="glass-card">
-              <form onSubmit={handleSubmit}>
-                <DialogHeader>
-                  <DialogTitle>
-                    {isEditMode ? 'Edit Supplier' : 'Tambah Supplier Baru'}
-                  </DialogTitle>
-                  <DialogDescription>
-                    {isEditMode 
-                      ? 'Perbarui informasi supplier' 
-                      : 'Lengkapi informasi supplier yang akan ditambahkan'
-                    }
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="nama_supplier">Nama Supplier *</Label>
-                    <Input
-                      id="nama_supplier"
-                      value={formData.nama_supplier}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        nama_supplier: e.target.value
-                      }))}
-                      placeholder="Masukkan nama supplier"
-                      className="glass-input"
-                      required
-                    />
-                  </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowDebug(!showDebug)}
+          >
+            <Bug className="h-4 w-4 mr-2" />
+            {showDebug ? 'Hide' : 'Show'} Debug
+          </Button>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="deskripsi">Deskripsi</Label>
-                    <Textarea
-                      id="deskripsi"
-                      value={formData.deskripsi}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        deskripsi: e.target.value
-                      }))}
-                      placeholder="Masukkan deskripsi supplier"
-                      className="glass-input"
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="alamat">Alamat</Label>
-                    <Textarea
-                      id="alamat"
-                      value={formData.alamat}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        alamat: e.target.value
-                      }))}
-                      placeholder="Masukkan alamat lengkap"
-                      className="glass-input"
-                      rows={2}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
+          {hasPermission('suppliers.create') && (
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
+            }}>
+              <DialogTrigger asChild>
+                <Button className="gradient-primary">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Tambah Supplier
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="glass-card">
+                <form onSubmit={handleSubmit}>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {isEditMode ? 'Edit Supplier' : 'Tambah Supplier Baru'}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {isEditMode 
+                        ? 'Perbarui informasi supplier' 
+                        : 'Lengkapi informasi supplier yang akan ditambahkan'
+                      }
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="no_hp">No. HP</Label>
+                      <Label htmlFor="nama_supplier">Nama Supplier *</Label>
                       <Input
-                        id="no_hp"
-                        value={formData.no_hp}
+                        id="nama_supplier"
+                        value={formData.nama_supplier}
                         onChange={(e) => setFormData(prev => ({
                           ...prev,
-                          no_hp: e.target.value
+                          nama_supplier: e.target.value
                         }))}
-                        placeholder="08xxxxxxxxxx"
+                        placeholder="Masukkan nama supplier"
                         className="glass-input"
+                        required
                       />
                     </div>
 
                     <div className="grid gap-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
+                      <Label htmlFor="deskripsi">Deskripsi</Label>
+                      <Textarea
+                        id="deskripsi"
+                        value={formData.deskripsi}
                         onChange={(e) => setFormData(prev => ({
                           ...prev,
-                          email: e.target.value
+                          deskripsi: e.target.value
                         }))}
-                        placeholder="supplier@example.com"
+                        placeholder="Masukkan deskripsi supplier"
                         className="glass-input"
+                        rows={3}
                       />
                     </div>
-                  </div>
-                </div>
 
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIsDialogOpen(false);
-                      resetForm();
-                    }}
-                    className="glass-button"
-                  >
-                    Batal
-                  </Button>
-                  <Button type="submit" className="gradient-primary">
-                    {isEditMode ? 'Perbarui' : 'Simpan'}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        )}
+                    <div className="grid gap-2">
+                      <Label htmlFor="alamat">Alamat</Label>
+                      <Textarea
+                        id="alamat"
+                        value={formData.alamat}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          alamat: e.target.value
+                        }))}
+                        placeholder="Masukkan alamat lengkap"
+                        className="glass-input"
+                        rows={2}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="no_hp">No. HP</Label>
+                        <Input
+                          id="no_hp"
+                          value={formData.no_hp}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            no_hp: e.target.value
+                          }))}
+                          placeholder="08xxxxxxxxxx"
+                          className="glass-input"
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            email: e.target.value
+                          }))}
+                          placeholder="supplier@example.com"
+                          className="glass-input"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsDialogOpen(false);
+                        resetForm();
+                      }}
+                      className="glass-button"
+                    >
+                      Batal
+                    </Button>
+                    <Button type="submit" className="gradient-primary">
+                      {isEditMode ? 'Perbarui' : 'Simpan'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
       </div>
+
+      {/* Debug Panel */}
+      {showDebug && (
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardHeader>
+            <CardTitle className="text-yellow-800">Debug Information</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <div className="space-y-2">
+              <div><strong>Suppliers Count:</strong> {suppliers?.length || 0}</div>
+              <div><strong>Loading:</strong> {loading ? 'Yes' : 'No'}</div>
+              {suppliers?.length > 0 && (
+                <div>
+                  <strong>First Supplier Structure:</strong>
+                  <pre className="bg-yellow-100 p-2 rounded text-xs overflow-x-auto">
+                    {JSON.stringify(suppliers[0], null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -388,7 +429,7 @@ const Suppliers = () => {
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{suppliers.length}</div>
+            <div className="text-2xl font-bold">{suppliers?.length || 0}</div>
             <p className="text-xs text-muted-foreground">
               Supplier aktif terdaftar
             </p>
@@ -402,7 +443,7 @@ const Suppliers = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {suppliers.filter(s => s.no_hp || s.email).length}
+              {suppliers?.filter(s => s.no_hp || s.email).length || 0}
             </div>
             <p className="text-xs text-muted-foreground">
               Supplier dengan info kontak
@@ -417,13 +458,13 @@ const Suppliers = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {suppliers.filter(s => {
+              {suppliers?.filter(s => {
                 const created = new Date(s.created_at);
                 const today = new Date();
                 const diffTime = Math.abs(today.getTime() - created.getTime());
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 return diffDays <= 30;
-              }).length}
+              }).length || 0}
             </div>
             <p className="text-xs text-muted-foreground">
               Ditambahkan 30 hari terakhir
@@ -435,10 +476,11 @@ const Suppliers = () => {
       {/* Data Table */}
       <DataTable
         columns={columns}
-        data={suppliers}
+        data={suppliers || []}
         loading={loading}
         searchable={true}
         searchPlaceholder="Cari supplier..."
+        debug={showDebug}
         onExport={() => {
           toast({
             title: "Info",
