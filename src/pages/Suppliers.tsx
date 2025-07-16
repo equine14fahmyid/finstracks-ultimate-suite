@@ -131,61 +131,63 @@ const Suppliers = () => {
     }
   };
 
-  // PERBAIKAN: Kolom configuration yang benar
+  // PERBAIKAN: Kolom configuration yang SANGAT SIMPLE
   const columns = [
     {
       key: "nama_supplier",
       title: "Nama Supplier",
       render: (value: any, supplier: any) => (
-        <div className="font-medium">{supplier?.nama_supplier || value || '-'}</div>
+        <div className="font-medium">{supplier.nama_supplier}</div>
       ),
     },
     {
       key: "deskripsi",
       title: "Deskripsi",
-      render: (value: any, supplier: any) => {
-        const deskripsi = supplier?.deskripsi || value;
-        return (
-          <div className="max-w-xs">
-            <div className="text-sm text-foreground font-medium">
-              {deskripsi ? (
-                <div className="line-clamp-2 break-words">
-                  {deskripsi}
-                </div>
-              ) : (
-                <span className="text-muted-foreground italic">-</span>
-              )}
-            </div>
+      render: (value: any, supplier: any) => (
+        <div className="max-w-xs">
+          <div className="text-sm text-foreground font-medium">
+            {supplier.deskripsi ? (
+              <div className="break-words overflow-hidden" style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical' as const
+              }}>
+                {supplier.deskripsi}
+              </div>
+            ) : (
+              <span className="text-muted-foreground italic">-</span>
+            )}
           </div>
-        );
-      },
+        </div>
+      ),
     },
     {
       key: "alamat",
       title: "Alamat",
-      render: (value: any, supplier: any) => {
-        const alamat = supplier?.alamat || value;
-        return (
-          <div className="max-w-xs">
-            <div className="text-sm text-foreground">
-              {alamat ? (
-                <div className="line-clamp-2 break-words">
-                  {alamat}
-                </div>
-              ) : (
-                <span className="text-muted-foreground italic">-</span>
-              )}
-            </div>
+      render: (value: any, supplier: any) => (
+        <div className="max-w-xs">
+          <div className="text-sm text-foreground">
+            {supplier.alamat ? (
+              <div className="break-words overflow-hidden" style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical' as const
+              }}>
+                {supplier.alamat}
+              </div>
+            ) : (
+              <span className="text-muted-foreground italic">-</span>
+            )}
           </div>
-        );
-      },
+        </div>
+      ),
     },
     {
       key: "no_hp",
       title: "No. HP",
       render: (value: any, supplier: any) => (
         <div className="text-muted-foreground">
-          {supplier?.no_hp || value || "-"}
+          {supplier.no_hp || "-"}
         </div>
       ),
     },
@@ -194,7 +196,7 @@ const Suppliers = () => {
       title: "Email",
       render: (value: any, supplier: any) => (
         <div className="text-muted-foreground">
-          {supplier?.email || value || "-"}
+          {supplier.email || "-"}
         </div>
       ),
     },
@@ -203,7 +205,7 @@ const Suppliers = () => {
       title: "Tgl Dibuat",
       render: (value: any, supplier: any) => (
         <div className="text-sm text-muted-foreground">
-          {formatDate(supplier?.created_at || value)}
+          {formatDate(supplier.created_at)}
         </div>
       ),
     },
@@ -227,7 +229,7 @@ const Suppliers = () => {
               variant="ghost" 
               size="sm" 
               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-              onClick={() => handleDelete(supplier?.id)}
+              onClick={() => handleDelete(supplier.id)}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
