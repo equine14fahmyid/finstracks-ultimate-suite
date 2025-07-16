@@ -227,31 +227,7 @@ const Banks = () => {
         </Dialog>
       </div>
 
-      {/* Debug Info - Hapus setelah masalah teratasi */}
-      {process.env.NODE_ENV === 'development' && (
-        <Card className="bg-yellow-50 border-yellow-200">
-          <CardHeader>
-            <CardTitle className="text-yellow-800">Debug Info</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm space-y-2">
-              <div>Loading: {loading ? 'Ya' : 'Tidak'}</div>
-              <div>Banks Length: {bankData.length}</div>
-              {bankData.length > 0 && (
-                <div className="border-t pt-2">
-                  <div className="font-medium">Sample Bank Data:</div>
-                  <div>ID: {bankData[0]?.id}</div>
-                  <div>Nama Bank: "{bankData[0]?.nama_bank}"</div>
-                  <div>Nama Pemilik: "{bankData[0]?.nama_pemilik}"</div>
-                  <div>No Rekening: "{bankData[0]?.no_rekening}"</div>
-                  <div>Saldo Awal: {bankData[0]?.saldo_awal}</div>
-                  <div>Saldo Akhir: {bankData[0]?.saldo_akhir}</div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
