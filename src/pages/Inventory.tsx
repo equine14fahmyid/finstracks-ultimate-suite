@@ -1,621 +1,377 @@
 import { useState, useEffect } from 'react';
+import { Plus, Edit, Trash2, Building2, Bug } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertTriangle, Package, TrendingDown, TrendingUp, Plus, Edit, Trash2, Bug } from 'lucide-react';
-import { useStock, useProducts } from '@/hooks/useSupabase';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { DataTable } from '@/components/common/DataTable';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { formatDate, formatCurrency } from '@/utils/format';
+import { useSuppliers } from '@/hooks/useSupabase';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
-import { formatCurrency } from '@/utils/format';
-import { useNavigate } from 'react-router-dom';
-import EmptyState from '@/components/common/EmptyState';
+import { supabase } from '@/integrations/supabase/client';
 
-const Inventory = () => {
-  const navigate = useNavigate();
-  const { stock, movements, loading, fetchStock, fetchStockMovements, adjustStock, createProductVariant, updateProductVariant, deleteProductVariant } = useStock();
-  const { products, fetchProducts } = useProducts();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [variantDialogOpen, setVariantDialogOpen] = useState(false);
-  const [selectedVariant, setSelectedVariant] = useState<any>(null);
+interface Supplier {
+  id: string;
+  nama_supplier: string;
+  alamat?: string;
+  no_hp?: string;
+  email?: string;
+  created_at: string;
+  is_active: boolean;
+}
+
+const Suppliers = () => {
+  const { hasPermission } = useAuth();
+  const { suppliers, loading, fetchSuppliers, createSupplier, updateSupplier, deleteSupplier } = useSuppliers();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
-  const [adjustmentData, setAdjustmentData] = useState({
-    quantity: 0,
-    notes: ''
-  });
-  const [variantFormData, setVariantFormData] = useState({
-    product_id: '',
-    warna: '',
-    size: '',
-    stok: 0,
-    sku: ''
+  const [formData, setFormData] = useState({
+    nama_supplier: '',
+    alamat: '',
+    no_hp: '',
+    email: '',
+    deskripsi: '',
   });
 
   useEffect(() => {
-    fetchStock();
-    fetchStockMovements();
-    fetchProducts();
+    fetchSuppliers();
   }, []);
 
-  // Helper function to get product name safely
-  const getProductName = (item: any) => {
-    // Try multiple possible paths for product name
-    return item?.products?.nama_produk || 
-           item?.product?.nama_produk || 
-           item?.nama_produk || 
-           'Produk tidak dikenal';
-  };
-
-  // Helper function to get product price safely
-  const getProductPrice = (item: any) => {
-    return item?.products?.harga_beli || 
-           item?.product?.harga_beli || 
-           item?.harga_beli || 
-           0;
-  };
-
-  // Helper function to get product unit safely
-  const getProductUnit = (item: any) => {
-    return item?.products?.satuan || 
-           item?.product?.satuan || 
-           item?.satuan || 
-           'pcs';
-  };
-
-  const resetVariantForm = () => {
-    setVariantFormData({
-      product_id: '',
-      warna: '',
-      size: '',
-      stok: 0,
-      sku: ''
+  const resetForm = () => {
+    setFormData({
+      nama_supplier: '',
+      alamat: '',
+      no_hp: '',
+      email: '',
+      deskripsi: '',
     });
     setIsEditMode(false);
-    setSelectedVariant(null);
+    setEditingId(null);
   };
 
-  const handleStockAdjustment = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedVariant || adjustmentData.quantity < 0) {
+    if (!formData.nama_supplier.trim()) {
       toast({
         title: "Error",
-        description: "Mohon isi data penyesuaian stok dengan benar. Stok tidak boleh negatif.",
+        description: "Nama supplier wajib diisi",
         variant: "destructive",
       });
       return;
     }
 
-    try {
-      await adjustStock(selectedVariant.id, adjustmentData.quantity, adjustmentData.notes || 'Penyesuaian stok manual');
-      
-      setDialogOpen(false);
-      setSelectedVariant(null);
-      setAdjustmentData({ quantity: 0, notes: '' });
-      
-      toast({
-        title: "Sukses",
-        description: "Stok berhasil disesuaikan",
-      });
-    } catch (error) {
-      console.error('Stock adjustment error:', error);
-      toast({
-        title: "Error",
-        description: "Gagal melakukan penyesuaian stok",
-        variant: "destructive",
-      });
+    let result;
+    if (isEditMode && editingId) {
+      result = await updateSupplier(editingId, formData);
+    } else {
+      result = await createSupplier(formData);
     }
-  };
-
-  const handleVariantSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
     
-    if (!variantFormData.product_id || !variantFormData.warna || !variantFormData.size) {
-      toast({
-        title: "Error",
-        description: "Mohon lengkapi semua field yang wajib diisi",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      let result;
-      if (isEditMode && selectedVariant) {
-        result = await updateProductVariant(selectedVariant.id, variantFormData);
-      } else {
-        result = await createProductVariant(variantFormData);
-      }
-      
-      if (!result?.error) {
-        setVariantDialogOpen(false);
-        resetVariantForm();
-        await fetchStock();
-        await fetchStockMovements();
-        await fetchProducts();
-      }
-    } catch (error) {
-      console.error('Variant submit error:', error);
-      toast({
-        title: "Error",
-        description: "Gagal menyimpan varian produk",
-        variant: "destructive",
-      });
+    if (!result?.error) {
+      setIsDialogOpen(false);
+      resetForm();
     }
   };
 
-  const handleEditVariant = (variant: any) => {
-    if (!variant) {
-      toast({
-        title: "Error",
-        description: "Data varian tidak ditemukan",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setVariantFormData({
-      product_id: variant.product_id || '',
-      warna: variant.warna || '',
-      size: variant.size || '',
-      stok: variant.stok || 0,
-      sku: variant.sku || ''
+  const handleEdit = (supplier: any) => {
+    setFormData({
+      nama_supplier: supplier.nama_supplier || '',
+      alamat: supplier.alamat || '',
+      no_hp: supplier.no_hp || '',
+      email: supplier.email || '',
+      deskripsi: supplier.deskripsi || '',
     });
-    setSelectedVariant(variant);
     setIsEditMode(true);
-    setVariantDialogOpen(true);
+    setEditingId(supplier.id);
+    setIsDialogOpen(true);
   };
 
-  const handleDeleteVariant = async (id: string) => {
-    if (!id) {
+  const handleDelete = async (id: string) => {
+    try {
+      const { data: purchases, error } = await supabase
+        .from('purchases')
+        .select('id')
+        .eq('supplier_id', id)
+        .limit(1);
+
+      if (error) throw error;
+
+      if (purchases && purchases.length > 0) {
+        toast({
+          title: "Tidak dapat menghapus",
+          description: "Supplier ini masih memiliki transaksi pembelian terkait",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (confirm('Apakah Anda yakin ingin menghapus supplier ini?')) {
+        await deleteSupplier(id);
+      }
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "ID varian tidak valid",
+        description: `Gagal memeriksa data: ${error.message}`,
         variant: "destructive",
       });
-      return;
-    }
-
-    if (confirm('Apakah Anda yakin ingin menghapus varian produk ini?')) {
-      try {
-        await deleteProductVariant(id);
-        await fetchStock();
-        await fetchStockMovements();
-        await fetchProducts();
-      } catch (error) {
-        console.error('Delete variant error:', error);
-      }
     }
   };
 
-  const stockColumns = [
+  // PERBAIKAN: Kolom configuration yang SANGAT SIMPLE
+  const columns = [
     {
-      key: 'product',
-      title: 'Produk',
-      render: (_, item: any) => {
-        if (!item) return <div>Data tidak tersedia</div>;
-        
-        const productName = getProductName(item);
-        
-        return (
-          <div>
-            <div className="font-medium">{productName}</div>
-            <div className="text-sm text-muted-foreground">
-              {item?.warna || 'N/A'} - {item?.size || 'N/A'}
-            </div>
-            {item?.sku && (
-              <div className="text-xs text-muted-foreground">SKU: {item.sku}</div>
-            )}
-            {showDebug && (
-              <div className="text-xs text-yellow-600 mt-1">
-                Debug: {JSON.stringify({
-                  products: item?.products?.nama_produk || 'null',
-                  product: item?.product?.nama_produk || 'null',
-                  direct: item?.nama_produk || 'null'
-                })}
+      key: "nama_supplier",
+      title: "Nama Supplier",
+      render: (value: any, supplier: any) => (
+        <div className="font-medium">{supplier.nama_supplier}</div>
+      ),
+    },
+    {
+      key: "deskripsi",
+      title: "Deskripsi",
+      render: (value: any, supplier: any) => (
+        <div className="max-w-xs">
+          <div className="text-sm text-foreground font-medium">
+            {supplier.deskripsi ? (
+              <div className="break-words overflow-hidden" style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical' as const
+              }}>
+                {supplier.deskripsi}
               </div>
+            ) : (
+              <span className="text-muted-foreground italic">-</span>
             )}
           </div>
-        );
-      }
+        </div>
+      ),
     },
     {
-      key: 'stok',
-      title: 'Stok',
-      render: (_, item: any) => {
-        if (!item) return <div>0</div>;
-        
-        const stok = item?.stok ?? 0;
-        const unit = getProductUnit(item);
-        
-        return (
-          <div className="flex items-center gap-2">
-            <span className={`font-medium ${stok <= 5 ? 'text-red-600' : stok <= 10 ? 'text-yellow-600' : 'text-green-600'}`}>
-              {stok.toLocaleString('id-ID')}
-            </span>
-            <span className="text-sm text-muted-foreground">{unit}</span>
-            {stok <= 5 && (
-              <Badge variant="destructive" className="text-xs">
-                <AlertTriangle className="h-3 w-3 mr-1" />
-                Stok Rendah
-              </Badge>
+      key: "alamat",
+      title: "Alamat",
+      render: (value: any, supplier: any) => (
+        <div className="max-w-xs">
+          <div className="text-sm text-foreground">
+            {supplier.alamat ? (
+              <div className="break-words overflow-hidden" style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical' as const
+              }}>
+                {supplier.alamat}
+              </div>
+            ) : (
+              <span className="text-muted-foreground italic">-</span>
             )}
           </div>
-        );
-      }
+        </div>
+      ),
     },
     {
-      key: 'value',
-      title: 'Nilai Stok',
-      render: (_, item: any) => {
-        if (!item) return <div>Rp 0</div>;
-        
-        const stok = item?.stok || 0;
-        const hargaBeli = getProductPrice(item);
-        const totalValue = stok * hargaBeli;
-        
-        return (
-          <div>
-            <div className="font-medium">
-              {formatCurrency(totalValue)}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              @ {formatCurrency(hargaBeli)}
-            </div>
-          </div>
-        );
-      }
+      key: "no_hp",
+      title: "No. HP",
+      render: (value: any, supplier: any) => (
+        <div className="text-muted-foreground">
+          {supplier.no_hp || "-"}
+        </div>
+      ),
     },
     {
-      key: 'actions',
-      title: 'Aksi',
-      render: (_, item: any) => {
-        if (!item) return <div>-</div>;
-        
-        return (
-          <div className="flex items-center gap-2">
+      key: "email",
+      title: "Email",
+      render: (value: any, supplier: any) => (
+        <div className="text-muted-foreground">
+          {supplier.email || "-"}
+        </div>
+      ),
+    },
+    {
+      key: "created_at",
+      title: "Tgl Dibuat",
+      render: (value: any, supplier: any) => (
+        <div className="text-sm text-muted-foreground">
+          {formatDate(supplier.created_at)}
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      title: "Aksi",
+      render: (value: any, supplier: any) => (
+        <div className="flex items-center gap-2">
+          {hasPermission('suppliers.update') && (
             <Button 
               variant="ghost" 
               size="sm" 
               className="h-8 w-8 p-0"
-              onClick={() => {
-                setSelectedVariant(item);
-                setAdjustmentData({ quantity: item?.stok || 0, notes: '' });
-                setDialogOpen(true);
-              }}
-            >
-              <Package className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-8 w-8 p-0"
-              onClick={() => handleEditVariant(item)}
+              onClick={() => handleEdit(supplier)}
             >
               <Edit className="h-4 w-4" />
             </Button>
+          )}
+          {hasPermission('suppliers.delete') && (
             <Button 
               variant="ghost" 
               size="sm" 
               className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-              onClick={() => handleDeleteVariant(item?.id)}
+              onClick={() => handleDelete(supplier.id)}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
-          </div>
-        );
-      }
-    }
-  ];
-
-  const movementColumns = [
-    {
-      key: 'created_at',
-      title: 'Tanggal',
-      render: (_, movement: any) => (
-        movement?.created_at ? new Date(movement.created_at).toLocaleDateString('id-ID') : '-'
-      )
-    },
-    {
-      key: 'product',
-      title: 'Produk',
-      render: (_, movement: any) => {
-        if (!movement) return <div>Data tidak tersedia</div>;
-        
-        const productName = movement?.product_variant?.products?.nama_produk || 
-                           movement?.product_variant?.product?.nama_produk || 
-                           'Produk tidak diketahui';
-        
-        return (
-          <div>
-            <div className="font-medium">{productName}</div>
-            <div className="text-sm text-muted-foreground">
-              {movement?.product_variant?.warna || 'N/A'} - {movement?.product_variant?.size || 'N/A'}
-            </div>
-          </div>
-        );
-      }
-    },
-    {
-      key: 'movement_type',
-      title: 'Jenis',
-      render: (_, movement: any) => {
-        if (!movement) return <Badge variant="secondary">N/A</Badge>;
-        
-        return (
-          <Badge variant={movement.movement_type === 'in' ? 'default' : 'secondary'}>
-            {movement.movement_type === 'in' ? (
-              <>
-                <TrendingUp className="h-3 w-3 mr-1" />
-                Masuk
-              </>
-            ) : (
-              <>
-                <TrendingDown className="h-3 w-3 mr-1" />
-                Keluar
-              </>
-            )}
-          </Badge>
-        );
-      }
-    },
-    {
-      key: 'quantity',
-      title: 'Jumlah',
-      render: (_, movement: any) => {
-        if (!movement) return <span>0</span>;
-        
-        const quantity = movement.quantity || 0;
-        
-        return (
-          <span className={`font-medium ${movement.movement_type === 'in' ? 'text-green-600' : 'text-red-600'}`}>
-            {movement.movement_type === 'in' ? '+' : '-'}{quantity.toLocaleString('id-ID')}
-          </span>
-        );
-      }
-    },
-    {
-      key: 'reference_type',
-      title: 'Referensi',
-      render: (_, movement: any) => {
-        if (!movement) return <div className="text-sm">N/A</div>;
-        
-        return (
-          <div className="text-sm">
-            <div className="capitalize">{movement.reference_type || 'Manual'}</div>
-            {movement.notes && (
-              <div className="text-muted-foreground">{movement.notes}</div>
-            )}
-          </div>
-        );
-      }
-    }
-  ];
-
-  // Calculate real totals from actual database data
-  const totalStockValue = stock?.reduce((total, item) => {
-    const stok = item?.stok || 0;
-    const harga = getProductPrice(item);
-    return total + (stok * harga);
-  }, 0) || 0;
-
-  const lowStockItems = stock?.filter(item => (item?.stok || 0) <= 5) || [];
-  const totalStock = stock?.reduce((total, item) => total + (item?.stok || 0), 0) || 0;
-  const filteredMovements = movements?.filter(movement => movement != null) || [];
-
-  if (loading) return <div className="p-6">Loading stock data...</div>;
-
-  // Show empty state if no stock data exists
-  if (!stock?.length) {
-    return (
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Manajemen Stok</h1>
+          )}
         </div>
+      ),
+    },
+  ];
 
-        <EmptyState
-          icon="📦"
-          title="Belum Ada Data Stok"
-          description="Mulai dengan menambahkan produk dan varian untuk mengelola stok Anda. Buka menu Master Data > Produk untuk menambahkan produk baru."
-          actionLabel="+ Tambah Produk"
-          onAction={() => navigate('/master-data/products')}
-        />
+  if (!hasPermission('suppliers.read')) {
+    return (
+      <div className="p-6">
+        <Card className="glass-card border-0 p-8 text-center">
+          <Building2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-semibold mb-2">Akses Terbatas</h3>
+          <p className="text-muted-foreground">
+            Anda tidak memiliki izin untuk melihat data supplier.
+          </p>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Manajemen Stok</h1>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => setShowDebug(!showDebug)}
-        >
-          <Bug className="h-4 w-4 mr-2" />
-          {showDebug ? 'Hide' : 'Show'} Debug
-        </Button>
-      </div>
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold gradient-text">Data Supplier</h1>
+          <p className="text-muted-foreground">
+            Kelola data supplier dan vendor bisnis Anda
+          </p>
+        </div>
 
-      {/* Debug Panel */}
-      {showDebug && (
-        <Card className="bg-yellow-50 border-yellow-200">
-          <CardHeader>
-            <CardTitle className="text-yellow-800">Debug Information</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">
-            <div className="space-y-2">
-              <div><strong>Stock Items:</strong> {stock?.length || 0}</div>
-              <div><strong>Products:</strong> {products?.length || 0}</div>
-              {stock?.length > 0 && (
-                <div>
-                  <strong>First Stock Item Structure:</strong>
-                  <pre className="bg-yellow-100 p-2 rounded text-xs overflow-x-auto">
-                    {JSON.stringify(stock[0], null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowDebug(!showDebug)}
+          >
+            <Bug className="h-4 w-4 mr-2" />
+            {showDebug ? 'Hide' : 'Show'} Debug
+          </Button>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Item</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stock?.length || 0}</div>
-            <p className="text-xs text-muted-foreground">Varian produk</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Stok</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalStock.toLocaleString('id-ID')}</div>
-            <p className="text-xs text-muted-foreground">Unit tersedia</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Nilai Stok</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalStockValue)}</div>
-            <p className="text-xs text-muted-foreground">Total investasi</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Stok Rendah</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{lowStockItems.length}</div>
-            <p className="text-xs text-muted-foreground">Perlu restock</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Stock Level Table */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Level Stok Saat Ini</CardTitle>
-          <div className="flex gap-2">
-            <Dialog open={variantDialogOpen} onOpenChange={(open) => {
-              setVariantDialogOpen(open);
-              if (!open) resetVariantForm();
+          {hasPermission('suppliers.create') && (
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
             }}>
               <DialogTrigger asChild>
-                <Button>
+                <Button className="gradient-primary">
                   <Plus className="h-4 w-4 mr-2" />
-                  Tambah Item Stok
+                  Tambah Supplier
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <form onSubmit={handleVariantSubmit}>
+              <DialogContent className="glass-card">
+                <form onSubmit={handleSubmit}>
                   <DialogHeader>
                     <DialogTitle>
-                      {isEditMode ? 'Edit Varian Produk' : 'Tambah Varian Produk Baru'}
+                      {isEditMode ? 'Edit Supplier' : 'Tambah Supplier Baru'}
                     </DialogTitle>
                     <DialogDescription>
-                      {isEditMode ? 'Perbarui informasi varian produk' : 'Lengkapi informasi varian produk yang akan ditambahkan'}
+                      {isEditMode 
+                        ? 'Perbarui informasi supplier' 
+                        : 'Lengkapi informasi supplier yang akan ditambahkan'
+                      }
                     </DialogDescription>
                   </DialogHeader>
                   
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="product_id">Produk *</Label>
-                      <Select
-                        value={variantFormData.product_id}
-                        onValueChange={(value) => setVariantFormData(prev => ({
+                      <Label htmlFor="nama_supplier">Nama Supplier *</Label>
+                      <Input
+                        id="nama_supplier"
+                        value={formData.nama_supplier}
+                        onChange={(e) => setFormData(prev => ({
                           ...prev,
-                          product_id: value
+                          nama_supplier: e.target.value
                         }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih produk" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products?.map((product: any) => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.nama_produk}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        placeholder="Masukkan nama supplier"
+                        className="glass-input"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="deskripsi">Deskripsi</Label>
+                      <Textarea
+                        id="deskripsi"
+                        value={formData.deskripsi}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          deskripsi: e.target.value
+                        }))}
+                        placeholder="Masukkan deskripsi supplier"
+                        className="glass-input"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="alamat">Alamat</Label>
+                      <Textarea
+                        id="alamat"
+                        value={formData.alamat}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          alamat: e.target.value
+                        }))}
+                        placeholder="Masukkan alamat lengkap"
+                        className="glass-input"
+                        rows={2}
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-2">
-                        <Label htmlFor="warna">Warna *</Label>
+                        <Label htmlFor="no_hp">No. HP</Label>
                         <Input
-                          id="warna"
-                          value={variantFormData.warna}
-                          onChange={(e) => setVariantFormData(prev => ({
+                          id="no_hp"
+                          value={formData.no_hp}
+                          onChange={(e) => setFormData(prev => ({
                             ...prev,
-                            warna: e.target.value
+                            no_hp: e.target.value
                           }))}
-                          placeholder="Merah, Biru, dll"
-                          required
+                          placeholder="08xxxxxxxxxx"
+                          className="glass-input"
                         />
                       </div>
 
                       <div className="grid gap-2">
-                        <Label htmlFor="size">Size *</Label>
+                        <Label htmlFor="email">Email</Label>
                         <Input
-                          id="size"
-                          value={variantFormData.size}
-                          onChange={(e) => setVariantFormData(prev => ({
+                          id="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData(prev => ({
                             ...prev,
-                            size: e.target.value
+                            email: e.target.value
                           }))}
-                          placeholder="S, M, L, XL, dll"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="stok">Stok Awal</Label>
-                        <Input
-                          id="stok"
-                          type="number"
-                          value={variantFormData.stok}
-                          onChange={(e) => setVariantFormData(prev => ({
-                            ...prev,
-                            stok: parseInt(e.target.value) || 0
-                          }))}
-                          min="0"
-                        />
-                      </div>
-
-                      <div className="grid gap-2">
-                        <Label htmlFor="sku">SKU</Label>
-                        <Input
-                          id="sku"
-                          value={variantFormData.sku}
-                          onChange={(e) => setVariantFormData(prev => ({
-                            ...prev,
-                            sku: e.target.value
-                          }))}
-                          placeholder="Kode produk"
+                          placeholder="supplier@example.com"
+                          className="glass-input"
                         />
                       </div>
                     </div>
@@ -626,123 +382,115 @@ const Inventory = () => {
                       type="button"
                       variant="outline"
                       onClick={() => {
-                        setVariantDialogOpen(false);
-                        resetVariantForm();
+                        setIsDialogOpen(false);
+                        resetForm();
                       }}
+                      className="glass-button"
                     >
                       Batal
                     </Button>
-                    <Button type="submit">
+                    <Button type="submit" className="gradient-primary">
                       {isEditMode ? 'Perbarui' : 'Simpan'}
                     </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
             </Dialog>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={stockColumns}
-            data={stock || []}
-            loading={loading}
-            searchable={true}
-            searchPlaceholder="Cari produk..."
-            
-          />
-        </CardContent>
-      </Card>
-
-      {/* Stock Movement History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Riwayat Pergerakan Stok</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {filteredMovements.length > 0 ? (
-            <DataTable
-              columns={movementColumns}
-              data={filteredMovements}
-              loading={loading}
-              searchable={true}
-              searchPlaceholder="Cari riwayat..."
-             
-            />
-          ) : (
-            <EmptyState
-              icon="📊"
-              title="Belum Ada Pergerakan Stok"
-              description="Riwayat pergerakan stok akan muncul ketika ada transaksi penjualan, pembelian, atau penyesuaian stok."
-            />
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Stock Adjustment Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Penyesuaian Stok</DialogTitle>
-            <DialogDescription>
-              Sesuaikan stok untuk {getProductName(selectedVariant)} - {selectedVariant?.warna} {selectedVariant?.size}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedVariant && (
-            <form onSubmit={handleStockAdjustment} className="space-y-4">
-              <div>
-                <Label>Produk</Label>
-                <div className="p-3 bg-muted rounded-md">
-                  <div className="font-medium">{getProductName(selectedVariant)}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {selectedVariant.warna} - {selectedVariant.size}
-                  </div>
-                  <div className="text-sm">Stok saat ini: {(selectedVariant?.stok || 0).toLocaleString('id-ID')}</div>
+      {/* Debug Panel */}
+      {showDebug && (
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardHeader>
+            <CardTitle className="text-yellow-800">Debug Information</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <div className="space-y-2">
+              <div><strong>Suppliers Count:</strong> {suppliers?.length || 0}</div>
+              <div><strong>Loading:</strong> {loading ? 'Yes' : 'No'}</div>
+              {suppliers?.length > 0 && (
+                <div>
+                  <strong>First Supplier Structure:</strong>
+                  <pre className="bg-yellow-100 p-2 rounded text-xs overflow-x-auto">
+                    {JSON.stringify(suppliers[0], null, 2)}
+                  </pre>
                 </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="quantity">Stok Baru *</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  value={adjustmentData.quantity}
-                  onChange={(e) => setAdjustmentData(prev => ({ 
-                    ...prev, 
-                    quantity: parseInt(e.target.value) || 0 
-                  }))}
-                  min="0"
-                  required
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="notes">Catatan</Label>
-                <Input
-                  id="notes"
-                  value={adjustmentData.notes}
-                  onChange={(e) => setAdjustmentData(prev => ({ 
-                    ...prev, 
-                    notes: e.target.value 
-                  }))}
-                  placeholder="Alasan penyesuaian stok..."
-                />
-              </div>
-              
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                  Batal
-                </Button>
-                <Button type="submit">
-                  Sesuaikan Stok
-                </Button>
-              </div>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="glass-card border-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Supplier</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{suppliers?.length || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Supplier aktif terdaftar
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Dengan Kontak</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {suppliers?.filter(s => s.no_hp || s.email).length || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Supplier dengan info kontak
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Terbaru</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {suppliers?.filter(s => {
+                const created = new Date(s.created_at);
+                const today = new Date();
+                const diffTime = Math.abs(today.getTime() - created.getTime());
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                return diffDays <= 30;
+              }).length || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Ditambahkan 30 hari terakhir
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Data Table */}
+      <DataTable
+        columns={columns}
+        data={suppliers || []}
+        loading={loading}
+        searchable={true}
+        searchPlaceholder="Cari supplier..."
+        onExport={() => {
+          toast({
+            title: "Info",
+            description: "Fitur export akan ditambahkan pada versi berikutnya",
+          });
+        }}
+      />
     </div>
   );
 };
 
-export default Inventory;
+export default Suppliers;
