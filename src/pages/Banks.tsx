@@ -86,11 +86,11 @@ const Banks = () => {
     
     setEditingBank(bank);
     setFormData({
-      nama_bank: bank.nama_bank || bank.bank_name || '',
-      nama_pemilik: bank.nama_pemilik || bank.account_holder || '',
-      no_rekening: bank.no_rekening || bank.account_number || '',
-      saldo_awal: bank.saldo_awal || bank.initial_balance || 0,
-      saldo_akhir: bank.saldo_akhir || bank.current_balance || 0
+      nama_bank: bank.nama_bank || '',
+      nama_pemilik: bank.nama_pemilik || '',
+      no_rekening: bank.no_rekening || '',
+      saldo_awal: bank.saldo_awal || 0,
+      saldo_akhir: bank.saldo_akhir || 0
     });
     setDialogOpen(true);
   };
@@ -111,10 +111,10 @@ const Banks = () => {
       render: (bank: any) => {
         console.log('Rendering bank info for:', bank); // DEBUG
         
-        // Fallback untuk berbagai kemungkinan nama field
-        const bankName = bank?.nama_bank || bank?.bank_name || bank?.bankName || '';
-        const ownerName = bank?.nama_pemilik || bank?.account_holder || bank?.accountHolder || '';
-        const accountNumber = bank?.no_rekening || bank?.account_number || bank?.accountNumber || '';
+        // Pastikan data tersedia - berdasarkan schema SQL yang benar
+        const bankName = bank?.nama_bank || '';
+        const ownerName = bank?.nama_pemilik || '';
+        const accountNumber = bank?.no_rekening || '';
         
         return (
           <div>
@@ -135,7 +135,7 @@ const Banks = () => {
       key: 'saldo_awal',
       title: 'Saldo Awal',
       render: (bank: any) => {
-        const saldoAwal = bank?.saldo_awal || bank?.initial_balance || 0;
+        const saldoAwal = bank?.saldo_awal || 0;
         return (
           <span className="font-medium">{formatCurrency(saldoAwal)}</span>
         );
@@ -145,8 +145,8 @@ const Banks = () => {
       key: 'saldo_akhir',
       title: 'Saldo Akhir',
       render: (bank: any) => {
-        const saldoAwal = bank?.saldo_awal || bank?.initial_balance || 0;
-        const saldoAkhir = bank?.saldo_akhir || bank?.current_balance || 0;
+        const saldoAwal = bank?.saldo_awal || 0;
+        const saldoAkhir = bank?.saldo_akhir || 0;
         const selisih = saldoAkhir - saldoAwal;
         
         return (
@@ -191,12 +191,12 @@ const Banks = () => {
   const bankData = Array.isArray(banks) ? banks : [];
   
   const totalSaldoAwal = bankData.reduce((total, bank) => {
-    const saldo = bank?.saldo_awal || bank?.initial_balance || 0;
+    const saldo = bank?.saldo_awal || 0;
     return total + saldo;
   }, 0);
   
   const totalSaldoAkhir = bankData.reduce((total, bank) => {
-    const saldo = bank?.saldo_akhir || bank?.current_balance || 0;
+    const saldo = bank?.saldo_akhir || 0;
     return total + saldo;
   }, 0);
   
@@ -311,7 +311,20 @@ const Banks = () => {
             <div className="text-sm space-y-2">
               <div>Loading: {loading ? 'Ya' : 'Tidak'}</div>
               <div>Banks Length: {bankData.length}</div>
-              <div>Banks Data: {JSON.stringify(bankData, null, 2)}</div>
+              <div className="max-h-40 overflow-y-auto">
+                <div>Banks Data: <pre className="text-xs">{JSON.stringify(bankData, null, 2)}</pre></div>
+              </div>
+              {bankData.length > 0 && (
+                <div className="border-t pt-2">
+                  <div className="font-medium">Sample Bank Data:</div>
+                  <div>ID: {bankData[0]?.id}</div>
+                  <div>Nama Bank: "{bankData[0]?.nama_bank}"</div>
+                  <div>Nama Pemilik: "{bankData[0]?.nama_pemilik}"</div>
+                  <div>No Rekening: "{bankData[0]?.no_rekening}"</div>
+                  <div>Saldo Awal: {bankData[0]?.saldo_awal}</div>
+                  <div>Saldo Akhir: {bankData[0]?.saldo_akhir}</div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -391,13 +404,77 @@ const Banks = () => {
               </Button>
             </div>
           ) : (
-            <DataTable
-              columns={columns}
-              data={bankData}
-              loading={loading}
-              searchable={true}
-              searchPlaceholder="Cari bank..."
-            />
+            <>
+              {/* DataTable Component */}
+              <DataTable
+                columns={columns}
+                data={bankData}
+                loading={loading}
+                searchable={true}
+                searchPlaceholder="Cari bank..."
+              />
+              
+              {/* Fallback Manual Table jika DataTable bermasalah */}
+              <div className="mt-8 border-t pt-4">
+                <h4 className="font-medium mb-4">Manual Table (Backup)</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-300">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-300 px-4 py-2 text-left">Informasi Bank</th>
+                        <th className="border border-gray-300 px-4 py-2 text-left">Saldo Awal</th>
+                        <th className="border border-gray-300 px-4 py-2 text-left">Saldo Akhir</th>
+                        <th className="border border-gray-300 px-4 py-2 text-left">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bankData.map((bank, index) => (
+                        <tr key={bank?.id || index} className="hover:bg-gray-50">
+                          <td className="border border-gray-300 px-4 py-2">
+                            <div>
+                              <div className="font-medium">{bank?.nama_bank || 'N/A'}</div>
+                              <div className="text-sm text-gray-600">{bank?.nama_pemilik || 'N/A'}</div>
+                              <div className="text-xs text-gray-500">{bank?.no_rekening || 'N/A'}</div>
+                            </div>
+                          </td>
+                          <td className="border border-gray-300 px-4 py-2">
+                            <span className="font-medium">{formatCurrency(bank?.saldo_awal || 0)}</span>
+                          </td>
+                          <td className="border border-gray-300 px-4 py-2">
+                            <div>
+                              <span className={`font-medium ${(bank?.saldo_akhir || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {formatCurrency(bank?.saldo_akhir || 0)}
+                              </span>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {((bank?.saldo_akhir || 0) - (bank?.saldo_awal || 0)) >= 0 ? (
+                                  <span className="text-green-600">
+                                    +{formatCurrency((bank?.saldo_akhir || 0) - (bank?.saldo_awal || 0))}
+                                  </span>
+                                ) : (
+                                  <span className="text-red-600">
+                                    {formatCurrency((bank?.saldo_akhir || 0) - (bank?.saldo_awal || 0))}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="border border-gray-300 px-4 py-2">
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" onClick={() => handleEdit(bank)}>
+                                Edit
+                              </Button>
+                              <Button size="sm" variant="destructive" onClick={() => handleDelete(bank?.id)}>
+                                Hapus
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
