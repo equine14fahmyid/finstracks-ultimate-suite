@@ -411,7 +411,7 @@ const BalanceSheet = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-red-600">KEWAJIBAN</CardTitle>
-                <Link to="/purhcases">
+                <Link to="/purchases">
                   <Button variant="ghost" size="sm">
                     <ExternalLink className="h-4 w-4 mr-1" />
                     Lihat Pembelian
