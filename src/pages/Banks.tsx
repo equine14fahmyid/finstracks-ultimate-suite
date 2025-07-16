@@ -1,28 +1,34 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Wallet, TrendingUp, TrendingDown, Building2, Search } from 'lucide-react';
-import { useBanks } from '@/hooks/useSupabase';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { DataTable } from '@/components/common/DataTable';
 import { formatCurrency } from '@/utils/format';
 
-interface BankFormData {
+interface Bank {
+  id: string;
   nama_bank: string;
   nama_pemilik: string;
   no_rekening: string;
   saldo_awal: number;
   saldo_akhir: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 const Banks = () => {
-  const { banks, loading, fetchBanks, createBank, updateBank, deleteBank } = useBanks();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingBank, setEditingBank] = useState<any>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [formData, setFormData] = useState<BankFormData>({
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingBank, setEditingBank] = useState<Bank | null>(null);
+  const [formData, setFormData] = useState({
     nama_bank: '',
     nama_pemilik: '',
     no_rekening: '',
@@ -30,42 +36,84 @@ const Banks = () => {
     saldo_akhir: 0
   });
 
-  useEffect(() => {
-    fetchBanks();
-  }, []);
+  const queryClient = useQueryClient();
 
-  // DEBUG: Log data banks untuk troubleshooting
-  useEffect(() => {
-    console.log('Banks data:', banks);
-    console.log('Banks length:', banks?.length);
-    if (banks?.length > 0) {
-      console.log('First bank:', banks[0]);
-      console.log('Bank keys:', Object.keys(banks[0] || {}));
+  const { data: banks = [], isLoading } = useQuery({
+    queryKey: ['banks'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('banks')
+        .select('*')
+        .eq('is_active', true)
+        .order('nama_bank');
+      
+      if (error) throw error;
+      return data as Bank[];
     }
-  }, [banks]);
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.nama_bank || !formData.nama_pemilik || !formData.no_rekening) {
-      toast({
-        title: "Error",
-        description: "Mohon lengkapi data bank",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const success = editingBank 
-      ? await updateBank(editingBank.id, formData)
-      : await createBank(formData);
-
-    if (success) {
-      setDialogOpen(false);
+  const createMutation = useMutation({
+    mutationFn: async (bankData: typeof formData) => {
+      const { data, error } = await supabase
+        .from('banks')
+        .insert([bankData])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['banks'] });
+      toast({ title: "Berhasil", description: "Bank berhasil ditambahkan" });
+      setIsAddDialogOpen(false);
       resetForm();
-      await fetchBanks();
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: "Gagal menambahkan bank: " + (error as Error).message, variant: "destructive" });
     }
-  };
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, ...bankData }: Partial<Bank>) => {
+      const { data, error } = await supabase
+        .from('banks')
+        .update(bankData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['banks'] });
+      toast({ title: "Berhasil", description: "Bank berhasil diperbarui" });
+      setEditingBank(null);
+      resetForm();
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: "Gagal memperbarui bank: " + (error as Error).message, variant: "destructive" });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('banks')
+        .update({ is_active: false })
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['banks'] });
+      toast({ title: "Berhasil", description: "Bank berhasil dihapus" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: "Gagal menghapus bank: " + (error as Error).message, variant: "destructive" });
+    }
+  });
 
   const resetForm = () => {
     setFormData({
@@ -75,151 +123,175 @@ const Banks = () => {
       saldo_awal: 0,
       saldo_akhir: 0
     });
-    setEditingBank(null);
   };
 
-  const handleEdit = (bank: any) => {
-    console.log('Editing bank:', bank);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     
-    if (!bank) return;
-    
-    setEditingBank(bank);
-    setFormData({
-      nama_bank: bank.nama_bank || '',
-      nama_pemilik: bank.nama_pemilik || '',
-      no_rekening: bank.no_rekening || '',
-      saldo_awal: bank.saldo_awal || 0,
-      saldo_akhir: bank.saldo_akhir || 0
-    });
-    setDialogOpen(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus bank ini?')) {
-      const success = await deleteBank(id);
-      if (success) {
-        await fetchBanks();
-      }
+    if (editingBank) {
+      await updateMutation.mutateAsync({ id: editingBank.id, ...formData });
+    } else {
+      await createMutation.mutateAsync(formData);
     }
   };
 
-  // Pastikan banks adalah array dan tidak null/undefined
-  const bankData = Array.isArray(banks) ? banks : [];
-  
-  // Filter data berdasarkan search term
-  const filteredBanks = bankData.filter(bank => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      (bank?.nama_bank || '').toLowerCase().includes(searchLower) ||
-      (bank?.nama_pemilik || '').toLowerCase().includes(searchLower) ||
-      (bank?.no_rekening || '').toLowerCase().includes(searchLower)
-    );
-  });
-  
-  const totalSaldoAwal = bankData.reduce((total, bank) => {
-    const saldo = bank?.saldo_awal || 0;
-    return total + saldo;
-  }, 0);
-  
-  const totalSaldoAkhir = bankData.reduce((total, bank) => {
-    const saldo = bank?.saldo_akhir || 0;
-    return total + saldo;
-  }, 0);
-  
-  const totalPerubahan = totalSaldoAkhir - totalSaldoAwal;
+  const handleEdit = (bank: Bank) => {
+    setEditingBank(bank);
+    setFormData({
+      nama_bank: bank.nama_bank,
+      nama_pemilik: bank.nama_pemilik,
+      no_rekening: bank.no_rekening,
+      saldo_awal: bank.saldo_awal,
+      saldo_akhir: bank.saldo_akhir
+    });
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteMutation.mutateAsync(id);
+  };
+
+  const columns = [
+    {
+      key: 'bank_info',
+      title: 'Informasi Bank',
+      render: (bank: Bank) => (
+        <div>
+          <div className="font-medium">{bank.nama_bank}</div>
+          <div className="text-sm text-muted-foreground">{bank.nama_pemilik}</div>
+          <div className="text-xs text-muted-foreground">{bank.no_rekening}</div>
+        </div>
+      )
+    },
+    {
+      key: 'saldo_awal',
+      title: 'Saldo Awal',
+      render: (bank: Bank) => formatCurrency(bank.saldo_awal)
+    },
+    {
+      key: 'saldo_akhir',
+      title: 'Saldo Akhir',
+      render: (bank: Bank) => formatCurrency(bank.saldo_akhir)
+    },
+    {
+      key: 'actions',
+      title: 'Aksi',
+      render: (bank: Bank) => (
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleEdit(bank)}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Hapus Bank</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Apakah Anda yakin ingin menghapus bank {bank.nama_bank}? Tindakan ini tidak dapat dibatalkan.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Batal</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleDelete(bank.id)}>
+                  Hapus
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      )
+    }
+  ];
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Manajemen Bank</h1>
-        <Dialog open={dialogOpen} onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) resetForm();
+        <h1 className="text-3xl font-bold">Master Data Bank</h1>
+        <Dialog open={isAddDialogOpen || !!editingBank} onOpenChange={(open) => {
+          if (!open) {
+            setIsAddDialogOpen(false);
+            setEditingBank(null);
+            resetForm();
+          }
         }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => setIsAddDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Tambah Bank
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent>
             <DialogHeader>
-              <DialogTitle>
-                {editingBank ? 'Edit Bank' : 'Tambah Bank'}
-              </DialogTitle>
+              <DialogTitle>{editingBank ? 'Edit Bank' : 'Tambah Bank Baru'}</DialogTitle>
             </DialogHeader>
-            
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="nama_bank">Nama Bank *</Label>
+                <Label htmlFor="nama_bank">Nama Bank</Label>
                 <Input
                   id="nama_bank"
                   value={formData.nama_bank}
-                  onChange={(e) => setFormData(prev => ({ ...prev, nama_bank: e.target.value }))}
-                  placeholder="BCA, Mandiri, BNI..."
+                  onChange={(e) => setFormData({ ...formData, nama_bank: e.target.value })}
+                  placeholder="Contoh: BCA, Mandiri, BRI"
                   required
                 />
               </div>
-
               <div>
-                <Label htmlFor="nama_pemilik">Nama Pemilik *</Label>
+                <Label htmlFor="nama_pemilik">Nama Pemilik</Label>
                 <Input
                   id="nama_pemilik"
                   value={formData.nama_pemilik}
-                  onChange={(e) => setFormData(prev => ({ ...prev, nama_pemilik: e.target.value }))}
+                  onChange={(e) => setFormData({ ...formData, nama_pemilik: e.target.value })}
                   placeholder="Nama pemilik rekening"
                   required
                 />
               </div>
-
               <div>
-                <Label htmlFor="no_rekening">Nomor Rekening *</Label>
+                <Label htmlFor="no_rekening">Nomor Rekening</Label>
                 <Input
                   id="no_rekening"
                   value={formData.no_rekening}
-                  onChange={(e) => setFormData(prev => ({ ...prev, no_rekening: e.target.value }))}
-                  placeholder="1234567890"
+                  onChange={(e) => setFormData({ ...formData, no_rekening: e.target.value })}
+                  placeholder="Nomor rekening"
                   required
                 />
               </div>
-
               <div>
                 <Label htmlFor="saldo_awal">Saldo Awal</Label>
                 <Input
                   id="saldo_awal"
                   type="number"
-                  value={formData.saldo_awal || ''}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    saldo_awal: parseFloat(e.target.value) || 0 
-                  }))}
-                  placeholder="5.000.000"
-                  min="0"
-                  step="0.01"
+                  value={formData.saldo_awal}
+                  onChange={(e) => setFormData({ ...formData, saldo_awal: parseInt(e.target.value) || 0 })}
+                  placeholder="0"
                 />
               </div>
-
               <div>
-                <Label htmlFor="saldo_akhir">Saldo Saat Ini</Label>
+                <Label htmlFor="saldo_akhir">Saldo Akhir</Label>
                 <Input
                   id="saldo_akhir"
                   type="number"
-                  value={formData.saldo_akhir || ''}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    saldo_akhir: parseFloat(e.target.value) || 0 
-                  }))}
-                  placeholder="7.500.000"
-                  step="0.01"
+                  value={formData.saldo_akhir}
+                  onChange={(e) => setFormData({ ...formData, saldo_akhir: parseInt(e.target.value) || 0 })}
+                  placeholder="0"
                 />
               </div>
-
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                <Button type="button" variant="outline" onClick={() => {
+                  setIsAddDialogOpen(false);
+                  setEditingBank(null);
+                  resetForm();
+                }}>
                   Batal
                 </Button>
-                <Button type="submit">
-                  {editingBank ? 'Update' : 'Simpan'}
+                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                  {createMutation.isPending || updateMutation.isPending ? 'Menyimpan...' : editingBank ? 'Update' : 'Simpan'}
                 </Button>
               </div>
             </form>
@@ -227,198 +299,18 @@ const Banks = () => {
         </Dialog>
       </div>
 
-
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Bank</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{bankData.length}</div>
-            <p className="text-xs text-muted-foreground">Rekening terdaftar</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo Awal</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalSaldoAwal)}</div>
-            <p className="text-xs text-muted-foreground">Modal awal</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo Saat Ini</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalSaldoAkhir)}</div>
-            <p className="text-xs text-muted-foreground">Total kas & bank</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Perubahan</CardTitle>
-            {totalPerubahan >= 0 ? (
-              <TrendingUp className="h-4 w-4 text-green-600" />
-            ) : (
-              <TrendingDown className="h-4 w-4 text-red-600" />
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${totalPerubahan >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {totalPerubahan >= 0 ? '+' : ''}{formatCurrency(totalPerubahan)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {totalPerubahan >= 0 ? 'Keuntungan' : 'Kerugian'}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Banks Table - Custom Implementation */}
       <Card>
         <CardHeader>
-          <CardTitle>Daftar Rekening Bank</CardTitle>
+          <CardTitle>Daftar Bank</CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <div className="text-muted-foreground">Memuat data...</div>
-            </div>
-          ) : bankData.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="text-muted-foreground">Belum ada data bank</div>
-              <Button className="mt-4" onClick={() => setDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Tambah Bank Pertama
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Search Input */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Cari bank..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* Results Info */}
-              <div className="text-sm text-muted-foreground">
-                {filteredBanks.length} dari {bankData.length} data
-              </div>
-
-              {/* Table */}
-              <div className="border rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        <th className="px-4 py-3 text-left font-medium">Informasi Bank</th>
-                        <th className="px-4 py-3 text-left font-medium">Saldo Awal</th>
-                        <th className="px-4 py-3 text-left font-medium">Saldo Akhir</th>
-                        <th className="px-4 py-3 text-left font-medium">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {filteredBanks.map((bank, index) => {
-                        const saldoAwal = bank?.saldo_awal || 0;
-                        const saldoAkhir = bank?.saldo_akhir || 0;
-                        const selisih = saldoAkhir - saldoAwal;
-                        
-                        return (
-                          <tr key={bank?.id || index} className="hover:bg-muted/50 transition-colors">
-                            <td className="px-4 py-3">
-                              <div className="space-y-1">
-                                <div className="font-medium text-foreground">
-                                  {bank?.nama_bank || 'Nama bank tidak tersedia'}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                  {bank?.nama_pemilik || 'Nama pemilik tidak tersedia'}
-                                </div>
-                                <div className="text-xs text-muted-foreground font-mono">
-                                  {bank?.no_rekening || 'No rekening tidak tersedia'}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="font-medium">{formatCurrency(saldoAwal)}</span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="space-y-1">
-                                <span className={`font-medium ${saldoAkhir >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                  {formatCurrency(saldoAkhir)}
-                                </span>
-                                <div className="text-xs">
-                                  {selisih >= 0 ? (
-                                    <span className="text-emerald-600 flex items-center">
-                                      <TrendingUp className="h-3 w-3 mr-1" />
-                                      +{formatCurrency(selisih)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-red-600 flex items-center">
-                                      <TrendingDown className="h-3 w-3 mr-1" />
-                                      {formatCurrency(selisih)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex gap-2">
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
-                                  onClick={() => handleEdit(bank)}
-                                >
-                                  Edit
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="destructive" 
-                                  onClick={() => handleDelete(bank?.id)}
-                                >
-                                  Hapus
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* No Results */}
-              {filteredBanks.length === 0 && searchTerm && (
-                <div className="text-center py-8">
-                  <div className="text-muted-foreground">
-                    Tidak ada data yang sesuai dengan pencarian "{searchTerm}"
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    className="mt-2" 
-                    onClick={() => setSearchTerm('')}
-                  >
-                    Reset Pencarian
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
+          <DataTable
+            data={banks}
+            columns={columns}
+            loading={isLoading}
+            searchKey="nama_bank"
+            searchPlaceholder="Cari bank..."
+          />
         </CardContent>
       </Card>
     </div>

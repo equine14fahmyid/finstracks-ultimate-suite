@@ -113,12 +113,17 @@ const BalanceSheet = () => {
           .eq('status', 'delivered')
           .lte('tanggal', reportDateStr);
 
-        // 8. Fetch user settings for modal_awal
-        const { data: userSettings } = await supabase
+        // 8. Fetch user settings for modal_awal - PERBAIKAN: Tambah error handling
+        const { data: userSettings, error: settingsError } = await supabase
           .from('user_settings')
           .select('modal_awal') // PERBAIKAN: Hanya ambil kolom modal_awal
           .limit(1)
-          .single();
+          .maybeSingle(); // PERBAIKAN: Gunakan maybeSingle() untuk menghindari error jika tidak ada data
+
+        if (settingsError) {
+          console.error('Error fetching user settings:', settingsError);
+          // Jangan throw error, gunakan nilai default
+        }
 
         // CALCULATIONS
 
@@ -163,7 +168,7 @@ const BalanceSheet = () => {
         // Akumulasi penyusutan juga merupakan biaya, jadi harus dikurangkan dari laba
         const labaDitahan = totalSales - totalExpenses - accumulatedDepreciation; 
 
-        // PERBAIKAN: Ambil modal awal dari database, beri nilai 0 jika tidak ada
+        // PERBAIKAN: Ambil modal awal dari database dengan safe access, beri nilai 0 jika tidak ada
         const modalAwal = userSettings?.modal_awal || 0;
         const totalEquity = modalAwal + labaDitahan;
 
@@ -212,7 +217,6 @@ const BalanceSheet = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      {/* ... SISA KODE JSX DI BAWAH INI SAMA, TIDAK PERLU DIUBAH ... */}
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>

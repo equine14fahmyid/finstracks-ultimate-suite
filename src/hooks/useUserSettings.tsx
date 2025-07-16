@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -57,8 +58,35 @@ export const useUserSettings = () => {
       }
 
       if (data) {
-        // --- PERBAIKAN 2: Type assertion yang lebih aman ---
-        setSettings(data as UserSettings);
+        // --- PERBAIKAN 2: Type assertion yang lebih aman dengan proper typing ---
+        setSettings({
+          id: data.id,
+          modal_awal: data.modal_awal || 0,
+          company_name: data.company_name,
+          company_address: data.company_address,
+          company_phone: data.company_phone,
+          company_email: data.company_email,
+          company_website: data.company_website,
+          tax_number: data.tax_number,
+          logo_url: data.logo_url,
+          theme: data.theme || 'light',
+          language: data.language || 'id',
+          timezone: data.timezone || 'Asia/Jakarta',
+          date_format: data.date_format || 'dd/MM/yyyy',
+          currency: data.currency || 'IDR',
+          email_notifications: data.email_notifications ?? true,
+          push_notifications: data.push_notifications ?? true,
+          sms_notifications: data.sms_notifications ?? false,
+          low_stock_alerts: data.low_stock_alerts ?? true,
+          payment_reminders: data.payment_reminders ?? true,
+          daily_reports: data.daily_reports ?? false,
+          weekly_reports: data.weekly_reports ?? true,
+          monthly_reports: data.monthly_reports ?? true,
+          two_factor_auth: data.two_factor_auth ?? false,
+          session_timeout: data.session_timeout,
+          password_expiry: data.password_expiry,
+          login_attempts: data.login_attempts
+        });
       }
     } catch (error) {
       console.error('Error fetching user settings:', error);

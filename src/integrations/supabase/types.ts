@@ -74,8 +74,8 @@ export type Database = {
           harga_perolehan: number
           id?: string
           is_active?: boolean | null
-          kode_asset: string
-          nama_asset: string
+          kode_asset?: string
+          nama_asset?: string
           nilai_buku?: number | null
           penyusutan_per_bulan?: number | null
           tanggal_perolehan: string
@@ -1021,6 +1021,7 @@ export type Database = {
           login_attempts: number | null
           logo_url: string | null
           low_stock_alerts: boolean | null
+          modal_awal: number | null
           monthly_reports: boolean | null
           password_expiry: number | null
           payment_reminders: boolean | null
@@ -1051,6 +1052,7 @@ export type Database = {
           login_attempts?: number | null
           logo_url?: string | null
           low_stock_alerts?: boolean | null
+          modal_awal?: number | null
           monthly_reports?: boolean | null
           password_expiry?: number | null
           payment_reminders?: boolean | null
@@ -1081,6 +1083,7 @@ export type Database = {
           login_attempts?: number | null
           logo_url?: string | null
           low_stock_alerts?: boolean | null
+          modal_awal?: number | null
           monthly_reports?: boolean | null
           password_expiry?: number | null
           payment_reminders?: boolean | null
