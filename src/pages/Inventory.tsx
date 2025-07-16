@@ -648,7 +648,7 @@ const Inventory = () => {
             loading={loading}
             searchable={true}
             searchPlaceholder="Cari produk..."
-            debug={showDebug}
+            
           />
         </CardContent>
       </Card>
@@ -666,7 +666,7 @@ const Inventory = () => {
               loading={loading}
               searchable={true}
               searchPlaceholder="Cari riwayat..."
-              debug={showDebug}
+             
             />
           ) : (
             <EmptyState
