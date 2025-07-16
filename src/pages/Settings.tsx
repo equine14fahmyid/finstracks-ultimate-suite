@@ -148,7 +148,8 @@ const Settings = () => {
                         <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="info@company.com" {...field} /></FormControl><FormMessage /></FormItem>
                       )} />
                       <FormField control={form.control} name="company_website" render={({ field }) => (
-                        <FormItem><FormLabel>Website</FormLabel><FormControl><Input placeholder="https://company.com" {...field} /></FormControl><FormMessage /></FormMessage>
+                        // --- BARIS INI YANG DIPERBAIKI ---
+                        <FormItem><FormLabel>Website</FormLabel><FormControl><Input placeholder="https://company.com" {...field} /></FormControl><FormMessage /></FormItem>
                       )} />
                     </div>
 
