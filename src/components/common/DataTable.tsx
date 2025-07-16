@@ -1,12 +1,3 @@
-// Gunakan di DataTable
-<DataTable
-  columns={columns}
-  data={dummySuppliers}
-  loading={false}
-  searchable={true}
-  searchPlaceholder="Cari supplier..."
-  debug={true}
-/>
 import { useState } from 'react';
 import {
   Table,
@@ -24,8 +15,8 @@ import {
   ChevronsLeft, 
   ChevronsRight,
   Search,
-  SlidersHorizontal,
-  Download
+  Download,
+  Bug
 } from 'lucide-react';
 
 interface SimpleColumn {
@@ -44,6 +35,7 @@ interface DataTableProps {
   searchPlaceholder?: string;
   onExport?: () => void;
   actions?: React.ReactNode;
+  debug?: boolean;
 }
 
 export function DataTable({
@@ -56,16 +48,30 @@ export function DataTable({
   searchPlaceholder = "Cari data...",
   onExport,
   actions,
+  debug = false,
 }: DataTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [showDebug, setShowDebug] = useState(false);
   const itemsPerPage = 10;
+
+  // DEBUG: Log data untuk troubleshooting
+  if (debug) {
+    console.log("=== DATATABLE DEBUG ===");
+    console.log("Data received:", data);
+    console.log("Columns config:", columns);
+    console.log("Data length:", data.length);
+    if (data.length > 0) {
+      console.log("First data item:", data[0]);
+      console.log("Available keys in first item:", Object.keys(data[0]));
+    }
+  }
 
   // Filter data based on search term
   const filteredData = searchable 
     ? data.filter(item => 
-        Object.values(item).some(value => 
-          String(value).toLowerCase().includes(searchTerm.toLowerCase())
+        Object.values(item || {}).some(value => 
+          String(value || '').toLowerCase().includes(searchTerm.toLowerCase())
         )
       )
     : data;
@@ -87,6 +93,68 @@ export function DataTable({
 
   return (
     <div className="space-y-4">
+      {/* DEBUG Panel */}
+      {debug && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-yellow-800 flex items-center">
+              <Bug className="h-4 w-4 mr-2" />
+              Debug Mode
+            </h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDebug(!showDebug)}
+            >
+              {showDebug ? 'Hide' : 'Show'} Details
+            </Button>
+          </div>
+          
+          {showDebug && (
+            <div className="space-y-2 text-sm">
+              <div>
+                <strong>Data Count:</strong> {data.length}
+              </div>
+              <div>
+                <strong>Columns:</strong> {columns.map(c => c.key).join(', ')}
+              </div>
+              {data.length > 0 && (
+                <div>
+                  <strong>Available Keys:</strong> {Object.keys(data[0] || {}).join(', ')}
+                </div>
+              )}
+              <div>
+                <strong>Missing Keys:</strong> {
+                  columns
+                    .filter(col => data.length > 0 && !(col.key in (data[0] || {})))
+                    .map(col => col.key)
+                    .join(', ') || 'None'
+                }
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Title & Actions */}
+      {(title || actions || onExport) && (
+        <div className="flex items-center justify-between">
+          <div>
+            {title && <h2 className="text-lg font-semibold">{title}</h2>}
+            {description && <p className="text-sm text-muted-foreground">{description}</p>}
+          </div>
+          <div className="flex items-center space-x-2">
+            {actions}
+            {onExport && (
+              <Button variant="outline" size="sm" onClick={onExport}>
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Search */}
       {searchable && (
         <div className="flex items-center space-x-2">
@@ -123,7 +191,15 @@ export function DataTable({
                 <TableRow key={index} className="hover:bg-muted/50 transition-colors">
                   {columns.map((column) => (
                     <TableCell key={column.key}>
-                      {column.render ? column.render(item[column.key], item) : item[column.key]}
+                      {debug && !(column.key in (item || {})) && !column.render ? (
+                        <span className="text-red-500 italic">
+                          Missing: {column.key}
+                        </span>
+                      ) : (
+                        column.render 
+                          ? column.render(item?.[column.key], item) 
+                          : (item?.[column.key] ?? '-')
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -134,6 +210,11 @@ export function DataTable({
                   <div className="flex flex-col items-center justify-center py-8">
                     <Search className="h-8 w-8 text-muted-foreground mb-2 opacity-50" />
                     <p className="text-muted-foreground">Tidak ada data ditemukan</p>
+                    {debug && data.length > 0 && (
+                      <p className="text-xs text-yellow-600 mt-1">
+                        Debug: Data tersedia ({data.length} items) tapi tidak cocok dengan filter
+                      </p>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -146,7 +227,8 @@ export function DataTable({
       {totalPages > 1 && (
         <div className="flex items-center justify-between space-x-2">
           <div className="text-sm text-muted-foreground">
-            Halaman {currentPage} dari {totalPages}
+            Halaman {currentPage} dari {totalPages} 
+            {debug && ` (${filteredData.length} filtered / ${data.length} total)`}
           </div>
           
           <div className="flex items-center space-x-2">

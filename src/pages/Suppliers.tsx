@@ -1,272 +1,497 @@
-import { useState } from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { useState, useEffect } from 'react';
+import { Plus, Edit, Trash2, Building2, Bug } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  ChevronsLeft, 
-  ChevronsRight,
-  Search,
-  Download,
-  Bug
-} from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { DataTable } from '@/components/common/DataTable';
+import { formatDate, formatCurrency } from '@/utils/format';
+import { useSuppliers } from '@/hooks/useSupabase';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
-interface SimpleColumn {
-  key: string;
-  title: string;
-  render?: (value: any, record: any) => React.ReactNode;
+interface Supplier {
+  id: string;
+  nama_supplier: string;
+  alamat?: string;
+  no_hp?: string;
+  email?: string;
+  created_at: string;
+  is_active: boolean;
 }
 
-interface DataTableProps {
-  data: any[];
-  columns: SimpleColumn[];
-  loading?: boolean;
-  title?: string;
-  description?: string;
-  searchable?: boolean;
-  searchPlaceholder?: string;
-  onExport?: () => void;
-  actions?: React.ReactNode;
-  debug?: boolean;
-}
-
-export function DataTable({
-  columns,
-  data,
-  loading = false,
-  title,
-  description,
-  searchable = false,
-  searchPlaceholder = "Cari data...",
-  onExport,
-  actions,
-  debug = false,
-}: DataTableProps) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+const Suppliers = () => {
+  const { hasPermission } = useAuth();
+  const { suppliers, loading, fetchSuppliers, createSupplier, updateSupplier, deleteSupplier } = useSuppliers();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
-  const itemsPerPage = 10;
+  const [formData, setFormData] = useState({
+    nama_supplier: '',
+    alamat: '',
+    no_hp: '',
+    email: '',
+    deskripsi: '',
+  });
 
-  // DEBUG: Log data untuk troubleshooting
-  if (debug) {
-    console.log("=== DATATABLE DEBUG ===");
-    console.log("Data received:", data);
-    console.log("Columns config:", columns);
-    console.log("Data length:", data.length);
-    if (data.length > 0) {
-      console.log("First data item:", data[0]);
-      console.log("Available keys in first item:", Object.keys(data[0]));
+  useEffect(() => {
+    fetchSuppliers();
+  }, []);
+
+  const resetForm = () => {
+    setFormData({
+      nama_supplier: '',
+      alamat: '',
+      no_hp: '',
+      email: '',
+      deskripsi: '',
+    });
+    setIsEditMode(false);
+    setEditingId(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.nama_supplier.trim()) {
+      toast({
+        title: "Error",
+        description: "Nama supplier wajib diisi",
+        variant: "destructive",
+      });
+      return;
     }
-  }
 
-  // Filter data based on search term
-  const filteredData = searchable 
-    ? data.filter(item => 
-        Object.values(item || {}).some(value => 
-          String(value || '').toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      )
-    : data;
+    let result;
+    if (isEditMode && editingId) {
+      result = await updateSupplier(editingId, formData);
+    } else {
+      result = await createSupplier(formData);
+    }
+    
+    if (!result?.error) {
+      setIsDialogOpen(false);
+      resetForm();
+    }
+  };
 
-  // Pagination
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+  const handleEdit = (supplier: any) => {
+    setFormData({
+      nama_supplier: supplier.nama_supplier || '',
+      alamat: supplier.alamat || '',
+      no_hp: supplier.no_hp || '',
+      email: supplier.email || '',
+      deskripsi: supplier.deskripsi || '',
+    });
+    setIsEditMode(true);
+    setEditingId(supplier.id);
+    setIsDialogOpen(true);
+  };
 
-  if (loading) {
+  const handleDelete = async (id: string) => {
+    try {
+      const { data: purchases, error } = await supabase
+        .from('purchases')
+        .select('id')
+        .eq('supplier_id', id)
+        .limit(1);
+
+      if (error) throw error;
+
+      if (purchases && purchases.length > 0) {
+        toast({
+          title: "Tidak dapat menghapus",
+          description: "Supplier ini masih memiliki transaksi pembelian terkait",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (confirm('Apakah Anda yakin ingin menghapus supplier ini?')) {
+        await deleteSupplier(id);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Gagal memeriksa data: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // PERBAIKAN: Kolom configuration yang SANGAT SIMPLE
+  const columns = [
+    {
+      key: "nama_supplier",
+      title: "Nama Supplier",
+      render: (value: any, supplier: any) => (
+        <div className="font-medium">{supplier.nama_supplier}</div>
+      ),
+    },
+    {
+      key: "deskripsi",
+      title: "Deskripsi",
+      render: (value: any, supplier: any) => (
+        <div className="max-w-xs">
+          <div className="text-sm text-foreground font-medium">
+            {supplier.deskripsi ? (
+              <div className="break-words overflow-hidden" style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical' as const
+              }}>
+                {supplier.deskripsi}
+              </div>
+            ) : (
+              <span className="text-muted-foreground italic">-</span>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "alamat",
+      title: "Alamat",
+      render: (value: any, supplier: any) => (
+        <div className="max-w-xs">
+          <div className="text-sm text-foreground">
+            {supplier.alamat ? (
+              <div className="break-words overflow-hidden" style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical' as const
+              }}>
+                {supplier.alamat}
+              </div>
+            ) : (
+              <span className="text-muted-foreground italic">-</span>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "no_hp",
+      title: "No. HP",
+      render: (value: any, supplier: any) => (
+        <div className="text-muted-foreground">
+          {supplier.no_hp || "-"}
+        </div>
+      ),
+    },
+    {
+      key: "email",
+      title: "Email",
+      render: (value: any, supplier: any) => (
+        <div className="text-muted-foreground">
+          {supplier.email || "-"}
+        </div>
+      ),
+    },
+    {
+      key: "created_at",
+      title: "Tgl Dibuat",
+      render: (value: any, supplier: any) => (
+        <div className="text-sm text-muted-foreground">
+          {formatDate(supplier.created_at)}
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      title: "Aksi",
+      render: (value: any, supplier: any) => (
+        <div className="flex items-center gap-2">
+          {hasPermission('suppliers.update') && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0"
+              onClick={() => handleEdit(supplier)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          )}
+          {hasPermission('suppliers.delete') && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+              onClick={() => handleDelete(supplier.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  if (!hasPermission('suppliers.read')) {
     return (
-      <div className="space-y-3">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-12 bg-muted animate-pulse rounded"></div>
-        ))}
+      <div className="p-6">
+        <Card className="glass-card border-0 p-8 text-center">
+          <Building2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-semibold mb-2">Akses Terbatas</h3>
+          <p className="text-muted-foreground">
+            Anda tidak memiliki izin untuk melihat data supplier.
+          </p>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* DEBUG Panel */}
-      {debug && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold text-yellow-800 flex items-center">
-              <Bug className="h-4 w-4 mr-2" />
-              Debug Mode
-            </h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowDebug(!showDebug)}
-            >
-              {showDebug ? 'Hide' : 'Show'} Details
-            </Button>
-          </div>
-          
-          {showDebug && (
-            <div className="space-y-2 text-sm">
-              <div>
-                <strong>Data Count:</strong> {data.length}
-              </div>
-              <div>
-                <strong>Columns:</strong> {columns.map(c => c.key).join(', ')}
-              </div>
-              {data.length > 0 && (
-                <div>
-                  <strong>Available Keys:</strong> {Object.keys(data[0] || {}).join(', ')}
-                </div>
-              )}
-              <div>
-                <strong>Missing Keys:</strong> {
-                  columns
-                    .filter(col => data.length > 0 && !(col.key in (data[0] || {})))
-                    .map(col => col.key)
-                    .join(', ') || 'None'
-                }
-              </div>
-            </div>
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold gradient-text">Data Supplier</h1>
+          <p className="text-muted-foreground">
+            Kelola data supplier dan vendor bisnis Anda
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowDebug(!showDebug)}
+          >
+            <Bug className="h-4 w-4 mr-2" />
+            {showDebug ? 'Hide' : 'Show'} Debug
+          </Button>
+
+          {hasPermission('suppliers.create') && (
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
+            }}>
+              <DialogTrigger asChild>
+                <Button className="gradient-primary">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Tambah Supplier
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="glass-card">
+                <form onSubmit={handleSubmit}>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {isEditMode ? 'Edit Supplier' : 'Tambah Supplier Baru'}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {isEditMode 
+                        ? 'Perbarui informasi supplier' 
+                        : 'Lengkapi informasi supplier yang akan ditambahkan'
+                      }
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="nama_supplier">Nama Supplier *</Label>
+                      <Input
+                        id="nama_supplier"
+                        value={formData.nama_supplier}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          nama_supplier: e.target.value
+                        }))}
+                        placeholder="Masukkan nama supplier"
+                        className="glass-input"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="deskripsi">Deskripsi</Label>
+                      <Textarea
+                        id="deskripsi"
+                        value={formData.deskripsi}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          deskripsi: e.target.value
+                        }))}
+                        placeholder="Masukkan deskripsi supplier"
+                        className="glass-input"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="alamat">Alamat</Label>
+                      <Textarea
+                        id="alamat"
+                        value={formData.alamat}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          alamat: e.target.value
+                        }))}
+                        placeholder="Masukkan alamat lengkap"
+                        className="glass-input"
+                        rows={2}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="no_hp">No. HP</Label>
+                        <Input
+                          id="no_hp"
+                          value={formData.no_hp}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            no_hp: e.target.value
+                          }))}
+                          placeholder="08xxxxxxxxxx"
+                          className="glass-input"
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            email: e.target.value
+                          }))}
+                          placeholder="supplier@example.com"
+                          className="glass-input"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsDialogOpen(false);
+                        resetForm();
+                      }}
+                      className="glass-button"
+                    >
+                      Batal
+                    </Button>
+                    <Button type="submit" className="gradient-primary">
+                      {isEditMode ? 'Perbarui' : 'Simpan'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
           )}
         </div>
-      )}
-
-      {/* Title & Actions */}
-      {(title || actions || onExport) && (
-        <div className="flex items-center justify-between">
-          <div>
-            {title && <h2 className="text-lg font-semibold">{title}</h2>}
-            {description && <p className="text-sm text-muted-foreground">{description}</p>}
-          </div>
-          <div className="flex items-center space-x-2">
-            {actions}
-            {onExport && (
-              <Button variant="outline" size="sm" onClick={onExport}>
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Search */}
-      {searchable && (
-        <div className="flex items-center space-x-2">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder={searchPlaceholder}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="text-sm text-muted-foreground">
-            {filteredData.length} dari {data.length} data
-          </div>
-        </div>
-      )}
-
-      {/* Table */}
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {columns.map((column) => (
-                <TableHead key={column.key} className="font-semibold">
-                  {column.title}
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedData.length ? (
-              paginatedData.map((item, index) => (
-                <TableRow key={index} className="hover:bg-muted/50 transition-colors">
-                  {columns.map((column) => (
-                    <TableCell key={column.key}>
-                      {debug && !(column.key in (item || {})) && !column.render ? (
-                        <span className="text-red-500 italic">
-                          Missing: {column.key}
-                        </span>
-                      ) : (
-                        column.render 
-                          ? column.render(item?.[column.key], item) 
-                          : (item?.[column.key] ?? '-')
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  <div className="flex flex-col items-center justify-center py-8">
-                    <Search className="h-8 w-8 text-muted-foreground mb-2 opacity-50" />
-                    <p className="text-muted-foreground">Tidak ada data ditemukan</p>
-                    {debug && data.length > 0 && (
-                      <p className="text-xs text-yellow-600 mt-1">
-                        Debug: Data tersedia ({data.length} items) tapi tidak cocok dengan filter
-                      </p>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between space-x-2">
-          <div className="text-sm text-muted-foreground">
-            Halaman {currentPage} dari {totalPages} 
-            {debug && ` (${filteredData.length} filtered / ${data.length} total)`}
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(1)}
-              disabled={currentPage === 1}
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(totalPages)}
-              disabled={currentPage === totalPages}
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+      {/* Debug Panel */}
+      {showDebug && (
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardHeader>
+            <CardTitle className="text-yellow-800">Debug Information</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <div className="space-y-2">
+              <div><strong>Suppliers Count:</strong> {suppliers?.length || 0}</div>
+              <div><strong>Loading:</strong> {loading ? 'Yes' : 'No'}</div>
+              {suppliers?.length > 0 && (
+                <div>
+                  <strong>First Supplier Structure:</strong>
+                  <pre className="bg-yellow-100 p-2 rounded text-xs overflow-x-auto">
+                    {JSON.stringify(suppliers[0], null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
+
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="glass-card border-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Supplier</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{suppliers?.length || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Supplier aktif terdaftar
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Dengan Kontak</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {suppliers?.filter(s => s.no_hp || s.email).length || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Supplier dengan info kontak
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Terbaru</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {suppliers?.filter(s => {
+                const created = new Date(s.created_at);
+                const today = new Date();
+                const diffTime = Math.abs(today.getTime() - created.getTime());
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                return diffDays <= 30;
+              }).length || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Ditambahkan 30 hari terakhir
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Data Table */}
+      <DataTable
+        columns={columns}
+        data={suppliers || []}
+        loading={loading}
+        searchable={true}
+        searchPlaceholder="Cari supplier..."
+        debug={showDebug}
+        onExport={() => {
+          toast({
+            title: "Info",
+            description: "Fitur export akan ditambahkan pada versi berikutnya",
+          });
+        }}
+      />
     </div>
   );
-}
+};
+
+export default Suppliers;
