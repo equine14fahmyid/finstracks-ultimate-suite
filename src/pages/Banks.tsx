@@ -1,10 +1,12 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Wallet, TrendingUp, TrendingDown, Building2, Search } from 'lucide-react';
+import { Plus, Wallet, TrendingUp, TrendingDown, Building2 } from 'lucide-react';
 import { useBanks } from '@/hooks/useSupabase';
+import { DataTable } from '@/components/common/DataTable';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/utils/format';
@@ -21,7 +23,6 @@ const Banks = () => {
   const { banks, loading, fetchBanks, createBank, updateBank, deleteBank } = useBanks();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<any>(null);
-  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState<BankFormData>({
     nama_bank: '',
     nama_pemilik: '',
@@ -33,16 +34,6 @@ const Banks = () => {
   useEffect(() => {
     fetchBanks();
   }, []);
-
-  // DEBUG: Log data banks untuk troubleshooting
-  useEffect(() => {
-    console.log('Banks data:', banks);
-    console.log('Banks length:', banks?.length);
-    if (banks?.length > 0) {
-      console.log('First bank:', banks[0]);
-      console.log('Bank keys:', Object.keys(banks[0] || {}));
-    }
-  }, [banks]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +54,6 @@ const Banks = () => {
     if (success) {
       setDialogOpen(false);
       resetForm();
-      await fetchBanks();
     }
   };
 
@@ -79,53 +69,86 @@ const Banks = () => {
   };
 
   const handleEdit = (bank: any) => {
-    console.log('Editing bank:', bank);
-    
     if (!bank) return;
     
     setEditingBank(bank);
     setFormData({
-      nama_bank: bank.nama_bank || '',
-      nama_pemilik: bank.nama_pemilik || '',
-      no_rekening: bank.no_rekening || '',
-      saldo_awal: bank.saldo_awal || 0,
-      saldo_akhir: bank.saldo_akhir || 0
+      nama_bank: bank?.nama_bank || '',
+      nama_pemilik: bank?.nama_pemilik || '',
+      no_rekening: bank?.no_rekening || '',
+      saldo_awal: bank?.saldo_awal || 0,
+      saldo_akhir: bank?.saldo_akhir || 0
     });
     setDialogOpen(true);
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus bank ini?')) {
-      const success = await deleteBank(id);
-      if (success) {
-        await fetchBanks();
-      }
+      await deleteBank(id);
     }
   };
 
-  // Pastikan banks adalah array dan tidak null/undefined
-  const bankData = Array.isArray(banks) ? banks : [];
-  
-  // Filter data berdasarkan search term
-  const filteredBanks = bankData.filter(bank => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      (bank?.nama_bank || '').toLowerCase().includes(searchLower) ||
-      (bank?.nama_pemilik || '').toLowerCase().includes(searchLower) ||
-      (bank?.no_rekening || '').toLowerCase().includes(searchLower)
-    );
-  });
-  
-  const totalSaldoAwal = bankData.reduce((total, bank) => {
-    const saldo = bank?.saldo_awal || 0;
-    return total + saldo;
-  }, 0);
-  
-  const totalSaldoAkhir = bankData.reduce((total, bank) => {
-    const saldo = bank?.saldo_akhir || 0;
-    return total + saldo;
-  }, 0);
-  
+  const columns = [
+    {
+      key: 'bank_info',
+      title: 'Informasi Bank',
+      render: (bank: any) => (
+        <div>
+          <div className="font-medium">{bank?.nama_bank || '-'}</div>
+          <div className="text-sm text-muted-foreground">{bank?.nama_pemilik || '-'}</div>
+          <div className="text-xs text-muted-foreground">{bank?.no_rekening || '-'}</div>
+        </div>
+      )
+    },
+    {
+      key: 'saldo_awal',
+      title: 'Saldo Awal',
+      render: (bank: any) => (
+        <span className="font-medium">{formatCurrency(bank?.saldo_awal || 0)}</span>
+      )
+    },
+    {
+      key: 'saldo_akhir',
+      title: 'Saldo Akhir',
+      render: (bank: any) => (
+        <div>
+          <span className={`font-medium ${(bank?.saldo_akhir || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {formatCurrency(bank?.saldo_akhir || 0)}
+          </span>
+          <div className="text-xs text-muted-foreground mt-1">
+            {(bank?.saldo_akhir || 0) >= (bank?.saldo_awal || 0) ? (
+              <span className="text-green-600 flex items-center">
+                <TrendingUp className="h-3 w-3 mr-1" />
+                +{formatCurrency((bank?.saldo_akhir || 0) - (bank?.saldo_awal || 0))}
+              </span>
+            ) : (
+              <span className="text-red-600 flex items-center">
+                <TrendingDown className="h-3 w-3 mr-1" />
+                {formatCurrency((bank?.saldo_akhir || 0) - (bank?.saldo_awal || 0))}
+              </span>
+            )}
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'actions',
+      title: 'Aksi',
+      render: (bank: any) => (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => handleEdit(bank)}>
+            Edit
+          </Button>
+          <Button size="sm" variant="destructive" onClick={() => handleDelete(bank?.id)}>
+            Hapus
+          </Button>
+        </div>
+      )
+    }
+  ];
+
+  const totalSaldoAwal = banks?.reduce((total, bank) => total + (bank?.saldo_awal || 0), 0) || 0;
+  const totalSaldoAkhir = banks?.reduce((total, bank) => total + (bank?.saldo_akhir || 0), 0) || 0;
   const totalPerubahan = totalSaldoAkhir - totalSaldoAwal;
 
   return (
@@ -193,7 +216,7 @@ const Banks = () => {
                     ...prev, 
                     saldo_awal: parseFloat(e.target.value) || 0 
                   }))}
-                  placeholder="5.000.000"
+                  placeholder="0"
                   min="0"
                   step="0.01"
                 />
@@ -209,7 +232,7 @@ const Banks = () => {
                     ...prev, 
                     saldo_akhir: parseFloat(e.target.value) || 0 
                   }))}
-                  placeholder="7.500.000"
+                  placeholder="0"
                   step="0.01"
                 />
               </div>
@@ -227,32 +250,6 @@ const Banks = () => {
         </Dialog>
       </div>
 
-      {/* Debug Info - Hapus setelah masalah teratasi */}
-      {process.env.NODE_ENV === 'development' && (
-        <Card className="bg-yellow-50 border-yellow-200">
-          <CardHeader>
-            <CardTitle className="text-yellow-800">Debug Info</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm space-y-2">
-              <div>Loading: {loading ? 'Ya' : 'Tidak'}</div>
-              <div>Banks Length: {bankData.length}</div>
-              {bankData.length > 0 && (
-                <div className="border-t pt-2">
-                  <div className="font-medium">Sample Bank Data:</div>
-                  <div>ID: {bankData[0]?.id}</div>
-                  <div>Nama Bank: "{bankData[0]?.nama_bank}"</div>
-                  <div>Nama Pemilik: "{bankData[0]?.nama_pemilik}"</div>
-                  <div>No Rekening: "{bankData[0]?.no_rekening}"</div>
-                  <div>Saldo Awal: {bankData[0]?.saldo_awal}</div>
-                  <div>Saldo Akhir: {bankData[0]?.saldo_akhir}</div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -261,7 +258,7 @@ const Banks = () => {
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{bankData.length}</div>
+            <div className="text-2xl font-bold">{banks.length}</div>
             <p className="text-xs text-muted-foreground">Rekening terdaftar</p>
           </CardContent>
         </Card>
@@ -308,141 +305,19 @@ const Banks = () => {
         </Card>
       </div>
 
-      {/* Banks Table - Custom Implementation */}
+      {/* Banks Table */}
       <Card>
         <CardHeader>
           <CardTitle>Daftar Rekening Bank</CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <div className="text-muted-foreground">Memuat data...</div>
-            </div>
-          ) : bankData.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="text-muted-foreground">Belum ada data bank</div>
-              <Button className="mt-4" onClick={() => setDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Tambah Bank Pertama
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Search Input */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Cari bank..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* Results Info */}
-              <div className="text-sm text-muted-foreground">
-                {filteredBanks.length} dari {bankData.length} data
-              </div>
-
-              {/* Table */}
-              <div className="border rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        <th className="px-4 py-3 text-left font-medium">Informasi Bank</th>
-                        <th className="px-4 py-3 text-left font-medium">Saldo Awal</th>
-                        <th className="px-4 py-3 text-left font-medium">Saldo Akhir</th>
-                        <th className="px-4 py-3 text-left font-medium">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {filteredBanks.map((bank, index) => {
-                        const saldoAwal = bank?.saldo_awal || 0;
-                        const saldoAkhir = bank?.saldo_akhir || 0;
-                        const selisih = saldoAkhir - saldoAwal;
-                        
-                        return (
-                          <tr key={bank?.id || index} className="hover:bg-muted/50 transition-colors">
-                            <td className="px-4 py-3">
-                              <div className="space-y-1">
-                                <div className="font-medium text-foreground">
-                                  {bank?.nama_bank || 'Nama bank tidak tersedia'}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                  {bank?.nama_pemilik || 'Nama pemilik tidak tersedia'}
-                                </div>
-                                <div className="text-xs text-muted-foreground font-mono">
-                                  {bank?.no_rekening || 'No rekening tidak tersedia'}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="font-medium">{formatCurrency(saldoAwal)}</span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="space-y-1">
-                                <span className={`font-medium ${saldoAkhir >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                  {formatCurrency(saldoAkhir)}
-                                </span>
-                                <div className="text-xs">
-                                  {selisih >= 0 ? (
-                                    <span className="text-emerald-600 flex items-center">
-                                      <TrendingUp className="h-3 w-3 mr-1" />
-                                      +{formatCurrency(selisih)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-red-600 flex items-center">
-                                      <TrendingDown className="h-3 w-3 mr-1" />
-                                      {formatCurrency(selisih)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex gap-2">
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
-                                  onClick={() => handleEdit(bank)}
-                                >
-                                  Edit
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="destructive" 
-                                  onClick={() => handleDelete(bank?.id)}
-                                >
-                                  Hapus
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* No Results */}
-              {filteredBanks.length === 0 && searchTerm && (
-                <div className="text-center py-8">
-                  <div className="text-muted-foreground">
-                    Tidak ada data yang sesuai dengan pencarian "{searchTerm}"
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    className="mt-2" 
-                    onClick={() => setSearchTerm('')}
-                  >
-                    Reset Pencarian
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
+          <DataTable
+            columns={columns}
+            data={banks}
+            loading={loading}
+            searchable={true}
+            searchPlaceholder="Cari bank..."
+          />
         </CardContent>
       </Card>
     </div>
