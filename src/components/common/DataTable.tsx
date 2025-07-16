@@ -1,3 +1,12 @@
+// Gunakan di DataTable
+<DataTable
+  columns={columns}
+  data={dummySuppliers}
+  loading={false}
+  searchable={true}
+  searchPlaceholder="Cari supplier..."
+  debug={true}
+/>
 import { useState } from 'react';
 import {
   Table,
