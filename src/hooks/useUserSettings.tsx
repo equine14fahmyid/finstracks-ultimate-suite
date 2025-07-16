@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 
 interface UserSettings {
+  modal_awal: number;
   company_name: string;
   company_address: string;
   company_phone: string;
@@ -106,3 +107,6 @@ export const useUserSettings = () => {
     refreshSettings: fetchSettings,
   };
 };
+// file: src/hooks/useUserSettings.tsx
+
+import { useState, useEffect } from 'react';
