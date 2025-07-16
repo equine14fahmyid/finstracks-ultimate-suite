@@ -1,118 +1,3 @@
-import { useState, useCallback, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient'; // Pastikan path ini benar
-import { Expense, Category, Bank, ExpenseFormData } from '@/types'; // Pastikan path ini benar
-import { toast } from '@/hooks/use-toast';
-
-// Hook terpadu untuk mengelola semua data dan logika di halaman Pengeluaran
-export const useExpensePage = () => {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [banks, setBanks] = useState<Bank[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fungsi untuk mengambil semua data yang dibutuhkan halaman ini secara bersamaan (paralel)
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [expensesRes, categoriesRes, banksRes] = await Promise.all([
-        supabase
-          .from('expenses')
-          .select('*, category:categories(*), bank:banks(*)') // Ambil data relasi
-          .order('tanggal', { ascending: false }),
-        supabase
-          .from('categories')
-          .select('*')
-          .eq('tipe_kategori', 'expense') // Hanya ambil kategori untuk pengeluaran
-          .order('nama_kategori', { ascending: true }),
-        supabase
-          .from('banks')
-          .select('*')
-          .order('nama_bank', { ascending: true }),
-      ]);
-
-      // Cek error untuk setiap request
-      if (expensesRes.error) throw expensesRes.error;
-      if (categoriesRes.error) throw categoriesRes.error;
-      if (banksRes.error) throw banksRes.error;
-
-      // Set state jika berhasil
-      setExpenses(expensesRes.data || []);
-      setCategories(categoriesRes.data || []);
-      setBanks(banksRes.data || []);
-
-    } catch (err: any) {
-      const errorMessage = "Gagal memuat data dari database.";
-      console.error(errorMessage, err);
-      setError(errorMessage);
-      toast({ title: "Error", description: errorMessage, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Panggil fetchData() saat komponen pertama kali dimuat
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Fungsi untuk membuat data baru
-  const createExpense = async (formData: ExpenseFormData) => {
-    try {
-      const { error } = await supabase.from('expenses').insert([formData]);
-      if (error) throw error;
-      toast({ title: "Sukses", description: "Pengeluaran baru berhasil ditambahkan." });
-      await fetchData(); // Ambil data terbaru setelah berhasil
-    } catch (err: any) {
-      const errorMessage = "Gagal menambahkan pengeluaran.";
-      console.error(errorMessage, err);
-      toast({ title: "Error", description: errorMessage, variant: "destructive" });
-      throw err; // Lemparkan error agar komponen bisa menangani
-    }
-  };
-
-  // Fungsi untuk update data
-  const updateExpense = async (id: string, formData: ExpenseFormData) => {
-    try {
-      const { error } = await supabase.from('expenses').update(formData).eq('id', id);
-      if (error) throw error;
-      toast({ title: "Sukses", description: "Data pengeluaran berhasil diperbarui." });
-      await fetchData(); // Ambil data terbaru
-    } catch (err: any) {
-      const errorMessage = "Gagal memperbarui pengeluaran.";
-      console.error(errorMessage, err);
-      toast({ title: "Error", description: errorMessage, variant: "destructive" });
-      throw err;
-    }
-  };
-
-  // Fungsi untuk menghapus data
-  const deleteExpense = async (id: string) => {
-    try {
-      const { error } = await supabase.from('expenses').delete().eq('id', id);
-      if (error) throw error;
-      toast({ title: "Sukses", description: "Pengeluaran berhasil dihapus." });
-      await fetchData(); // Ambil data terbaru
-    } catch (err: any) {
-      const errorMessage = "Gagal menghapus pengeluaran.";
-      console.error(errorMessage, err);
-      toast({ title: "Error", description: errorMessage, variant: "destructive" });
-      throw err;
-    }
-  };
-
-  // Kembalikan semua state dan fungsi yang dibutuhkan oleh UI
-  return { expenses, categories, banks, loading, error, createExpense, updateExpense, deleteExpense };
-};
-```
-
-### 2. Komponen Halaman Pengeluaran (Diperbarui)
-
-Ganti seluruh isi file `expenses.tsx` Anda dengan kode di bawah ini. Kemungkinan besar path file ini adalah `src/app/dashboard/pengeluaran/page.tsx` atau yang serupa.
-
-
-```typescript
 'use client'; // Diperlukan untuk komponen yang menggunakan hooks dan interaktivitas
 
 import { useState } from 'react';
@@ -134,7 +19,7 @@ import { ExpenseFormData, Expense } from '@/types';
 const ExpensesPage = () => {
   // Gunakan satu hook terpadu untuk semua data dan fungsi. Jadi lebih rapi!
   const { expenses, categories, banks, loading, createExpense, updateExpense, deleteExpense } = useExpensePage();
-  
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [formData, setFormData] = useState<ExpenseFormData>({
@@ -144,7 +29,7 @@ const ExpensesPage = () => {
     bank_id: '',
     keterangan: ''
   });
-  
+
   // State untuk dialog konfirmasi hapus
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
@@ -326,6 +211,3 @@ const ExpensesPage = () => {
 };
 
 export default ExpensesPage;
-```
-
-Setelah Anda mengganti kedua file tersebut, halaman Anda seharusnya sudah berfungsi dengan baik. Jika masih ada kendala, jangan ragu untuk bertanya lagi. Kita pasti bisa selesaikan i
