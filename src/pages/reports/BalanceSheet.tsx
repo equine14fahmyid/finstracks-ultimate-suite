@@ -45,21 +45,25 @@ interface BalanceSheetData {
 const BalanceSheet = () => {
   const [reportDate, setReportDate] = useState<Date>(new Date());
 
-  // Helper function to calculate months between dates
+  // Helper function to calculate months between dates (FIXED)
   const calculateMonthsBetween = (startDate: string, endDate: Date): number => {
     const start = new Date(startDate);
     const end = endDate;
     
-    const yearDiff = end.getFullYear() - start.getFullYear();
-    const monthDiff = end.getMonth() - start.getMonth();
-    const dayDiff = end.getDate() - start.getDate();
+    // Calculate total days difference
+    const daysDiff = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
     
-    let totalMonths = yearDiff * 12 + monthDiff;
-    if (dayDiff >= 0) {
-      totalMonths += dayDiff / 30; // Approximate partial month
-    }
+    // Convert to months (more accurate)
+    const monthsUsed = daysDiff / 30;
     
-    return Math.max(0, Math.floor(totalMonths));
+    console.log(`Asset depreciation calculation:`, {
+      startDate,
+      endDate: end.toISOString().split('T')[0],
+      daysDiff,
+      monthsUsed
+    });
+    
+    return Math.max(0, monthsUsed);
   };
 
   const { data: balanceSheetData, isLoading } = useQuery({
@@ -91,12 +95,18 @@ const BalanceSheet = () => {
           `)
           .eq('is_active', true);
 
-        // 4. Fetch assets data for depreciation calculation
-        const { data: assetsData } = await supabase
+        // 4. Fetch assets data for depreciation calculation (IMPROVED QUERY)
+        const { data: assetsData, error: assetsError } = await supabase
           .from('assets')
-          .select('harga_perolehan, penyusutan_per_bulan, tanggal_perolehan')
+          .select('harga_perolehan, penyusutan_per_bulan, tanggal_perolehan, nama_asset, kode_asset')
           .eq('is_active', true)
           .lte('tanggal_perolehan', reportDateStr); // Only assets acquired before report date
+
+        if (assetsError) {
+          console.error('Error fetching assets:', assetsError);
+        } else {
+          console.log('Assets fetched:', assetsData?.length || 0);
+        }
 
         // 5. Fetch pending purchases (hutang usaha)
         const { data: pendingPurchases } = await supabase
@@ -136,24 +146,46 @@ const BalanceSheet = () => {
 
         const currentAssetsTotal = kasBankTotal + piutangTotal + persediaanTotal;
 
-        // Fixed Assets with date-based depreciation calculation
+        // Fixed Assets with date-based depreciation calculation (IMPROVED)
         let equipmentTotal = 0;
         let accumulatedDepreciation = 0;
         let equipmentNetValue = 0;
 
-        if (assetsData) {
+        console.log('Processing assets for depreciation:', assetsData?.length || 0);
+
+        if (assetsData && assetsData.length > 0) {
           for (const asset of assetsData) {
             const monthsUsed = calculateMonthsBetween(asset.tanggal_perolehan, reportDate);
+            const monthlyDepreciation = asset.penyusutan_per_bulan || 0;
+            const assetCost = asset.harga_perolehan || 0;
+            
+            // Calculate depreciation (cannot exceed asset cost)
             const assetDepreciation = Math.min(
-              monthsUsed * (asset.penyusutan_per_bulan || 0),
-              asset.harga_perolehan || 0
+              monthsUsed * monthlyDepreciation,
+              assetCost
             );
             
-            equipmentTotal += asset.harga_perolehan || 0;
+            const assetNetValue = Math.max(0, assetCost - assetDepreciation);
+            
+            console.log(`Asset ${asset.tanggal_perolehan}:`, {
+              cost: assetCost,
+              monthsUsed,
+              monthlyDepreciation,
+              totalDepreciation: assetDepreciation,
+              netValue: assetNetValue
+            });
+            
+            equipmentTotal += assetCost;
             accumulatedDepreciation += assetDepreciation;
-            equipmentNetValue += Math.max(0, (asset.harga_perolehan || 0) - assetDepreciation);
+            equipmentNetValue += assetNetValue;
           }
         }
+
+        console.log('Final fixed assets calculation:', {
+          equipmentTotal,
+          accumulatedDepreciation,
+          equipmentNetValue
+        });
 
         const totalAssets = currentAssetsTotal + equipmentNetValue;
 
@@ -379,7 +411,7 @@ const BalanceSheet = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-red-600">KEWAJIBAN</CardTitle>
-                <Link to="/purchases">
+                <Link to="/pembelian">
                   <Button variant="ghost" size="sm">
                     <ExternalLink className="h-4 w-4 mr-1" />
                     Lihat Pembelian
