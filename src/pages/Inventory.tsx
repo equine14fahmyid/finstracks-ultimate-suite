@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertTriangle, Package, TrendingDown, TrendingUp, Plus, Edit, Trash2 } from 'lucide-react';
+import { AlertTriangle, Package, TrendingDown, TrendingUp, Plus, Edit, Trash2, Bug } from 'lucide-react';
 import { useStock, useProducts } from '@/hooks/useSupabase';
 import { DataTable } from '@/components/common/DataTable';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -13,7 +13,6 @@ import { toast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/utils/format';
 import { useNavigate } from 'react-router-dom';
 import EmptyState from '@/components/common/EmptyState';
-import { supabase } from '@/integrations/supabase/client';
 
 const Inventory = () => {
   const navigate = useNavigate();
@@ -23,6 +22,7 @@ const Inventory = () => {
   const [variantDialogOpen, setVariantDialogOpen] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
   const [adjustmentData, setAdjustmentData] = useState({
     quantity: 0,
     notes: ''
@@ -41,6 +41,30 @@ const Inventory = () => {
     fetchProducts();
   }, []);
 
+  // Helper function to get product name safely
+  const getProductName = (item: any) => {
+    // Try multiple possible paths for product name
+    return item?.products?.nama_produk || 
+           item?.product?.nama_produk || 
+           item?.nama_produk || 
+           'Produk tidak dikenal';
+  };
+
+  // Helper function to get product price safely
+  const getProductPrice = (item: any) => {
+    return item?.products?.harga_beli || 
+           item?.product?.harga_beli || 
+           item?.harga_beli || 
+           0;
+  };
+
+  // Helper function to get product unit safely
+  const getProductUnit = (item: any) => {
+    return item?.products?.satuan || 
+           item?.product?.satuan || 
+           item?.satuan || 
+           'pcs';
+  };
 
   const resetVariantForm = () => {
     setVariantFormData({
@@ -110,7 +134,6 @@ const Inventory = () => {
       if (!result?.error) {
         setVariantDialogOpen(false);
         resetVariantForm();
-        // Force refresh all data to sync
         await fetchStock();
         await fetchStockMovements();
         await fetchProducts();
@@ -160,13 +183,11 @@ const Inventory = () => {
     if (confirm('Apakah Anda yakin ingin menghapus varian produk ini?')) {
       try {
         await deleteProductVariant(id);
-        // Force refresh all data to sync
         await fetchStock();
         await fetchStockMovements();
         await fetchProducts();
       } catch (error) {
         console.error('Delete variant error:', error);
-        // Error handling is done in the hook
       }
     }
   };
@@ -175,35 +196,48 @@ const Inventory = () => {
     {
       key: 'product',
       title: 'Produk',
-      render: (item: any) => {
+      render: (_, item: any) => {
         if (!item) return <div>Data tidak tersedia</div>;
+        
+        const productName = getProductName(item);
         
         return (
           <div>
-            <div className="font-medium">{item?.products?.nama_produk || 'Unknown Product'}</div>
+            <div className="font-medium">{productName}</div>
             <div className="text-sm text-muted-foreground">
               {item?.warna || 'N/A'} - {item?.size || 'N/A'}
             </div>
             {item?.sku && (
               <div className="text-xs text-muted-foreground">SKU: {item.sku}</div>
             )}
+            {showDebug && (
+              <div className="text-xs text-yellow-600 mt-1">
+                Debug: {JSON.stringify({
+                  products: item?.products?.nama_produk || 'null',
+                  product: item?.product?.nama_produk || 'null',
+                  direct: item?.nama_produk || 'null'
+                })}
+              </div>
+            )}
           </div>
         );
       }
     },
     {
-      key: 'stock',
+      key: 'stok',
       title: 'Stok',
-      render: (item: any) => {
+      render: (_, item: any) => {
         if (!item) return <div>0</div>;
         
         const stok = item?.stok ?? 0;
+        const unit = getProductUnit(item);
+        
         return (
           <div className="flex items-center gap-2">
             <span className={`font-medium ${stok <= 5 ? 'text-red-600' : stok <= 10 ? 'text-yellow-600' : 'text-green-600'}`}>
-              {stok}
+              {stok.toLocaleString('id-ID')}
             </span>
-            <span className="text-sm text-muted-foreground">{item?.products?.satuan || 'pcs'}</span>
+            <span className="text-sm text-muted-foreground">{unit}</span>
             {stok <= 5 && (
               <Badge variant="destructive" className="text-xs">
                 <AlertTriangle className="h-3 w-3 mr-1" />
@@ -217,16 +251,20 @@ const Inventory = () => {
     {
       key: 'value',
       title: 'Nilai Stok',
-      render: (item: any) => {
+      render: (_, item: any) => {
         if (!item) return <div>Rp 0</div>;
+        
+        const stok = item?.stok || 0;
+        const hargaBeli = getProductPrice(item);
+        const totalValue = stok * hargaBeli;
         
         return (
           <div>
             <div className="font-medium">
-              {formatCurrency((item?.stok || 0) * (item?.products?.harga_beli || 0))}
+              {formatCurrency(totalValue)}
             </div>
             <div className="text-sm text-muted-foreground">
-              @ {formatCurrency(item?.products?.harga_beli || 0)}
+              @ {formatCurrency(hargaBeli)}
             </div>
           </div>
         );
@@ -235,7 +273,7 @@ const Inventory = () => {
     {
       key: 'actions',
       title: 'Aksi',
-      render: (item: any) => {
+      render: (_, item: any) => {
         if (!item) return <div>-</div>;
         
         return (
@@ -276,34 +314,36 @@ const Inventory = () => {
 
   const movementColumns = [
     {
-      key: 'date',
+      key: 'created_at',
       title: 'Tanggal',
-      render: (movement: any) => (
+      render: (_, movement: any) => (
         movement?.created_at ? new Date(movement.created_at).toLocaleDateString('id-ID') : '-'
       )
     },
     {
       key: 'product',
       title: 'Produk',
-      render: (movement: any) => {
+      render: (_, movement: any) => {
         if (!movement) return <div>Data tidak tersedia</div>;
+        
+        const productName = movement?.product_variant?.products?.nama_produk || 
+                           movement?.product_variant?.product?.nama_produk || 
+                           'Produk tidak diketahui';
         
         return (
           <div>
-            <div className="font-medium">
-              {movement.product_variant?.product?.nama_produk || 'Produk tidak diketahui'}
-            </div>
+            <div className="font-medium">{productName}</div>
             <div className="text-sm text-muted-foreground">
-              {movement.product_variant?.warna || 'N/A'} - {movement.product_variant?.size || 'N/A'}
+              {movement?.product_variant?.warna || 'N/A'} - {movement?.product_variant?.size || 'N/A'}
             </div>
           </div>
         );
       }
     },
     {
-      key: 'type',
+      key: 'movement_type',
       title: 'Jenis',
-      render: (movement: any) => {
+      render: (_, movement: any) => {
         if (!movement) return <Badge variant="secondary">N/A</Badge>;
         
         return (
@@ -326,20 +366,22 @@ const Inventory = () => {
     {
       key: 'quantity',
       title: 'Jumlah',
-      render: (movement: any) => {
+      render: (_, movement: any) => {
         if (!movement) return <span>0</span>;
+        
+        const quantity = movement.quantity || 0;
         
         return (
           <span className={`font-medium ${movement.movement_type === 'in' ? 'text-green-600' : 'text-red-600'}`}>
-            {movement.movement_type === 'in' ? '+' : '-'}{movement.quantity || 0}
+            {movement.movement_type === 'in' ? '+' : '-'}{quantity.toLocaleString('id-ID')}
           </span>
         );
       }
     },
     {
-      key: 'reference',
+      key: 'reference_type',
       title: 'Referensi',
-      render: (movement: any) => {
+      render: (_, movement: any) => {
         if (!movement) return <div className="text-sm">N/A</div>;
         
         return (
@@ -355,9 +397,11 @@ const Inventory = () => {
   ];
 
   // Calculate real totals from actual database data
-  const totalStockValue = stock?.reduce((total, item) => 
-    total + ((item?.stok || 0) * (item?.products?.harga_beli || 0)), 0
-  ) || 0;
+  const totalStockValue = stock?.reduce((total, item) => {
+    const stok = item?.stok || 0;
+    const harga = getProductPrice(item);
+    return total + (stok * harga);
+  }, 0) || 0;
 
   const lowStockItems = stock?.filter(item => (item?.stok || 0) <= 5) || [];
   const totalStock = stock?.reduce((total, item) => total + (item?.stok || 0), 0) || 0;
@@ -388,9 +432,40 @@ const Inventory = () => {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Manajemen Stok</h1>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => setShowDebug(!showDebug)}
+        >
+          <Bug className="h-4 w-4 mr-2" />
+          {showDebug ? 'Hide' : 'Show'} Debug
+        </Button>
       </div>
 
-      {/* Summary Cards - Using real data only */}
+      {/* Debug Panel */}
+      {showDebug && (
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardHeader>
+            <CardTitle className="text-yellow-800">Debug Information</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <div className="space-y-2">
+              <div><strong>Stock Items:</strong> {stock?.length || 0}</div>
+              <div><strong>Products:</strong> {products?.length || 0}</div>
+              {stock?.length > 0 && (
+                <div>
+                  <strong>First Stock Item Structure:</strong>
+                  <pre className="bg-yellow-100 p-2 rounded text-xs overflow-x-auto">
+                    {JSON.stringify(stock[0], null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -409,7 +484,7 @@ const Inventory = () => {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalStock}</div>
+            <div className="text-2xl font-bold">{totalStock.toLocaleString('id-ID')}</div>
             <p className="text-xs text-muted-foreground">Unit tersedia</p>
           </CardContent>
         </Card>
@@ -453,7 +528,6 @@ const Inventory = () => {
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-md">
-                
                 <form onSubmit={handleVariantSubmit}>
                   <DialogHeader>
                     <DialogTitle>
@@ -574,6 +648,7 @@ const Inventory = () => {
             loading={loading}
             searchable={true}
             searchPlaceholder="Cari produk..."
+            debug={showDebug}
           />
         </CardContent>
       </Card>
@@ -591,6 +666,7 @@ const Inventory = () => {
               loading={loading}
               searchable={true}
               searchPlaceholder="Cari riwayat..."
+              debug={showDebug}
             />
           ) : (
             <EmptyState
@@ -608,7 +684,7 @@ const Inventory = () => {
           <DialogHeader>
             <DialogTitle>Penyesuaian Stok</DialogTitle>
             <DialogDescription>
-              Sesuaikan stok untuk {selectedVariant?.product?.nama_produk} - {selectedVariant?.warna} {selectedVariant?.size}
+              Sesuaikan stok untuk {getProductName(selectedVariant)} - {selectedVariant?.warna} {selectedVariant?.size}
             </DialogDescription>
           </DialogHeader>
           
@@ -617,11 +693,11 @@ const Inventory = () => {
               <div>
                 <Label>Produk</Label>
                 <div className="p-3 bg-muted rounded-md">
-                  <div className="font-medium">{selectedVariant.product?.nama_produk || 'N/A'}</div>
+                  <div className="font-medium">{getProductName(selectedVariant)}</div>
                   <div className="text-sm text-muted-foreground">
                     {selectedVariant.warna} - {selectedVariant.size}
                   </div>
-                  <div className="text-sm">Stok saat ini: {selectedVariant?.stok || 0}</div>
+                  <div className="text-sm">Stok saat ini: {(selectedVariant?.stok || 0).toLocaleString('id-ID')}</div>
                 </div>
               </div>
               
