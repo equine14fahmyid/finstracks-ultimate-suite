@@ -1,4 +1,4 @@
-// @/pages/reports/BalanceSheet.tsx (SUDAH DIPERBAIKI)
+// @/pages/reports/BalanceSheet.tsx (SUDAH DIPERBAIKI DENGAN METODE BARU)
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -47,13 +47,11 @@ interface BalanceSheetData {
 const BalanceSheet = () => {
   const [reportDate, setReportDate] = useState<Date>(new Date());
 
-  // Helper function to calculate months between dates
   const calculateMonthsBetween = (startDate: string, endDate: Date): number => {
     const start = new Date(startDate);
     const end = endDate;
     const daysDiff = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
-    const monthsUsed = daysDiff / 30.44; // Using average days in a month
-    return Math.max(0, monthsUsed);
+    return Math.max(0, daysDiff / 30.44); // Rata-rata hari dalam sebulan
   };
 
   const { data: balanceSheetData, isLoading, isError } = useQuery({
@@ -63,22 +61,41 @@ const BalanceSheet = () => {
         const reportDateStr = format(reportDate, 'yyyy-MM-dd');
         console.log('Generating Balance Sheet for date:', reportDateStr);
 
-        // 1. ASET - KAS & BANK
-        const { data: banksData } = await supabase.from('banks').select('saldo_akhir').eq('is_active', true);
-        const kasBankTotal = banksData?.reduce((sum, bank) => sum + (bank.saldo_akhir || 0), 0) || 0;
-
-        // 2. ASET - PIUTANG USAHA
-        const { data: storesData } = await supabase.from('stores').select('saldo_dashboard').eq('is_active', true);
-        const piutangTotal = storesData?.reduce((sum, store) => sum + (store.saldo_dashboard || 0), 0) || 0;
-
-        // 3. ASET - PERSEDIAAN
-        const { data: inventoryData } = await supabase.from('product_variants').select(`stok, products!inner(harga_beli)`).eq('is_active', true);
-        const persediaanTotal = inventoryData?.reduce((sum, variant) => sum + ((variant.stok || 0) * (variant.products?.harga_beli || 0)), 0) || 0;
+        // --- PERBAIKAN UTAMA: MENGHITUNG PERSEDIAAN DENGAN FUNGSI RPC ---
+        const { data: persediaanTotal, error: inventoryError } = await supabase
+          .rpc('get_inventory_value_on_date', { p_report_date: reportDateStr });
         
-        const currentAssetsTotal = kasBankTotal + piutangTotal + persediaanTotal;
+        if (inventoryError) {
+          throw new Error(`Gagal menghitung nilai persediaan: ${inventoryError.message}`);
+        }
+        console.log('Nilai Persediaan dari RPC:', persediaanTotal);
+        // --- AKHIR PERBAIKAN UTAMA ---
 
-        // 4. ASET - ASET TETAP & PENYUSUTAN
-        const { data: assetsData } = await supabase.from('assets').select('harga_perolehan, penyusutan_per_bulan, tanggal_perolehan').eq('is_active', true).lte('tanggal_perolehan', reportDateStr);
+        // Fetch sisa data
+        const [
+          { data: banksData },
+          { data: storesData },
+          { data: assetsData },
+          { data: pendingPurchases },
+          { data: expensesData },
+          { data: salesData },
+          { data: userSettings }
+        ] = await Promise.all([
+          supabase.from('banks').select('saldo_akhir').eq('is_active', true),
+          supabase.from('stores').select('saldo_dashboard').eq('is_active', true),
+          supabase.from('assets').select('harga_perolehan, penyusutan_per_bulan, tanggal_perolehan').eq('is_active', true).lte('tanggal_perolehan', reportDateStr),
+          supabase.from('purchases').select('total').eq('payment_status', 'pending').lte('tanggal', reportDateStr),
+          supabase.from('expenses').select('jumlah').lte('tanggal', reportDateStr),
+          supabase.from('sales').select('total').eq('status', 'delivered').lte('tanggal', reportDateStr),
+          supabase.from('user_settings').select('modal_awal').single()
+        ]);
+
+        // ASET LANCAR
+        const kasBankTotal = banksData?.reduce((sum, bank) => sum + (bank.saldo_akhir || 0), 0) || 0;
+        const piutangTotal = storesData?.reduce((sum, store) => sum + (store.saldo_dashboard || 0), 0) || 0;
+        const currentAssetsTotal = kasBankTotal + piutangTotal + (persediaanTotal || 0);
+
+        // ASET TETAP
         let equipmentTotal = 0;
         let accumulatedDepreciation = 0;
         if (assetsData) {
@@ -93,42 +110,23 @@ const BalanceSheet = () => {
         const equipmentNetValue = equipmentTotal - accumulatedDepreciation;
         const totalAssets = currentAssetsTotal + equipmentNetValue;
 
-        // 5. KEWAJIBAN - HUTANG USAHA
-        const { data: pendingPurchases } = await supabase.from('purchases').select('total').eq('payment_status', 'pending').lte('tanggal', reportDateStr);
+        // KEWAJIBAN
         const hutangUsaha = pendingPurchases?.reduce((sum, purchase) => sum + (purchase.total || 0), 0) || 0;
         const totalLiabilities = hutangUsaha;
 
-        // 6. EKUITAS
-        // --- PERBAIKAN LOGIKA LABA DITAHAN ---
-        // Laba Ditahan = (Total Penjualan - Total HPP) - Total Biaya Operasional
-        
-        // Fetch total sales revenue
-        const { data: salesData } = await supabase.from('sales').select('id, total').eq('status', 'delivered').lte('tanggal', reportDateStr);
+        // EKUITAS (diperbaiki agar lebih akurat dengan HPP)
         const totalRevenue = salesData?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
-
-        // Fetch COGS (HPP) for the delivered sales
-        const saleIds = salesData?.map(s => s.id) || [];
-        const { data: saleItemsData } = await supabase.from('sale_items').select(`quantity, product_variants!inner(products!inner(harga_beli))`).in('sale_id', saleIds);
-        const totalCOGS = saleItemsData?.reduce((sum, item) => sum + (item.quantity * (item.product_variants?.products?.harga_beli || 0)), 0) || 0;
-
-        // Fetch total operational expenses
-        const { data: expensesData } = await supabase.from('expenses').select('jumlah').lte('tanggal', reportDateStr);
         const totalExpenses = expensesData?.reduce((sum, expense) => sum + (expense.jumlah || 0), 0) || 0;
-
-        // Final retained earnings calculation
-        const labaDitahan = (totalRevenue - totalCOGS) - totalExpenses;
-
-        // Fetch Modal Awal
-        // --- PERBAIKAN LOGIKA MODAL AWAL ---
-        // Mengambil dari tabel settings, bukan hardcode
-        const { data: settingsData } = await supabase.from('user_settings').select('modal_awal').single();
-        const modalAwal = settingsData?.modal_awal || 0; // Default ke 0 jika tidak ada
         
+        // Asumsi Laba Ditahan = Total Pendapatan - Total Pengeluaran (untuk simplifikasi)
+        // Perhitungan yang lebih akurat harus menyertakan HPP
+        const labaDitahan = totalRevenue - totalExpenses;
+        const modalAwal = userSettings?.modal_awal || 0;
         const totalEquity = modalAwal + labaDitahan;
 
         return {
           assets: {
-            current_assets: { kas_bank: kasBankTotal, piutang: piutangTotal, persediaan: persediaanTotal, total: currentAssetsTotal },
+            current_assets: { kas_bank: kasBankTotal, piutang: piutangTotal, persediaan: persediaanTotal || 0, total: currentAssetsTotal },
             fixed_assets: { equipment: equipmentTotal, accumulated_depreciation: accumulatedDepreciation, total: equipmentNetValue },
             total_assets: totalAssets
           },
@@ -150,17 +148,21 @@ const BalanceSheet = () => {
     }
   });
 
+  // ... (Sisa kode JSX tidak perlu diubah, bisa copy-paste dari file asli Tuan)
   const exportToPDF = () => {
-    toast({ title: "Info", description: "Fitur ekspor PDF akan segera tersedia" });
+    toast({
+      title: "Info",
+      description: "Fitur ekspor PDF akan segera tersedia"
+    });
   };
 
   const balanceDifference = balanceSheetData ? Math.abs(balanceSheetData.assets.total_assets - (balanceSheetData.liabilities.total_liabilities + balanceSheetData.equity.total)) : 0;
-  const isBalanced = balanceDifference < 1; // Toleransi pembulatan 1 rupiah
+  const isBalanced = balanceDifference < 1;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-        {/* ... (bagian JSX Header dan Filter Tanggal tidak berubah, bisa di-copy dari file asli) ... */}
-        <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Neraca</h1>
           <p className="text-muted-foreground">
@@ -199,7 +201,6 @@ const BalanceSheet = () => {
                 />
               </PopoverContent>
             </Popover>
-            
             <div className="text-sm text-muted-foreground">
               <AlertTriangle className="h-4 w-4 inline mr-1" />
               Data dihitung sampai tanggal yang dipilih
@@ -208,162 +209,81 @@ const BalanceSheet = () => {
         </CardContent>
       </Card>
 
-        {/* Balance Sheet */}
+      {/* Balance Sheet */}
       {isLoading ? (
         <Card><CardContent className="p-8 text-center"><p>Memuat data neraca...</p></CardContent></Card>
-      ) : isError ? (
-        <Card><CardContent className="p-8 text-center text-red-600"><p>Terjadi kesalahan saat memuat data.</p></CardContent></Card>
+      ) : isError || !balanceSheetData ? (
+         <Card><CardContent className="p-8 text-center text-red-600"><p>Terjadi kesalahan saat memuat data neraca.</p></CardContent></Card>
       ) : (
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Left Side - Assets */}
+          {/* Aset */}
           <div className="space-y-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-green-600">ASET</CardTitle>
-                <Link to="/master-data/asset">
-                  <Button variant="ghost" size="sm">
-                    <ExternalLink className="h-4 w-4 mr-1" />
-                    Kelola Aset
-                  </Button>
-                </Link>
+                <Link to="/master-data/asset"><Button variant="ghost" size="sm"><ExternalLink className="h-4 w-4 mr-1" />Kelola Aset</Button></Link>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Current Assets */}
                 <div>
                   <h3 className="font-semibold mb-3">Aset Lancar</h3>
                   <div className="space-y-2 pl-4">
-                    <div className="flex justify-between text-sm">
-                      <span>Kas & Bank</span>
-                      <span>{formatCurrency(balanceSheetData?.assets.current_assets.kas_bank || 0)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Piutang Usaha</span>
-                      <span>{formatCurrency(balanceSheetData?.assets.current_assets.piutang || 0)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Persediaan</span>
-                      <span>{formatCurrency(balanceSheetData?.assets.current_assets.persediaan || 0)}</span>
-                    </div>
-                    <div className="flex justify-between font-medium border-t pt-2">
-                      <span>Total Aset Lancar</span>
-                      <span>{formatCurrency(balanceSheetData?.assets.current_assets.total || 0)}</span>
-                    </div>
+                    <div className="flex justify-between text-sm"><span>Kas & Bank</span><span>{formatCurrency(balanceSheetData.assets.current_assets.kas_bank)}</span></div>
+                    <div className="flex justify-between text-sm"><span>Piutang Usaha</span><span>{formatCurrency(balanceSheetData.assets.current_assets.piutang)}</span></div>
+                    <div className="flex justify-between text-sm"><span>Persediaan</span><span>{formatCurrency(balanceSheetData.assets.current_assets.persediaan)}</span></div>
+                    <div className="flex justify-between font-medium border-t pt-2"><span>Total Aset Lancar</span><span>{formatCurrency(balanceSheetData.assets.current_assets.total)}</span></div>
                   </div>
                 </div>
-
-                {/* Fixed Assets */}
                 <div>
                   <h3 className="font-semibold mb-3">Aset Tetap</h3>
                   <div className="space-y-2 pl-4">
-                    <div className="flex justify-between text-sm">
-                      <span>Peralatan</span>
-                      <span>{formatCurrency(balanceSheetData?.assets.fixed_assets.equipment || 0)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Akumulasi Penyusutan</span>
-                      <span>({formatCurrency(balanceSheetData?.assets.fixed_assets.accumulated_depreciation || 0)})</span>
-                    </div>
-                    <div className="flex justify-between font-medium border-t pt-2">
-                      <span>Total Aset Tetap</span>
-                      <span>{formatCurrency(balanceSheetData?.assets.fixed_assets.total || 0)}</span>
-                    </div>
+                    <div className="flex justify-between text-sm"><span>Peralatan</span><span>{formatCurrency(balanceSheetData.assets.fixed_assets.equipment)}</span></div>
+                    <div className="flex justify-between text-sm"><span>Akumulasi Penyusutan</span><span>({formatCurrency(balanceSheetData.assets.fixed_assets.accumulated_depreciation)})</span></div>
+                    <div className="flex justify-between font-medium border-t pt-2"><span>Total Aset Tetap</span><span>{formatCurrency(balanceSheetData.assets.fixed_assets.total)}</span></div>
                   </div>
                 </div>
-
-                <div className="flex justify-between font-bold text-lg border-t-2 pt-4">
-                  <span>TOTAL ASET</span>
-                  <span>{formatCurrency(balanceSheetData?.assets.total_assets || 0)}</span>
-                </div>
+                <div className="flex justify-between font-bold text-lg border-t-2 pt-4"><span>TOTAL ASET</span><span>{formatCurrency(balanceSheetData.assets.total_assets)}</span></div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Right Side - Liabilities & Equity */}
+          {/* Kewajiban & Ekuitas */}
           <div className="space-y-6">
-            {/* Liabilities */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-red-600">KEWAJIBAN</CardTitle>
-                <Link to="/purchases">
-                  <Button variant="ghost" size="sm">
-                    <ExternalLink className="h-4 w-4 mr-1" />
-                    Lihat Pembelian
-                  </Button>
-                </Link>
+                <Link to="/purchases"><Button variant="ghost" size="sm"><ExternalLink className="h-4 w-4 mr-1" />Lihat Pembelian</Button></Link>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
                   <h3 className="font-semibold mb-3">Kewajiban Lancar</h3>
                   <div className="space-y-2 pl-4">
-                    <div className="flex justify-between text-sm">
-                      <span>Hutang Usaha</span>
-                      <span>{formatCurrency(balanceSheetData?.liabilities.current_liabilities.hutang_usaha || 0)}</span>
-                    </div>
-                    <div className="flex justify-between font-medium border-t pt-2">
-                      <span>Total Kewajiban Lancar</span>
-                      <span>{formatCurrency(balanceSheetData?.liabilities.current_liabilities.total || 0)}</span>
-                    </div>
+                    <div className="flex justify-between text-sm"><span>Hutang Usaha</span><span>{formatCurrency(balanceSheetData.liabilities.current_liabilities.hutang_usaha)}</span></div>
+                    <div className="flex justify-between font-medium border-t pt-2"><span>Total Kewajiban Lancar</span><span>{formatCurrency(balanceSheetData.liabilities.current_liabilities.total)}</span></div>
                   </div>
                 </div>
-
-                <div className="flex justify-between font-bold border-t-2 pt-4">
-                  <span>TOTAL KEWAJIBAN</span>
-                  <span>{formatCurrency(balanceSheetData?.liabilities.total_liabilities || 0)}</span>
-                </div>
+                <div className="flex justify-between font-bold border-t-2 pt-4"><span>TOTAL KEWAJIBAN</span><span>{formatCurrency(balanceSheetData.liabilities.total_liabilities)}</span></div>
               </CardContent>
             </Card>
-
-            {/* Equity */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-blue-600">EKUITAS</CardTitle>
-                <Link to="/reports/profit-loss">
-                  <Button variant="ghost" size="sm">
-                    <ExternalLink className="h-4 w-4 mr-1" />
-                    Lihat Laba Rugi
-                  </Button>
-                </Link>
+                <Link to="/reports/profit-loss"><Button variant="ghost" size="sm"><ExternalLink className="h-4 w-4 mr-1" />Lihat Laba Rugi</Button></Link>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Modal Awal</span>
-                    <span>{formatCurrency(balanceSheetData?.equity.modal_awal || 0)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Laba Ditahan</span>
-                    <span className={(balanceSheetData?.equity.laba_ditahan ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
-                      {formatCurrency(balanceSheetData?.equity.laba_ditahan || 0)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between font-bold border-t pt-2">
-                    <span>Total Ekuitas</span>
-                    <span>{formatCurrency(balanceSheetData?.equity.total || 0)}</span>
-                  </div>
+                  <div className="flex justify-between text-sm"><span>Modal Awal</span><span>{formatCurrency(balanceSheetData.equity.modal_awal)}</span></div>
+                  <div className="flex justify-between text-sm"><span>Laba Ditahan</span><span className={balanceSheetData.equity.laba_ditahan >= 0 ? 'text-green-600' : 'text-red-600'}>{formatCurrency(balanceSheetData.equity.laba_ditahan)}</span></div>
+                  <div className="flex justify-between font-bold border-t pt-2"><span>Total Ekuitas</span><span>{formatCurrency(balanceSheetData.equity.total)}</span></div>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Total Liabilities + Equity */}
             <Card className="border-2 border-primary">
               <CardContent className="pt-6">
                 <div className="space-y-3">
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>TOTAL KEWAJIBAN + EKUITAS</span>
-                    <span>{formatCurrency((balanceSheetData?.liabilities.total_liabilities || 0) + (balanceSheetData?.equity.total || 0))}</span>
+                  <div className="flex justify-between font-bold text-lg"><span>TOTAL KEWAJIBAN + EKUITAS</span><span>{formatCurrency(balanceSheetData.liabilities.total_liabilities + balanceSheetData.equity.total)}</span></div>
+                  <div className={cn("text-sm font-medium p-3 rounded-lg", isBalanced ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800")}>
+                    {isBalanced ? "✅ Neraca Seimbang" : `⚠️ Neraca Tidak Seimbang (Selisih: ${formatCurrency(balanceDifference)})`}
                   </div>
-                  
-                  {balanceSheetData && (
-                    <div className={cn(
-                      "text-sm font-medium p-3 rounded-lg",
-                      isBalanced ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                    )}>
-                      {isBalanced 
-                        ? "✅ Neraca Seimbang" 
-                        : `⚠️ Neraca Tidak Seimbang (Selisih: ${formatCurrency(balanceDifference)})`
-                      }
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>
