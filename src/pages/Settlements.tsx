@@ -1,14 +1,12 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, ArrowLeftRight, Calendar, DollarSign } from 'lucide-react';
+import { Plus, ArrowLeftRight, Calendar, DollarSign, Search } from 'lucide-react';
 import { useStores, useBanks } from '@/hooks/useSupabase';
 import { useSettlements } from '@/hooks/useSettlements';
-import { DataTable } from '@/components/common/DataTable';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
@@ -29,6 +27,7 @@ const Settlements = () => {
   const { banks, fetchBanks } = useBanks();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSettlement, setEditingSettlement] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState<SettlementFormData>({
     tanggal: new Date().toISOString().split('T')[0],
     store_id: '',
@@ -43,6 +42,16 @@ const Settlements = () => {
     fetchStores();
     fetchBanks();
   }, []);
+
+  // DEBUG: Log settlements data
+  useEffect(() => {
+    console.log('Settlements data:', settlements);
+    console.log('Settlements length:', settlements?.length);
+    if (settlements?.length > 0) {
+      console.log('First settlement:', settlements[0]);
+      console.log('Settlement keys:', Object.keys(settlements[0] || {}));
+    }
+  }, [settlements]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +72,7 @@ const Settlements = () => {
     if (success) {
       setDialogOpen(false);
       resetForm();
+      await fetchSettlements(); // Refresh data
     }
   };
 
@@ -79,6 +89,7 @@ const Settlements = () => {
   };
 
   const handleEdit = (settlement: any) => {
+    console.log('Editing settlement:', settlement);
     setEditingSettlement(settlement);
     setFormData({
       tanggal: settlement.tanggal,
@@ -93,80 +104,28 @@ const Settlements = () => {
 
   const handleDelete = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus pencairan ini?')) {
-      await deleteSettlement(id);
+      const success = await deleteSettlement(id);
+      if (success) {
+        await fetchSettlements(); // Refresh data
+      }
     }
   };
 
-  const columns = [
-    {
-      key: 'tanggal',
-      title: 'Tanggal',
-      render: (settlement: any) => settlement ? formatShortDate(settlement.tanggal) : '-'
-    },
-    {
-      key: 'store',
-      title: 'Toko',
-      render: (settlement: any) => (
-        <div>
-          <div className="font-medium">{settlement?.store?.nama_toko || '-'}</div>
-          <div className="text-sm text-muted-foreground">
-            {settlement?.store?.platform?.nama_platform || '-'}
-          </div>
-        </div>
-      )
-    },
-    {
-      key: 'jumlah_dicairkan',
-      title: 'Jumlah Dicairkan',
-      render: (settlement: any) => (
-        <span className="font-medium text-green-600">
-          {settlement ? formatCurrency(settlement.jumlah_dicairkan || 0) : '-'}
-        </span>
-      )
-    },
-    {
-      key: 'biaya_admin',
-      title: 'Biaya Admin',
-      render: (settlement: any) => (
-        <span className="text-red-600">
-          {settlement ? formatCurrency(settlement.biaya_admin || 0) : '-'}
-        </span>
-      )
-    },
-    {
-      key: 'net_amount',
-      title: 'Diterima',
-      render: (settlement: any) => (
-        <span className="font-medium">
-          {settlement ? formatCurrency((settlement.jumlah_dicairkan || 0) - (settlement.biaya_admin || 0)) : '-'}
-        </span>
-      )
-    },
-    {
-      key: 'bank',
-      title: 'Ke Bank',
-      render: (settlement: any) => (
-        <span>{settlement?.bank?.nama_bank || 'Kas'}</span>
-      )
-    },
-    {
-      key: 'actions',
-      title: 'Aksi',
-      render: (settlement: any) => settlement ? (
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => handleEdit(settlement)}>
-            Edit
-          </Button>
-          <Button size="sm" variant="destructive" onClick={() => handleDelete(settlement.id)}>
-            Hapus
-          </Button>
-        </div>
-      ) : null
-    }
-  ];
-
   // Filter out any undefined/null settlements and calculate totals safely
-  const validSettlements = settlements.filter(settlement => settlement && typeof settlement.jumlah_dicairkan === 'number');
+  const validSettlements = Array.isArray(settlements) ? settlements.filter(settlement => settlement && typeof settlement.jumlah_dicairkan === 'number') : [];
+  
+  // Filter berdasarkan search term
+  const filteredSettlements = validSettlements.filter(settlement => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      (settlement?.store?.nama_toko || '').toLowerCase().includes(searchLower) ||
+      (settlement?.store?.platform?.nama_platform || '').toLowerCase().includes(searchLower) ||
+      (settlement?.bank?.nama_bank || '').toLowerCase().includes(searchLower) ||
+      (settlement?.keterangan || '').toLowerCase().includes(searchLower) ||
+      (settlement?.tanggal || '').includes(searchLower)
+    );
+  });
+
   const totalSettlements = validSettlements.reduce((total, settlement) => total + (settlement.jumlah_dicairkan || 0), 0);
   const totalFees = validSettlements.reduce((total, settlement) => total + (settlement.biaya_admin || 0), 0);
   const netReceived = totalSettlements - totalFees;
@@ -200,6 +159,7 @@ const Settlements = () => {
                   type="date"
                   value={formData.tanggal}
                   onChange={(e) => setFormData(prev => ({ ...prev, tanggal: e.target.value }))}
+                  max={new Date().toISOString().split('T')[0]}
                   required
                 />
               </div>
@@ -233,7 +193,7 @@ const Settlements = () => {
                     ...prev, 
                     jumlah_dicairkan: parseFloat(e.target.value) || 0 
                   }))}
-                  placeholder="0"
+                  placeholder="1.000.000"
                   min="0"
                   step="0.01"
                   required
@@ -250,7 +210,7 @@ const Settlements = () => {
                     ...prev, 
                     biaya_admin: parseFloat(e.target.value) || 0 
                   }))}
-                  placeholder="0"
+                  placeholder="50.000"
                   min="0"
                   step="0.01"
                 />
@@ -263,9 +223,10 @@ const Settlements = () => {
                   onValueChange={(value) => setFormData(prev => ({ ...prev, bank_id: value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Pilih bank" />
+                    <SelectValue placeholder="Pilih bank atau kas" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Kas</SelectItem>
                     {banks.map((bank) => (
                       <SelectItem key={bank.id} value={bank.id}>
                         {bank.nama_bank} - {bank.nama_pemilik}
@@ -285,6 +246,19 @@ const Settlements = () => {
                   rows={3}
                 />
               </div>
+
+              {/* Preview Net Amount */}
+              {formData.jumlah_dicairkan > 0 && (
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="text-sm text-muted-foreground">Jumlah Diterima:</div>
+                  <div className="font-medium text-lg text-green-600">
+                    {formatCurrency(formData.jumlah_dicairkan - formData.biaya_admin)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {formatCurrency(formData.jumlah_dicairkan)} - {formatCurrency(formData.biaya_admin)} biaya admin
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
@@ -346,19 +320,141 @@ const Settlements = () => {
         </Card>
       </div>
 
-      {/* Settlements Table */}
+      {/* Settlements Table - Native Implementation */}
       <Card>
         <CardHeader>
           <CardTitle>Daftar Pencairan</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={columns}
-            data={validSettlements}
-            loading={loading}
-            searchable={true}
-            searchPlaceholder="Cari pencairan..."
-          />
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="text-muted-foreground">Memuat data...</div>
+            </div>
+          ) : validSettlements.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-muted-foreground">Belum ada data pencairan</div>
+              <Button className="mt-4" onClick={() => setDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Pencairan Pertama
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Cari pencairan..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              {/* Results Info */}
+              <div className="text-sm text-muted-foreground">
+                {filteredSettlements.length} dari {validSettlements.length} data
+              </div>
+
+              {/* Table */}
+              <div className="border rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium">Tanggal</th>
+                        <th className="px-4 py-3 text-left font-medium">Toko</th>
+                        <th className="px-4 py-3 text-left font-medium">Jumlah Dicairkan</th>
+                        <th className="px-4 py-3 text-left font-medium">Biaya Admin</th>
+                        <th className="px-4 py-3 text-left font-medium">Diterima</th>
+                        <th className="px-4 py-3 text-left font-medium">Ke Bank</th>
+                        <th className="px-4 py-3 text-left font-medium">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {filteredSettlements.map((settlement, index) => {
+                        const netAmount = (settlement.jumlah_dicairkan || 0) - (settlement.biaya_admin || 0);
+                        
+                        return (
+                          <tr key={settlement?.id || index} className="hover:bg-muted/50 transition-colors">
+                            <td className="px-4 py-3">
+                              <span className="font-medium">
+                                {settlement?.tanggal ? formatShortDate(settlement.tanggal) : '-'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="space-y-1">
+                                <div className="font-medium text-foreground">
+                                  {settlement?.store?.nama_toko || 'Toko tidak diketahui'}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {settlement?.store?.platform?.nama_platform || 'Platform tidak diketahui'}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-medium text-green-600">
+                                {formatCurrency(settlement?.jumlah_dicairkan || 0)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-red-600">
+                                {formatCurrency(settlement?.biaya_admin || 0)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-medium text-blue-600">
+                                {formatCurrency(netAmount)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-muted-foreground">
+                                {settlement?.bank?.nama_bank || 'Kas'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex gap-2">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => handleEdit(settlement)}
+                                >
+                                  Edit
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="destructive" 
+                                  onClick={() => handleDelete(settlement?.id)}
+                                >
+                                  Hapus
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* No Results */}
+              {filteredSettlements.length === 0 && searchTerm && (
+                <div className="text-center py-8">
+                  <div className="text-muted-foreground">
+                    Tidak ada data yang sesuai dengan pencarian "{searchTerm}"
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="mt-2" 
+                    onClick={() => setSearchTerm('')}
+                  >
+                    Reset Pencarian
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
