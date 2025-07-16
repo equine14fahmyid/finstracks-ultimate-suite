@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Building, Plus, Edit, Trash2, TrendingDown, Calculator, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Building, Plus, Edit, Trash2, TrendingDown, Calculator, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency, formatDate } from '@/utils/format';
@@ -661,3 +661,20 @@ const Assets = () => {
                         <p className="text-gray-400 mb-6">
                           Tambahkan asset pertama untuk mulai mengelola aset perusahaan
                         </p>
+                        <Button onClick={() => setDialogOpen(true)}>
+                          + Tambah Asset Pertama
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default Assets;
