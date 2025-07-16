@@ -1,324 +1,154 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Plus, DollarSign, Calendar, TrendingDown } from 'lucide-react';
-import { useCategories, useBanks } from '@/hooks/useSupabase';
-import { useExpenses } from '@/hooks/useExpenses';
-import { DataTable } from '@/components/common/DataTable';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useState, useCallback } from 'react';
+import { supabase } from '@/lib/supabaseClient'; // Pastikan path ini sesuai dengan lokasi client supabase Anda
+import { Expense, ExpenseFormData } from '@/types'; // Pastikan path ini sesuai dengan definisi tipe Anda
 import { toast } from '@/hooks/use-toast';
-import { formatCurrency, formatShortDate } from '@/utils/format';
-import { ExpenseFormData, Expense, Category, Bank } from '@/types';
 
-const Expenses = () => {
-  const { expenses, loading, fetchExpenses, createExpense, updateExpense, deleteExpense } = useExpenses();
-  const { categories, fetchCategories } = useCategories();
-  const { banks, fetchBanks } = useBanks();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [formData, setFormData] = useState<ExpenseFormData>({
-    tanggal: new Date().toISOString().split('T')[0],
-    category_id: '',
-    jumlah: 0,
-    bank_id: '',
-    keterangan: ''
-  });
+// Ini adalah "custom hook", sebuah fungsi khusus di React untuk mengelola logika yang bisa dipakai ulang.
+// Hook ini bertanggung jawab untuk semua hal yang berkaitan dengan data pengeluaran (expenses).
+export const useExpenses = () => {
+  // State untuk menyimpan daftar pengeluaran yang didapat dari database
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  // State untuk menandakan apakah sedang dalam proses mengambil data (untuk menampilkan loading spinner)
+  const [loading, setLoading] = useState(true);
+  // State untuk menyimpan pesan error jika terjadi kesalahan
+  const [error, setError] = useState<string | null>(null);
 
-  // Filter categories for expenses only
-  const expenseCategories = categories.filter(cat => cat.tipe_kategori === 'expense');
+  // Fungsi untuk mengambil (fetch) data pengeluaran dari Supabase
+  // useCallback digunakan untuk optimisasi, agar fungsi ini tidak dibuat ulang di setiap render, kecuali dependensinya berubah.
+  const fetchExpenses = useCallback(async () => {
+    setLoading(true); // Mulai loading
+    setError(null);
 
-  useEffect(() => {
-    fetchExpenses();
-    fetchCategories();
-    fetchBanks();
-  }, []);
+    try {
+      // Inilah bagian yang diperbaiki!
+      // Kita memberitahu Supabase untuk mengambil:
+      // 1. `*`: Semua kolom dari tabel `expenses`.
+      // 2. `category:categories(*)`: Data dari tabel `categories` yang berelasi, dan menamainya `category`.
+      // 3. `bank:banks(*)`: Data dari tabel `banks` yang berelasi, dan menamainya `bank`.
+      const { data, error: fetchError } = await supabase
+        .from('expenses')
+        .select(`
+          *,
+          category:categories(*),
+          bank:banks(*)
+        `)
+        .order('tanggal', { ascending: false }); // Mengurutkan data berdasarkan tanggal terbaru
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.category_id || formData.jumlah <= 0) {
+      if (fetchError) {
+        throw fetchError; // Jika ada error saat fetch, lemparkan error
+      }
+
+      // Jika berhasil, simpan data ke state `expenses`
+      setExpenses(data || []);
+
+    } catch (err: any) {
+      const errorMessage = "Gagal memuat data pengeluaran.";
+      console.error(errorMessage, err);
+      setError(errorMessage);
       toast({
         title: "Error",
-        description: "Mohon lengkapi data pengeluaran",
+        description: errorMessage,
         variant: "destructive",
       });
-      return;
+    } finally {
+      setLoading(false); // Selesai loading, baik berhasil maupun gagal
     }
+  }, []); // Array dependensi kosong, berarti fungsi ini hanya dibuat sekali
 
-    // Clean formData - replace "cash" with null for bank_id
-    const cleanedFormData = {
-      ...formData,
-      bank_id: formData.bank_id === "cash" ? null : formData.bank_id
-    };
+  // Fungsi untuk membuat data pengeluaran baru
+  const createExpense = async (formData: ExpenseFormData) => {
+    try {
+      const { data, error } = await supabase
+        .from('expenses')
+        .insert([formData])
+        .select();
 
-    const result = editingExpense 
-      ? await updateExpense(editingExpense.id, cleanedFormData)
-      : await createExpense(cleanedFormData);
+      if (error) throw error;
 
-    if (!result?.error) {
-      setDialogOpen(false);
-      resetForm();
-    }
-  };
+      toast({
+        title: "Sukses",
+        description: "Pengeluaran baru berhasil ditambahkan.",
+      });
+      fetchExpenses(); // Ambil ulang data terbaru setelah berhasil menambahkan
+      return { data, error: null };
 
-  const resetForm = () => {
-    setFormData({
-      tanggal: new Date().toISOString().split('T')[0],
-      category_id: '',
-      jumlah: 0,
-      bank_id: '',
-      keterangan: ''
-    });
-    setEditingExpense(null);
-  };
-
-  const handleEdit = (expense: Expense) => {
-    setEditingExpense(expense);
-    setFormData({
-      tanggal: expense.tanggal,
-      category_id: expense.category_id || '',
-      jumlah: expense.jumlah,
-      bank_id: expense.bank_id || '',
-      keterangan: expense.keterangan || ''
-    });
-    setDialogOpen(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus pengeluaran ini?')) {
-      await deleteExpense(id);
+    } catch (err: any) {
+      const errorMessage = "Gagal menambahkan pengeluaran.";
+      console.error(errorMessage, err);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      return { data: null, error: err };
     }
   };
 
-  const columns = [
-    {
-      key: 'tanggal',
-      title: 'Tanggal',
-      render: (expense: Expense) => formatShortDate(expense?.tanggal)
-    },
-    {
-      key: 'category',
-      title: 'Kategori',
-      render: (expense: Expense) => (
-        <span className="font-medium">{expense?.category?.nama_kategori || 'Tidak dikategorikan'}</span>
-      )
-    },
-    {
-      key: 'jumlah',
-      title: 'Jumlah',
-      render: (expense: Expense) => (
-        <span className="font-medium text-red-600">-{formatCurrency(expense?.jumlah || 0)}</span>
-      )
-    },
-    {
-      key: 'bank',
-      title: 'Dari Bank',
-      render: (expense: Expense) => (
-        <span>{expense?.bank?.nama_bank || 'Kas'}</span>
-      )
-    },
-    {
-      key: 'keterangan',
-      title: 'Keterangan',
-      render: (expense: Expense) => (
-        <span className="text-sm text-muted-foreground">
-          {expense?.keterangan || '-'}
-        </span>
-      )
-    },
-    {
-      key: 'actions',
-      title: 'Aksi',
-      render: (expense: Expense) => (
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => handleEdit(expense)}>
-            Edit
-          </Button>
-          <Button size="sm" variant="destructive" onClick={() => handleDelete(expense?.id)}>
-            Hapus
-          </Button>
-        </div>
-      )
+  // Fungsi untuk memperbarui data pengeluaran yang sudah ada
+  const updateExpense = async (id: string, formData: ExpenseFormData) => {
+    try {
+      const { data, error } = await supabase
+        .from('expenses')
+        .update(formData)
+        .eq('id', id)
+        .select();
+
+      if (error) throw error;
+
+      toast({
+        title: "Sukses",
+        description: "Data pengeluaran berhasil diperbarui.",
+      });
+      fetchExpenses(); // Ambil ulang data terbaru setelah berhasil update
+      return { data, error: null };
+
+    } catch (err: any) {
+      const errorMessage = "Gagal memperbarui pengeluaran.";
+      console.error(errorMessage, err);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      return { data: null, error: err };
     }
-  ];
+  };
 
-  const totalExpenses = expenses.reduce((total, expense) => total + (expense?.jumlah || 0), 0);
-  const thisMonthExpenses = expenses.filter(expense => 
-    expense?.tanggal && new Date(expense.tanggal).getMonth() === new Date().getMonth()
-  ).reduce((total, expense) => total + (expense?.jumlah || 0), 0);
+  // Fungsi untuk menghapus data pengeluaran
+  const deleteExpense = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', id);
 
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Pengeluaran</h1>
-        <Dialog open={dialogOpen} onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Tambah Pengeluaran
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {editingExpense ? 'Edit Pengeluaran' : 'Tambah Pengeluaran'}
-              </DialogTitle>
-            </DialogHeader>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="tanggal">Tanggal *</Label>
-                <Input
-                  id="tanggal"
-                  type="date"
-                  value={formData.tanggal}
-                  onChange={(e) => setFormData(prev => ({ ...prev, tanggal: e.target.value }))}
-                  required
-                />
-              </div>
+      if (error) throw error;
+      
+      toast({
+        title: "Sukses",
+        description: "Pengeluaran berhasil dihapus.",
+      });
+      fetchExpenses(); // Ambil ulang data terbaru setelah berhasil menghapus
 
-              <div>
-                <Label htmlFor="category_id">Kategori *</Label>
-                <Select 
-                  value={formData.category_id} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, category_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih kategori" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {expenseCategories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.nama_kategori}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+    } catch (err: any) {
+      const errorMessage = "Gagal menghapus pengeluaran.";
+      console.error(errorMessage, err);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
 
-              <div>
-                <Label htmlFor="jumlah">Jumlah *</Label>
-                <Input
-                  id="jumlah"
-                  type="number"
-                  value={formData.jumlah || ''}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    jumlah: parseFloat(e.target.value) || 0 
-                  }))}
-                  placeholder="0"
-                  min="0"
-                  step="0.01"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="bank_id">Dibayar dari</Label>
-                <Select 
-                  value={formData.bank_id} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, bank_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih bank/kas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Kas</SelectItem>
-                    {banks.map((bank) => (
-                      <SelectItem key={bank.id} value={bank.id}>
-                        {bank.nama_bank} - {bank.nama_pemilik}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="keterangan">Keterangan</Label>
-                <Textarea
-                  id="keterangan"
-                  value={formData.keterangan}
-                  onChange={(e) => setFormData(prev => ({ ...prev, keterangan: e.target.value }))}
-                  placeholder="Deskripsi pengeluaran..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                  Batal
-                </Button>
-                <Button type="submit">
-                  {editingExpense ? 'Update' : 'Simpan'}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pengeluaran</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</div>
-            <p className="text-xs text-muted-foreground">Semua periode</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bulan Ini</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{formatCurrency(thisMonthExpenses)}</div>
-            <p className="text-xs text-muted-foreground">
-              {new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Transaksi</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{expenses.length}</div>
-            <p className="text-xs text-muted-foreground">Total pengeluaran</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Expenses Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Pengeluaran</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={columns}
-            data={expenses}
-            loading={loading}
-            searchable={true}
-            searchPlaceholder="Cari pengeluaran..."
-          />
-        </CardContent>
-      </Card>
-    </div>
-  );
+  // Mengembalikan semua state dan fungsi agar bisa digunakan di komponen lain (seperti expenses.tsx)
+  return {
+    expenses,
+    loading,
+    error,
+    fetchExpenses,
+    createExpense,
+    updateExpense,
+    deleteExpense,
+  };
 };
-
-export default Expenses;
