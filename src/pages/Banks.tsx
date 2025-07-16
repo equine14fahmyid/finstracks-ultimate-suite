@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,6 +34,16 @@ const Banks = () => {
     fetchBanks();
   }, []);
 
+  // DEBUG: Log data banks untuk troubleshooting
+  useEffect(() => {
+    console.log('Banks data:', banks);
+    console.log('Banks length:', banks?.length);
+    if (banks?.length > 0) {
+      console.log('First bank:', banks[0]);
+      console.log('Bank keys:', Object.keys(banks[0] || {}));
+    }
+  }, [banks]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -54,6 +63,8 @@ const Banks = () => {
     if (success) {
       setDialogOpen(false);
       resetForm();
+      // Refresh data setelah create/update
+      await fetchBanks();
     }
   };
 
@@ -69,22 +80,27 @@ const Banks = () => {
   };
 
   const handleEdit = (bank: any) => {
+    console.log('Editing bank:', bank); // DEBUG
+    
     if (!bank) return;
     
     setEditingBank(bank);
     setFormData({
-      nama_bank: bank?.nama_bank || '',
-      nama_pemilik: bank?.nama_pemilik || '',
-      no_rekening: bank?.no_rekening || '',
-      saldo_awal: bank?.saldo_awal || 0,
-      saldo_akhir: bank?.saldo_akhir || 0
+      nama_bank: bank.nama_bank || bank.bank_name || '',
+      nama_pemilik: bank.nama_pemilik || bank.account_holder || '',
+      no_rekening: bank.no_rekening || bank.account_number || '',
+      saldo_awal: bank.saldo_awal || bank.initial_balance || 0,
+      saldo_akhir: bank.saldo_akhir || bank.current_balance || 0
     });
     setDialogOpen(true);
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus bank ini?')) {
-      await deleteBank(id);
+      const success = await deleteBank(id);
+      if (success) {
+        await fetchBanks(); // Refresh data setelah delete
+      }
     }
   };
 
@@ -92,44 +108,68 @@ const Banks = () => {
     {
       key: 'bank_info',
       title: 'Informasi Bank',
-      render: (bank: any) => (
-        <div>
-          <div className="font-medium">{bank?.nama_bank || '-'}</div>
-          <div className="text-sm text-muted-foreground">{bank?.nama_pemilik || '-'}</div>
-          <div className="text-xs text-muted-foreground">{bank?.no_rekening || '-'}</div>
-        </div>
-      )
+      render: (bank: any) => {
+        console.log('Rendering bank info for:', bank); // DEBUG
+        
+        // Fallback untuk berbagai kemungkinan nama field
+        const bankName = bank?.nama_bank || bank?.bank_name || bank?.bankName || '';
+        const ownerName = bank?.nama_pemilik || bank?.account_holder || bank?.accountHolder || '';
+        const accountNumber = bank?.no_rekening || bank?.account_number || bank?.accountNumber || '';
+        
+        return (
+          <div>
+            <div className="font-medium">
+              {bankName || 'Bank tidak diketahui'}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {ownerName || 'Pemilik tidak diketahui'}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {accountNumber || 'No rekening tidak diketahui'}
+            </div>
+          </div>
+        );
+      }
     },
     {
       key: 'saldo_awal',
       title: 'Saldo Awal',
-      render: (bank: any) => (
-        <span className="font-medium">{formatCurrency(bank?.saldo_awal || 0)}</span>
-      )
+      render: (bank: any) => {
+        const saldoAwal = bank?.saldo_awal || bank?.initial_balance || 0;
+        return (
+          <span className="font-medium">{formatCurrency(saldoAwal)}</span>
+        );
+      }
     },
     {
       key: 'saldo_akhir',
       title: 'Saldo Akhir',
-      render: (bank: any) => (
-        <div>
-          <span className={`font-medium ${(bank?.saldo_akhir || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {formatCurrency(bank?.saldo_akhir || 0)}
-          </span>
-          <div className="text-xs text-muted-foreground mt-1">
-            {(bank?.saldo_akhir || 0) >= (bank?.saldo_awal || 0) ? (
-              <span className="text-green-600 flex items-center">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                +{formatCurrency((bank?.saldo_akhir || 0) - (bank?.saldo_awal || 0))}
-              </span>
-            ) : (
-              <span className="text-red-600 flex items-center">
-                <TrendingDown className="h-3 w-3 mr-1" />
-                {formatCurrency((bank?.saldo_akhir || 0) - (bank?.saldo_awal || 0))}
-              </span>
-            )}
+      render: (bank: any) => {
+        const saldoAwal = bank?.saldo_awal || bank?.initial_balance || 0;
+        const saldoAkhir = bank?.saldo_akhir || bank?.current_balance || 0;
+        const selisih = saldoAkhir - saldoAwal;
+        
+        return (
+          <div>
+            <span className={`font-medium ${saldoAkhir >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {formatCurrency(saldoAkhir)}
+            </span>
+            <div className="text-xs text-muted-foreground mt-1">
+              {selisih >= 0 ? (
+                <span className="text-green-600 flex items-center">
+                  <TrendingUp className="h-3 w-3 mr-1" />
+                  +{formatCurrency(selisih)}
+                </span>
+              ) : (
+                <span className="text-red-600 flex items-center">
+                  <TrendingDown className="h-3 w-3 mr-1" />
+                  {formatCurrency(selisih)}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      )
+        );
+      }
     },
     {
       key: 'actions',
@@ -147,8 +187,19 @@ const Banks = () => {
     }
   ];
 
-  const totalSaldoAwal = banks?.reduce((total, bank) => total + (bank?.saldo_awal || 0), 0) || 0;
-  const totalSaldoAkhir = banks?.reduce((total, bank) => total + (bank?.saldo_akhir || 0), 0) || 0;
+  // Pastikan banks adalah array dan tidak null/undefined
+  const bankData = Array.isArray(banks) ? banks : [];
+  
+  const totalSaldoAwal = bankData.reduce((total, bank) => {
+    const saldo = bank?.saldo_awal || bank?.initial_balance || 0;
+    return total + saldo;
+  }, 0);
+  
+  const totalSaldoAkhir = bankData.reduce((total, bank) => {
+    const saldo = bank?.saldo_akhir || bank?.current_balance || 0;
+    return total + saldo;
+  }, 0);
+  
   const totalPerubahan = totalSaldoAkhir - totalSaldoAwal;
 
   return (
@@ -216,7 +267,7 @@ const Banks = () => {
                     ...prev, 
                     saldo_awal: parseFloat(e.target.value) || 0 
                   }))}
-                  placeholder="0"
+                  placeholder="5.000.000"
                   min="0"
                   step="0.01"
                 />
@@ -232,7 +283,7 @@ const Banks = () => {
                     ...prev, 
                     saldo_akhir: parseFloat(e.target.value) || 0 
                   }))}
-                  placeholder="0"
+                  placeholder="7.500.000"
                   step="0.01"
                 />
               </div>
@@ -250,6 +301,22 @@ const Banks = () => {
         </Dialog>
       </div>
 
+      {/* Debug Info - Hapus setelah masalah teratasi */}
+      {process.env.NODE_ENV === 'development' && (
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardHeader>
+            <CardTitle className="text-yellow-800">Debug Info</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm space-y-2">
+              <div>Loading: {loading ? 'Ya' : 'Tidak'}</div>
+              <div>Banks Length: {bankData.length}</div>
+              <div>Banks Data: {JSON.stringify(bankData, null, 2)}</div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -258,7 +325,7 @@ const Banks = () => {
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{banks.length}</div>
+            <div className="text-2xl font-bold">{bankData.length}</div>
             <p className="text-xs text-muted-foreground">Rekening terdaftar</p>
           </CardContent>
         </Card>
@@ -311,13 +378,27 @@ const Banks = () => {
           <CardTitle>Daftar Rekening Bank</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={columns}
-            data={banks}
-            loading={loading}
-            searchable={true}
-            searchPlaceholder="Cari bank..."
-          />
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="text-muted-foreground">Memuat data...</div>
+            </div>
+          ) : bankData.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-muted-foreground">Belum ada data bank</div>
+              <Button className="mt-4" onClick={() => setDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Bank Pertama
+              </Button>
+            </div>
+          ) : (
+            <DataTable
+              columns={columns}
+              data={bankData}
+              loading={loading}
+              searchable={true}
+              searchPlaceholder="Cari bank..."
+            />
+          )}
         </CardContent>
       </Card>
     </div>
