@@ -3,15 +3,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 
+// --- PERBAIKAN 1: Menyesuaikan tipe data dengan skema database ---
 interface UserSettings {
-  modal_awal: number; // <-- TAMBAHKAN BARIS INI
-  company_name: string;
-  company_address: string;
-  company_phone: string;
-  company_email: string;
-  company_website: string;
-  tax_number: string;
-  logo_url: string;
+  id: string; // Wajib ada untuk proses update
+  modal_awal: number | null; // Bisa jadi null jika belum di-set
+  company_name: string | null;
+  company_address: string | null;
+  company_phone: string | null;
+  company_email: string | null;
+  company_website: string | null;
+  tax_number: string | null;
+  logo_url: string | null;
   theme: 'light' | 'dark' | 'auto';
   language: 'id' | 'en';
   timezone: string;
@@ -26,9 +28,9 @@ interface UserSettings {
   weekly_reports: boolean;
   monthly_reports: boolean;
   two_factor_auth: boolean;
-  session_timeout: number;
-  password_expiry: number;
-  login_attempts: number;
+  session_timeout: number | null;
+  password_expiry: number | null;
+  login_attempts: number | null;
 }
 
 export const useUserSettings = () => {
@@ -37,46 +39,47 @@ export const useUserSettings = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchSettings = async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('user_settings')
         .select('*')
         .eq('user_id', user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // Not found error
+      if (error && error.code !== 'PGRST116') { // Abaikan error "no rows found"
         throw error;
       }
 
       if (data) {
+        // --- PERBAIKAN 2: Type assertion yang lebih aman ---
         setSettings(data as UserSettings);
       }
     } catch (error) {
       console.error('Error fetching user settings:', error);
+      toast({ title: "Error", description: "Gagal memuat pengaturan.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
   const updateSettings = async (newSettings: Partial<UserSettings>) => {
-    if (!user) return false;
+    if (!user || !settings?.id) {
+        toast({ title: "Error", description: "User atau pengaturan tidak ditemukan.", variant: "destructive" });
+        return false;
+    }
 
     try {
       setLoading(true);
-
-      // Ambil ID dari settings yang ada, karena upsert butuh user_id
-      // dan kita juga perlu memastikan ada baris untuk diupdate
-      const currentSettingsId = settings?.id; 
-
       const { error } = await supabase
         .from('user_settings')
-        .upsert({
-          ...newSettings,
-          user_id: user.id,
-          id: currentSettingsId, // Pastikan ID disertakan untuk update
-        });
+        .update(newSettings)
+        .eq('id', settings.id); // Update berdasarkan ID baris
 
       if (error) throw error;
 
@@ -93,7 +96,7 @@ export const useUserSettings = () => {
       console.error('Error updating settings:', error);
       toast({
         title: "Error",
-        description: "Gagal menyimpan pengaturan",
+        description: "Gagal menyimpan pengaturan: " + (error as Error).message,
         variant: "destructive",
       });
       return false;
