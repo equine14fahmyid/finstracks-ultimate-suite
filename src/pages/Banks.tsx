@@ -154,7 +154,7 @@ const Banks = () => {
     {
       key: 'bank_info',
       title: 'Informasi Bank',
-      render: (bank: Bank) => (
+      render: (value: any, bank: Bank) => (
         <div>
           <div className="font-medium">{bank.nama_bank}</div>
           <div className="text-sm text-muted-foreground">{bank.nama_pemilik}</div>
@@ -165,17 +165,17 @@ const Banks = () => {
     {
       key: 'saldo_awal',
       title: 'Saldo Awal',
-      render: (bank: Bank) => formatCurrency(bank.saldo_awal)
+      render: (value: any, bank: Bank) => formatCurrency(bank.saldo_awal)
     },
     {
       key: 'saldo_akhir',
       title: 'Saldo Akhir',
-      render: (bank: Bank) => formatCurrency(bank.saldo_akhir)
+      render: (value: any, bank: Bank) => formatCurrency(bank.saldo_akhir)
     },
     {
       key: 'actions',
       title: 'Aksi',
-      render: (bank: Bank) => (
+      render: (value: any, bank: Bank) => (
         <div className="flex gap-2">
           <Button
             variant="ghost"
@@ -308,7 +308,7 @@ const Banks = () => {
             data={banks}
             columns={columns}
             loading={isLoading}
-            searchKey="nama_bank"
+            searchable={true}
             searchPlaceholder="Cari bank..."
           />
         </CardContent>

@@ -168,37 +168,37 @@ const Settlements = () => {
     {
       key: 'tanggal',
       title: 'Tanggal',
-      render: (settlement: Settlement) => format(new Date(settlement.tanggal), 'dd MMM yyyy', { locale: id })
+      render: (value: any, settlement: Settlement) => format(new Date(settlement.tanggal), 'dd MMM yyyy', { locale: id })
     },
     {
       key: 'store_info',
       title: 'Toko',
-      render: (settlement: Settlement) => settlement.stores?.nama_toko || 'N/A'
+      render: (value: any, settlement: Settlement) => settlement.stores?.nama_toko || 'N/A'
     },
     {
       key: 'jumlah_dicairkan',
       title: 'Jumlah Dicairkan',
-      render: (settlement: Settlement) => formatCurrency(settlement.jumlah_dicairkan)
+      render: (value: any, settlement: Settlement) => formatCurrency(settlement.jumlah_dicairkan)
     },
     {
       key: 'bank_info',
       title: 'Bank Tujuan',
-      render: (settlement: Settlement) => settlement.banks?.nama_bank || 'N/A'
+      render: (value: any, settlement: Settlement) => settlement.banks?.nama_bank || 'N/A'
     },
     {
       key: 'biaya_admin',
       title: 'Biaya Admin',
-      render: (settlement: Settlement) => formatCurrency(settlement.biaya_admin || 0)
+      render: (value: any, settlement: Settlement) => formatCurrency(settlement.biaya_admin || 0)
     },
     {
       key: 'keterangan',
       title: 'Keterangan',
-      render: (settlement: Settlement) => settlement.keterangan || '-'
+      render: (value: any, settlement: Settlement) => settlement.keterangan || '-'
     },
     {
       key: 'actions',
       title: 'Aksi',
-      render: (settlement: Settlement) => (
+      render: (value: any, settlement: Settlement) => (
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -333,7 +333,7 @@ const Settlements = () => {
             data={settlements}
             columns={columns}
             loading={isLoading}
-            searchKey="stores.nama_toko"
+            searchable={true}
             searchPlaceholder="Cari toko..."
           />
         </CardContent>
