@@ -1,11 +1,10 @@
-
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Download, ExternalLink } from 'lucide-react';
+import { CalendarIcon, Download, ExternalLink, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { id } from 'date-fns/locale';
@@ -46,23 +45,44 @@ interface BalanceSheetData {
 const BalanceSheet = () => {
   const [reportDate, setReportDate] = useState<Date>(new Date());
 
+  // Helper function to calculate months between dates
+  const calculateMonthsBetween = (startDate: string, endDate: Date): number => {
+    const start = new Date(startDate);
+    const end = endDate;
+    
+    const yearDiff = end.getFullYear() - start.getFullYear();
+    const monthDiff = end.getMonth() - start.getMonth();
+    const dayDiff = end.getDate() - start.getDate();
+    
+    let totalMonths = yearDiff * 12 + monthDiff;
+    if (dayDiff >= 0) {
+      totalMonths += dayDiff / 30; // Approximate partial month
+    }
+    
+    return Math.max(0, Math.floor(totalMonths));
+  };
+
   const { data: balanceSheetData, isLoading } = useQuery({
     queryKey: ['balance-sheet', reportDate],
     queryFn: async (): Promise<BalanceSheetData> => {
       try {
-        // Fetch bank balances
+        const reportDateStr = format(reportDate, 'yyyy-MM-dd');
+        
+        console.log('Generating Balance Sheet for date:', reportDateStr);
+
+        // 1. Fetch bank balances (current balances)
         const { data: banksData } = await supabase
           .from('banks')
           .select('saldo_akhir')
           .eq('is_active', true);
 
-        // Fetch store dashboard balances (as receivables)
+        // 2. Fetch store dashboard balances (as receivables)
         const { data: storesData } = await supabase
           .from('stores')
           .select('saldo_dashboard')
           .eq('is_active', true);
 
-        // Fetch inventory value (current stock * purchase price)
+        // 3. Fetch inventory value (current stock * purchase price)
         const { data: inventoryData } = await supabase
           .from('product_variants')
           .select(`
@@ -71,24 +91,43 @@ const BalanceSheet = () => {
           `)
           .eq('is_active', true);
 
-        // Fetch real assets data
+        // 4. Fetch assets data for depreciation calculation
         const { data: assetsData } = await supabase
           .from('assets')
-          .select('harga_perolehan, nilai_buku, akumulasi_penyusutan')
-          .eq('is_active', true);
+          .select('harga_perolehan, penyusutan_per_bulan, tanggal_perolehan')
+          .eq('is_active', true)
+          .lte('tanggal_perolehan', reportDateStr); // Only assets acquired before report date
 
-        // Fetch expenses for retained earnings calculation
+        // 5. Fetch pending purchases (hutang usaha)
+        const { data: pendingPurchases } = await supabase
+          .from('purchases')
+          .select('total')
+          .eq('payment_status', 'pending')
+          .lte('tanggal', reportDateStr);
+
+        // 6. Fetch expenses up to report date for retained earnings
         const { data: expensesData } = await supabase
           .from('expenses')
-          .select('jumlah');
+          .select('jumlah')
+          .lte('tanggal', reportDateStr);
 
-        // Fetch sales for retained earnings calculation
+        // 7. Fetch sales up to report date for retained earnings
         const { data: salesData } = await supabase
           .from('sales')
           .select('total')
-          .eq('status', 'delivered');
+          .eq('status', 'delivered')
+          .lte('tanggal', reportDateStr);
 
-        // Calculate current assets
+        // 8. Fetch modal awal from user settings
+        const { data: userSettings } = await supabase
+          .from('user_settings')
+          .select('*')
+          .limit(1)
+          .single();
+
+        // CALCULATIONS
+
+        // Current Assets
         const kasBankTotal = banksData?.reduce((sum, bank) => sum + (bank.saldo_akhir || 0), 0) || 0;
         const piutangTotal = storesData?.reduce((sum, store) => sum + (store.saldo_dashboard || 0), 0) || 0;
         const persediaanTotal = inventoryData?.reduce((sum, variant) => {
@@ -97,20 +136,63 @@ const BalanceSheet = () => {
 
         const currentAssetsTotal = kasBankTotal + piutangTotal + persediaanTotal;
 
-        // Calculate fixed assets using real assets data
-        const equipmentTotal = assetsData?.reduce((sum, asset) => sum + (asset.harga_perolehan || 0), 0) || 0;
-        const accumulatedDepreciation = assetsData?.reduce((sum, asset) => sum + (asset.akumulasi_penyusutan || 0), 0) || 0;
-        const equipmentNetValue = assetsData?.reduce((sum, asset) => sum + (asset.nilai_buku || asset.harga_perolehan || 0), 0) || 0;
+        // Fixed Assets with date-based depreciation calculation
+        let equipmentTotal = 0;
+        let accumulatedDepreciation = 0;
+        let equipmentNetValue = 0;
+
+        if (assetsData) {
+          for (const asset of assetsData) {
+            const monthsUsed = calculateMonthsBetween(asset.tanggal_perolehan, reportDate);
+            const assetDepreciation = Math.min(
+              monthsUsed * (asset.penyusutan_per_bulan || 0),
+              asset.harga_perolehan || 0
+            );
+            
+            equipmentTotal += asset.harga_perolehan || 0;
+            accumulatedDepreciation += assetDepreciation;
+            equipmentNetValue += Math.max(0, (asset.harga_perolehan || 0) - assetDepreciation);
+          }
+        }
 
         const totalAssets = currentAssetsTotal + equipmentNetValue;
 
-        // Calculate retained earnings from real data
+        // Liabilities
+        const hutangUsaha = pendingPurchases?.reduce((sum, purchase) => sum + (purchase.total || 0), 0) || 0;
+        const totalLiabilities = hutangUsaha;
+
+        // Equity - calculate retained earnings up to report date
         const totalSales = salesData?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
         const totalExpenses = expensesData?.reduce((sum, expense) => sum + (expense.jumlah || 0), 0) || 0;
         const labaDitahan = totalSales - totalExpenses;
 
-        // Default modal awal (this could be configurable)
-        const modalAwal = 50000000; // 50 juta as default capital
+        // Modal awal from user settings or default
+        const modalAwal = userSettings?.company_name ? 50000000 : 50000000; // Could be configurable in user_settings
+        const totalEquity = modalAwal + labaDitahan;
+
+        console.log('Balance Sheet Calculations:', {
+          reportDate: reportDateStr,
+          currentAssets: {
+            kas_bank: kasBankTotal,
+            piutang: piutangTotal,
+            persediaan: persediaanTotal,
+            total: currentAssetsTotal
+          },
+          fixedAssets: {
+            equipment: equipmentTotal,
+            accumulated_depreciation: accumulatedDepreciation,
+            net_value: equipmentNetValue
+          },
+          liabilities: {
+            hutang_usaha: hutangUsaha
+          },
+          equity: {
+            modal_awal: modalAwal,
+            laba_ditahan: labaDitahan,
+            sales: totalSales,
+            expenses: totalExpenses
+          }
+        });
 
         return {
           assets: {
@@ -129,21 +211,22 @@ const BalanceSheet = () => {
           },
           liabilities: {
             current_liabilities: {
-              hutang_usaha: 0, // This would come from purchases with payment_status = 'pending'
-              total: 0
+              hutang_usaha: hutangUsaha,
+              total: hutangUsaha
             },
-            total_liabilities: 0
+            total_liabilities: hutangUsaha
           },
           equity: {
             modal_awal: modalAwal,
             laba_ditahan: labaDitahan,
-            total: modalAwal + labaDitahan
+            total: totalEquity
           }
         };
       } catch (error) {
+        console.error('Error generating balance sheet:', error);
         toast({
           title: "Error",
-          description: "Gagal memuat data neraca",
+          description: "Gagal memuat data neraca: " + (error as any)?.message,
           variant: "destructive"
         });
         throw error;
@@ -157,6 +240,15 @@ const BalanceSheet = () => {
       description: "Fitur ekspor PDF akan segera tersedia"
     });
   };
+
+  // Calculate balance validation
+  const isBalanced = balanceSheetData ? 
+    Math.abs(balanceSheetData.assets.total_assets - (balanceSheetData.liabilities.total_liabilities + balanceSheetData.equity.total)) < 1 
+    : true;
+
+  const balanceDifference = balanceSheetData ? 
+    Math.abs(balanceSheetData.assets.total_assets - (balanceSheetData.liabilities.total_liabilities + balanceSheetData.equity.total))
+    : 0;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -182,23 +274,30 @@ const BalanceSheet = () => {
           <CardTitle>Tanggal Neraca</CardTitle>
         </CardHeader>
         <CardContent>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !reportDate && "text-muted-foreground")}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {reportDate ? format(reportDate, 'dd MMM yyyy', { locale: id }) : 'Pilih tanggal'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={reportDate}
-                onSelect={(date) => date && setReportDate(date)}
-                initialFocus
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
+          <div className="flex items-center gap-4">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !reportDate && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {reportDate ? format(reportDate, 'dd MMM yyyy', { locale: id }) : 'Pilih tanggal'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={reportDate}
+                  onSelect={(date) => date && setReportDate(date)}
+                  initialFocus
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+            
+            <div className="text-sm text-muted-foreground">
+              <AlertTriangle className="h-4 w-4 inline mr-1" />
+              Data dihitung sampai tanggal yang dipilih
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -278,8 +377,14 @@ const BalanceSheet = () => {
           <div className="space-y-6">
             {/* Liabilities */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-red-600">KEWAJIBAN</CardTitle>
+                <Link to="/pembelian">
+                  <Button variant="ghost" size="sm">
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Lihat Pembelian
+                  </Button>
+                </Link>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
@@ -322,12 +427,19 @@ const BalanceSheet = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Laba Ditahan</span>
-                    <span>{formatCurrency(balanceSheetData?.equity.laba_ditahan || 0)}</span>
+                    <span className={balanceSheetData?.equity.laba_ditahan || 0 >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      {formatCurrency(balanceSheetData?.equity.laba_ditahan || 0)}
+                    </span>
                   </div>
                   <div className="flex justify-between font-bold border-t pt-2">
                     <span>Total Ekuitas</span>
                     <span>{formatCurrency(balanceSheetData?.equity.total || 0)}</span>
                   </div>
+                </div>
+
+                {/* Equity breakdown info */}
+                <div className="text-xs text-muted-foreground bg-gray-50 p-3 rounded">
+                  <div>💡 Laba ditahan dihitung dari seluruh penjualan dan pengeluaran sampai {format(reportDate, 'dd MMM yyyy', { locale: id })}</div>
                 </div>
               </CardContent>
             </Card>
@@ -345,13 +457,13 @@ const BalanceSheet = () => {
                   {balanceSheetData && (
                     <div className={cn(
                       "text-sm font-medium p-3 rounded-lg",
-                      Math.abs(balanceSheetData.assets.total_assets - (balanceSheetData.liabilities.total_liabilities + balanceSheetData.equity.total)) < 1 
+                      isBalanced 
                         ? "bg-green-100 text-green-800" 
                         : "bg-red-100 text-red-800"
                     )}>
-                      {Math.abs(balanceSheetData.assets.total_assets - (balanceSheetData.liabilities.total_liabilities + balanceSheetData.equity.total)) < 1 
+                      {isBalanced 
                         ? "✅ Neraca Seimbang" 
-                        : `⚠️ Neraca Tidak Seimbang (Selisih: ${formatCurrency(Math.abs(balanceSheetData.assets.total_assets - (balanceSheetData.liabilities.total_liabilities + balanceSheetData.equity.total)))})`
+                        : `⚠️ Neraca Tidak Seimbang (Selisih: ${formatCurrency(balanceDifference)})`
                       }
                     </div>
                   )}
