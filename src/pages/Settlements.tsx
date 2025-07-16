@@ -72,7 +72,7 @@ const Settlements = () => {
     if (success) {
       setDialogOpen(false);
       resetForm();
-      await fetchSettlements(); // Refresh data
+      fetchSettlements(); // Refresh data tanpa await
     }
   };
 
@@ -106,7 +106,7 @@ const Settlements = () => {
     if (confirm('Apakah Anda yakin ingin menghapus pencairan ini?')) {
       const success = await deleteSettlement(id);
       if (success) {
-        await fetchSettlements(); // Refresh data
+        fetchSettlements(); // Refresh data tanpa await
       }
     }
   };
