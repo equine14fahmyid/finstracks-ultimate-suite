@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import {
   Table,
@@ -188,20 +189,24 @@ export function DataTable({
           <TableBody>
             {paginatedData.length ? (
               paginatedData.map((item, index) => (
-                <TableRow key={index} className="hover:bg-muted/50 transition-colors">
-                  {columns.map((column) => (
-                    <TableCell key={column.key}>
-                      {debug && !(column.key in (item || {})) && !column.render ? (
-                        <span className="text-red-500 italic">
-                          Missing: {column.key}
-                        </span>
-                      ) : (
-                        column.render 
-                          ? column.render(item?.[column.key], item) 
-                          : (item?.[column.key] ?? '-')
-                      )}
-                    </TableCell>
-                  ))}
+                <TableRow key={item.id || index} className="hover:bg-muted/50 transition-colors">
+                  {columns.map((column) => {
+                    if (debug) {
+                      console.log(`Rendering column ${column.key} for item:`, item);
+                    }
+                    
+                    return (
+                      <TableCell key={column.key}>
+                        {column.render ? (
+                          // For render functions, pass the column value and the full record
+                          column.render(item?.[column.key], item)
+                        ) : (
+                          // For simple columns, display the value directly
+                          item?.[column.key] ?? '-'
+                        )}
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               ))
             ) : (

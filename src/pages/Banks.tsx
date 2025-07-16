@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,16 +35,6 @@ const Banks = () => {
     fetchBanks();
   }, []);
 
-  // DEBUG: Log data banks untuk troubleshooting
-  useEffect(() => {
-    console.log('Banks data:', banks);
-    console.log('Banks length:', banks?.length);
-    if (banks?.length > 0) {
-      console.log('First bank:', banks[0]);
-      console.log('Bank keys:', Object.keys(banks[0] || {}));
-    }
-  }, [banks]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -56,15 +47,23 @@ const Banks = () => {
       return;
     }
 
-    const success = editingBank 
-      ? await updateBank(editingBank.id, formData)
-      : await createBank(formData);
+    try {
+      const success = editingBank 
+        ? await updateBank(editingBank.id, formData)
+        : await createBank(formData);
 
-    if (success) {
-      setDialogOpen(false);
-      resetForm();
-      // Refresh data setelah create/update
-      await fetchBanks();
+      if (success) {
+        setDialogOpen(false);
+        resetForm();
+        await fetchBanks();
+      }
+    } catch (error) {
+      console.error('Error saving bank:', error);
+      toast({
+        title: "Error",
+        description: "Terjadi kesalahan saat menyimpan data bank",
+        variant: "destructive",
+      });
     }
   };
 
@@ -80,8 +79,6 @@ const Banks = () => {
   };
 
   const handleEdit = (bank: any) => {
-    console.log('Editing bank:', bank); // DEBUG
-    
     if (!bank) return;
     
     setEditingBank(bank);
@@ -97,9 +94,18 @@ const Banks = () => {
 
   const handleDelete = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus bank ini?')) {
-      const success = await deleteBank(id);
-      if (success) {
-        await fetchBanks(); // Refresh data setelah delete
+      try {
+        const success = await deleteBank(id);
+        if (success) {
+          await fetchBanks();
+        }
+      } catch (error) {
+        console.error('Error deleting bank:', error);
+        toast({
+          title: "Error",
+          description: "Terjadi kesalahan saat menghapus data bank",
+          variant: "destructive",
+        });
       }
     }
   };
@@ -108,13 +114,16 @@ const Banks = () => {
     {
       key: 'bank_info',
       title: 'Informasi Bank',
-      render: (bank: any) => {
-        console.log('Rendering bank info for:', bank); // DEBUG
+      render: (_value: any, bank: any) => {
+        console.log('Rendering bank info for:', bank);
         
-        // Pastikan data tersedia - berdasarkan schema SQL yang benar
-        const bankName = bank?.nama_bank || '';
-        const ownerName = bank?.nama_pemilik || '';
-        const accountNumber = bank?.no_rekening || '';
+        if (!bank) {
+          return <div className="text-muted-foreground">Data tidak tersedia</div>;
+        }
+        
+        const bankName = bank.nama_bank || '';
+        const ownerName = bank.nama_pemilik || '';
+        const accountNumber = bank.no_rekening || '';
         
         return (
           <div>
@@ -134,7 +143,7 @@ const Banks = () => {
     {
       key: 'saldo_awal',
       title: 'Saldo Awal',
-      render: (bank: any) => {
+      render: (_value: any, bank: any) => {
         const saldoAwal = bank?.saldo_awal || 0;
         return (
           <span className="font-medium">{formatCurrency(saldoAwal)}</span>
@@ -144,7 +153,7 @@ const Banks = () => {
     {
       key: 'saldo_akhir',
       title: 'Saldo Akhir',
-      render: (bank: any) => {
+      render: (_value: any, bank: any) => {
         const saldoAwal = bank?.saldo_awal || 0;
         const saldoAkhir = bank?.saldo_akhir || 0;
         const selisih = saldoAkhir - saldoAwal;
@@ -174,7 +183,7 @@ const Banks = () => {
     {
       key: 'actions',
       title: 'Aksi',
-      render: (bank: any) => (
+      render: (_value: any, bank: any) => (
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => handleEdit(bank)}>
             Edit
@@ -301,35 +310,6 @@ const Banks = () => {
         </Dialog>
       </div>
 
-      {/* Debug Info - Hapus setelah masalah teratasi */}
-      {process.env.NODE_ENV === 'development' && (
-        <Card className="bg-yellow-50 border-yellow-200">
-          <CardHeader>
-            <CardTitle className="text-yellow-800">Debug Info</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm space-y-2">
-              <div>Loading: {loading ? 'Ya' : 'Tidak'}</div>
-              <div>Banks Length: {bankData.length}</div>
-              <div className="max-h-40 overflow-y-auto">
-                <div>Banks Data: <pre className="text-xs">{JSON.stringify(bankData, null, 2)}</pre></div>
-              </div>
-              {bankData.length > 0 && (
-                <div className="border-t pt-2">
-                  <div className="font-medium">Sample Bank Data:</div>
-                  <div>ID: {bankData[0]?.id}</div>
-                  <div>Nama Bank: "{bankData[0]?.nama_bank}"</div>
-                  <div>Nama Pemilik: "{bankData[0]?.nama_pemilik}"</div>
-                  <div>No Rekening: "{bankData[0]?.no_rekening}"</div>
-                  <div>Saldo Awal: {bankData[0]?.saldo_awal}</div>
-                  <div>Saldo Akhir: {bankData[0]?.saldo_akhir}</div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -404,77 +384,14 @@ const Banks = () => {
               </Button>
             </div>
           ) : (
-            <>
-              {/* DataTable Component */}
-              <DataTable
-                columns={columns}
-                data={bankData}
-                loading={loading}
-                searchable={true}
-                searchPlaceholder="Cari bank..."
-              />
-              
-              {/* Fallback Manual Table jika DataTable bermasalah */}
-              <div className="mt-8 border-t pt-4">
-                <h4 className="font-medium mb-4">Manual Table (Backup)</h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-300">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-300 px-4 py-2 text-left">Informasi Bank</th>
-                        <th className="border border-gray-300 px-4 py-2 text-left">Saldo Awal</th>
-                        <th className="border border-gray-300 px-4 py-2 text-left">Saldo Akhir</th>
-                        <th className="border border-gray-300 px-4 py-2 text-left">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bankData.map((bank, index) => (
-                        <tr key={bank?.id || index} className="hover:bg-gray-50">
-                          <td className="border border-gray-300 px-4 py-2">
-                            <div>
-                              <div className="font-medium">{bank?.nama_bank || 'N/A'}</div>
-                              <div className="text-sm text-gray-600">{bank?.nama_pemilik || 'N/A'}</div>
-                              <div className="text-xs text-gray-500">{bank?.no_rekening || 'N/A'}</div>
-                            </div>
-                          </td>
-                          <td className="border border-gray-300 px-4 py-2">
-                            <span className="font-medium">{formatCurrency(bank?.saldo_awal || 0)}</span>
-                          </td>
-                          <td className="border border-gray-300 px-4 py-2">
-                            <div>
-                              <span className={`font-medium ${(bank?.saldo_akhir || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {formatCurrency(bank?.saldo_akhir || 0)}
-                              </span>
-                              <div className="text-xs text-gray-500 mt-1">
-                                {((bank?.saldo_akhir || 0) - (bank?.saldo_awal || 0)) >= 0 ? (
-                                  <span className="text-green-600">
-                                    +{formatCurrency((bank?.saldo_akhir || 0) - (bank?.saldo_awal || 0))}
-                                  </span>
-                                ) : (
-                                  <span className="text-red-600">
-                                    {formatCurrency((bank?.saldo_akhir || 0) - (bank?.saldo_awal || 0))}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="border border-gray-300 px-4 py-2">
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="outline" onClick={() => handleEdit(bank)}>
-                                Edit
-                              </Button>
-                              <Button size="sm" variant="destructive" onClick={() => handleDelete(bank?.id)}>
-                                Hapus
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
+            <DataTable
+              columns={columns}
+              data={bankData}
+              loading={loading}
+              searchable={true}
+              searchPlaceholder="Cari bank..."
+              debug={true}
+            />
           )}
         </CardContent>
       </Card>

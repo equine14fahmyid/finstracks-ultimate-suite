@@ -98,6 +98,51 @@ export type Database = {
         }
         Relationships: []
       }
+      assets_backup: {
+        Row: {
+          akumulasi_penyusutan: number | null
+          created_at: string | null
+          harga_perolehan: number | null
+          id: string | null
+          is_active: boolean | null
+          kode_asset: string | null
+          nama_asset: string | null
+          nilai_buku: number | null
+          penyusutan_per_bulan: number | null
+          tanggal_perolehan: string | null
+          umur_ekonomis_bulan: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          akumulasi_penyusutan?: number | null
+          created_at?: string | null
+          harga_perolehan?: number | null
+          id?: string | null
+          is_active?: boolean | null
+          kode_asset?: string | null
+          nama_asset?: string | null
+          nilai_buku?: number | null
+          penyusutan_per_bulan?: number | null
+          tanggal_perolehan?: string | null
+          umur_ekonomis_bulan?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          akumulasi_penyusutan?: number | null
+          created_at?: string | null
+          harga_perolehan?: number | null
+          id?: string | null
+          is_active?: boolean | null
+          kode_asset?: string | null
+          nama_asset?: string | null
+          nilai_buku?: number | null
+          penyusutan_per_bulan?: number | null
+          tanggal_perolehan?: string | null
+          umur_ekonomis_bulan?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       banks: {
         Row: {
           created_at: string | null
