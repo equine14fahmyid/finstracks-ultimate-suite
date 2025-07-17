@@ -2,6 +2,9 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from './use-toast';
 
+// Import useSales yang sudah benar
+import { useSales } from './useSales';
+
 interface Product {
   id: string;
   created_at: string;
@@ -1153,191 +1156,6 @@ export const useUserProfiles = () => {
   };
 };
 
-// Sales hooks  
-export const useSales = () => {
-  const [sales, setSales] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchSales = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('sales')
-        .select(`
-          *,
-          store:stores(nama_toko, platform:platforms(nama_platform)),
-          expedition:expeditions(nama_ekspedisi),
-          sale_items(
-            id,
-            quantity,
-            harga_satuan,
-            subtotal,
-            product_variant:product_variants(
-              id,
-              warna,
-              size,
-              product:products(nama_produk)
-            )
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setSales(data || []);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Gagal memuat data penjualan",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createSale = async (saleData: any, items: any[]) => {
-    try {
-      // Calculate totals
-      const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.harga_satuan), 0);
-      const total = subtotal + (saleData.ongkir || 0) - (saleData.diskon || 0);
-
-      const { data: sale, error } = await supabase
-        .from('sales')
-        .insert([{
-          ...saleData,
-          subtotal,
-          total
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Create sale items
-      const itemsData = items.map(item => ({
-        sale_id: sale.id,
-        product_variant_id: item.product_variant_id,
-        quantity: item.quantity,
-        harga_satuan: item.harga_satuan,
-        subtotal: item.quantity * item.harga_satuan
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('sale_items')
-        .insert(itemsData);
-
-      if (itemsError) throw itemsError;
-
-      await fetchSales();
-      toast({
-        title: "Berhasil",
-        description: "Penjualan berhasil ditambahkan",
-      });
-      return { error: null };
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Gagal menambahkan penjualan",
-        variant: "destructive",
-      });
-      return { error };
-    }
-  };
-
-  const updateSale = async (id: string, saleData: any, items: any[]) => {
-    try {
-      // Calculate totals
-      const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.harga_satuan), 0);
-      const total = subtotal + (saleData.ongkir || 0) - (saleData.diskon || 0);
-
-      const { error } = await supabase
-        .from('sales')
-        .update({
-          ...saleData,
-          subtotal,
-          total
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      // Delete existing items
-      await supabase
-        .from('sale_items')
-        .delete()
-        .eq('sale_id', id);
-
-      // Create new items
-      const itemsData = items.map(item => ({
-        sale_id: id,
-        product_variant_id: item.product_variant_id,
-        quantity: item.quantity,
-        harga_satuan: item.harga_satuan,
-        subtotal: item.quantity * item.harga_satuan
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('sale_items')
-        .insert(itemsData);
-
-      if (itemsError) throw itemsError;
-
-      await fetchSales();
-      toast({
-        title: "Berhasil",
-        description: "Penjualan berhasil diupdate",
-      });
-      return { error: null };
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Gagal mengupdate penjualan",
-        variant: "destructive",
-      });
-      return { error };
-    }
-  };
-
-  const deleteSale = async (id: string) => {
-    try {
-      // Delete sale items first
-      await supabase
-        .from('sale_items')
-        .delete()
-        .eq('sale_id', id);
-
-      // Delete sale
-      const { error } = await supabase
-        .from('sales')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      await fetchSales();
-      toast({
-        title: "Berhasil",
-        description: "Penjualan berhasil dihapus",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Gagal menghapus penjualan",
-        variant: "destructive",
-      });
-    }
-  };
-
-  return {
-    sales,
-    loading,
-    fetchSales,
-    createSale,
-    updateSale,
-    deleteSale
-  };
-};
-
 // Purchases hooks
 export const usePurchases = () => {
   const [purchases, setPurchases] = useState<any[]>([]);
@@ -1510,3 +1328,9 @@ export const usePlatformPerformance = (startDate: string, endDate: string) => {
   // Placeholder - will be implemented later
   return { data, loading };
 };
+
+
+// ===================================================================
+// EXPORT SEMUA HOOKS DI SINI, TERMASUK useSales YANG SUDAH DIPERBAIKI
+// ===================================================================
+export { useSales };
