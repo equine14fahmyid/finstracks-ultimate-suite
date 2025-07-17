@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
+// ID Kategori "Pencairan Saldo Toko" yang sudah kita buat sebelumnya
+const INCOME_CATEGORY_ID_FOR_SETTLEMENT = '47877c5f-fa72-4ed4-9354-f56d52b8880e';
+
 export const useSettlements = () => {
   const [settlements, setSettlements] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -39,23 +42,39 @@ export const useSettlements = () => {
   const createSettlement = async (settlementData: any) => {
     setLoading(true);
     try {
-      // Memanggil Edge Function dengan format body yang benar
-      const { data, error } = await supabase.functions.invoke('create_settlement_and_update_balances', {
-        body: settlementData, // Mengirim data langsung, tidak dibungkus objek lain
-      });
+      // 1. Mengambil ID pengguna yang sedang login
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("Sesi pengguna tidak ditemukan. Silakan login kembali.");
+      }
+
+      // 2. Menyiapkan semua parameter untuk fungsi database
+      const params = {
+        p_store_id: settlementData.store_id,
+        p_bank_id: settlementData.bank_id,
+        p_amount: settlementData.jumlah_dicairkan,
+        p_admin_fee: settlementData.biaya_admin || 0,
+        p_notes: settlementData.keterangan,
+        p_income_category_id: INCOME_CATEGORY_ID_FOR_SETTLEMENT,
+        p_settlement_date: settlementData.tanggal,
+        p_user_id: user.id
+      };
+
+      // 3. Memanggil fungsi database secara langsung (RPC Call)
+      const { error } = await supabase.rpc('process_settlement', params);
 
       if (error) {
-        const errorMessage = (error as any).context?.msg || error.message;
-        throw new Error(errorMessage);
+        // Menangani error dari database dengan lebih baik
+        throw new Error(error.message);
       }
 
       toast({
-        title: "Sukses",
+        title: "Sukses!",
         description: "Pencairan dana berhasil diproses.",
       });
 
       await fetchSettlements();
-      return { data, error: null };
+      return { data: {}, error: null };
 
     } catch (error: any) {
       console.error('Create settlement error:', error);
@@ -70,12 +89,14 @@ export const useSettlements = () => {
     }
   };
 
-  const updateSettlement = async (id: string, settlementData: any) => {
-    // Logika untuk update bisa ditambahkan di sini jika perlu
-  };
-
   const deleteSettlement = async (id: string) => {
-    // Logika untuk delete yang aman bisa ditambahkan di sini jika perlu
+    // Implementasi delete yang aman perlu dibuat di sini jika diperlukan
+    // Misalnya, membuat fungsi RPC lain untuk mengembalikan saldo
+    toast({
+        title: "Fungsi Belum Tersedia",
+        description: "Menghapus pencairan perlu penanganan khusus untuk mengembalikan saldo.",
+        variant: "destructive",
+    });
   };
 
   return {
@@ -83,7 +104,6 @@ export const useSettlements = () => {
     loading,
     fetchSettlements,
     createSettlement,
-    updateSettlement,
     deleteSettlement,
   };
 };
