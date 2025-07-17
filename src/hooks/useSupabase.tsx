@@ -404,32 +404,6 @@ export const useStock = () => {
 // Banks hooks
 import { useRef } from 'react'; // Tambahkan ini jika belum ada
 import { RealtimeChannel } from '@supabase/supabase-js'; // Tambahkan ini jika belum ada
-export const useBanks = () => {
-  const [banks, setBanks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchBanks = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('banks')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setBanks(data || []);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Gagal memuat data bank",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const createBank = async (bankData: any) => {
     try {
       const { data, error } = await supabase
@@ -1507,8 +1481,7 @@ export const usePlatformPerformance = (startDate: string, endDate: string) => {
 
   // Placeholder - will be implemented later
   return { data, loading };
-};
-// TAMBAHKAN DI AKHIR FILE src/hooks/useSupabase.ts
+};// TAMBAHKAN DI AKHIR FILE src/hooks/useSupabase.ts
 
 export const useBanks = () => {
   const [banks, setBanks] = useState<any[]>([]);
