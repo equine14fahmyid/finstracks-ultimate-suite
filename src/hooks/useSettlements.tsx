@@ -2,39 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
-// Interface untuk Settlement
-export interface Settlement {
-  id: string;
-  tanggal: string;
-  store_id: string;
-  jumlah_dicairkan: number;
-  bank_id: string;
-  biaya_admin: number;
-  keterangan: string;
-  created_at: string;
-  stores: {
-    nama_toko: string;
-    saldo_dashboard: number;
-  };
-  banks: {
-    nama_bank: string;
-  };
-}
-
-// Interface untuk Store
-export interface Store {
-  id: string;
-  nama_toko: string;
-  saldo_dashboard: number;
-}
-
-// Interface untuk Bank
-export interface Bank {
-  id: string;
-  nama_bank: string;
-}
-
-// Interface untuk Settlement Data
+// Interface untuk data yang dikirim ke form
 export interface SettlementData {
   tanggal: string;
   store_id: string;
@@ -45,134 +13,75 @@ export interface SettlementData {
 }
 
 export const useSettlements = () => {
-  const [settlements, setSettlements] = useState<Settlement[]>([]);
-  const [stores, setStores] = useState<Store[]>([]);
-  const [banks, setBanks] = useState<Bank[]>([]);
+  const [settlements, setSettlements] = useState<any[]>([]);
+  const [stores, setStores] = useState<any[]>([]);
+  const [banks, setBanks] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Fetch settlements dari database
   const fetchSettlements = useCallback(async () => {
-    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('settlements')
-        .select(`
-          *,
-          stores!inner(nama_toko, saldo_dashboard),
-          banks!inner(nama_bank)
-        `)
+        .select(`*, stores!inner(nama_toko, saldo_dashboard), banks!inner(nama_bank)`)
         .order('tanggal', { ascending: false });
-      
       if (error) throw error;
       setSettlements(data || []);
     } catch (error: any) {
       console.error('Fetch settlements error:', error);
-      toast({
-        title: "Error",
-        description: `Gagal memuat data pencairan: ${error.message}`,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
     }
   }, []);
 
-  // Fetch stores dari database
   const fetchStores = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('stores')
-        .select('id, nama_toko, saldo_dashboard')
-        .eq('is_active', true)
-        .order('nama_toko');
-      
+      const { data, error } = await supabase.from('stores').select('id, nama_toko, saldo_dashboard').eq('is_active', true);
       if (error) throw error;
       setStores(data || []);
     } catch (error: any) {
       console.error('Fetch stores error:', error);
-      toast({
-        title: "Error",
-        description: `Gagal memuat data toko: ${error.message}`,
-        variant: "destructive",
-      });
     }
   }, []);
 
-  // Fetch banks dari database
   const fetchBanks = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('banks')
-        .select('id, nama_bank')
-        .eq('is_active', true)
-        .order('nama_bank');
-      
+      const { data, error } = await supabase.from('banks').select('id, nama_bank').eq('is_active', true);
       if (error) throw error;
       setBanks(data || []);
     } catch (error: any) {
       console.error('Fetch banks error:', error);
-      toast({
-        title: "Error",
-        description: `Gagal memuat data bank: ${error.message}`,
-        variant: "destructive",
-      });
     }
   }, []);
 
-  // Load semua data saat component mount
-  useEffect(() => {
-    fetchSettlements();
-    fetchStores();
-    fetchBanks();
+  const refreshAll = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([fetchSettlements(), fetchStores(), fetchBanks()]);
+    setLoading(false);
   }, [fetchSettlements, fetchStores, fetchBanks]);
 
-  // Fungsi untuk membuat pencairan dana
+  useEffect(() => {
+    refreshAll();
+  }, [refreshAll]);
+
   const createSettlement = async (settlementData: SettlementData) => {
     setLoading(true);
     try {
-      // 1. Validasi saldo toko
-      const selectedStore = stores.find(s => s.id === settlementData.store_id);
-      if (!selectedStore) {
-        throw new Error("Toko tidak ditemukan");
-      }
-      
-      if (settlementData.jumlah_dicairkan > selectedStore.saldo_dashboard) {
-        throw new Error("Jumlah pencairan melebihi saldo toko yang tersedia");
-      }
-
-      // 2. Panggil Edge Function untuk memproses pencairan
+      // Panggil Edge Function dengan format body yang sudah diperbaiki
       const { data, error } = await supabase.functions.invoke('create_settlement_and_update_balances', {
-        body: {
-          settlementData: {
-            tanggal: settlementData.tanggal,
-            store_id: settlementData.store_id,
-            bank_id: settlementData.bank_id,
-            jumlah_dicairkan: settlementData.jumlah_dicairkan,
-            biaya_admin: settlementData.biaya_admin || 0,
-            keterangan: settlementData.keterangan || ''
-          }
-        }
+        body: settlementData, // Mengirim data langsung, tanpa bungkusan tambahan
       });
 
       if (error) {
-        console.error('Edge Function error:', error);
-        throw new Error(error.message || 'Gagal memproses pencairan dana');
+        const errorMessage = (error as any).context?.msg || error.message;
+        throw new Error(errorMessage);
       }
 
-      // 3. Berhasil - refresh data dan tampilkan notifikasi
       toast({
         title: "Sukses!",
-        description: "Pencairan dana berhasil diproses. Saldo toko dan bank telah diperbarui.",
+        description: "Pencairan dana berhasil diproses.",
       });
 
-      // Refresh semua data
-      await Promise.all([
-        fetchSettlements(),
-        fetchStores(),
-        fetchBanks()
-      ]);
-
+      await refreshAll();
       return { data, error: null };
+
     } catch (error: any) {
       console.error('Create settlement error:', error);
       toast({
@@ -186,11 +95,10 @@ export const useSettlements = () => {
     }
   };
 
-  // Fungsi untuk menghapus pencairan (jika diperlukan)
   const deleteSettlement = async (id: string) => {
     toast({
       title: "Fungsi Belum Tersedia",
-      description: "Menghapus pencairan perlu penanganan khusus untuk mengembalikan saldo.",
+      description: "Menghapus pencairan perlu penanganan khusus.",
       variant: "destructive",
     });
   };
@@ -200,9 +108,6 @@ export const useSettlements = () => {
     stores,
     banks,
     loading,
-    fetchSettlements,
-    fetchStores,
-    fetchBanks,
     createSettlement,
     deleteSettlement,
   };
