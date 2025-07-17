@@ -1,4 +1,3 @@
-
 // ============================================================================
 // FINTRACKS ULTIMATE - FORMATTING UTILITIES
 // Indonesian Number & Currency Formatting
