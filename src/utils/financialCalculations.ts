@@ -83,11 +83,13 @@ export const calculateProfitLoss = async (startDate: Date, endDate: Date): Promi
   const total_expenses = expensesData.data?.reduce((sum, exp) => sum + (exp.jumlah || 0), 0) || 0;
   const expensesByCategoryMap = new Map<string, number>();
   expensesData.data?.forEach(exp => {
-    // --- PENANGANAN ERROR YANG LEBIH AMAN ---
-    // Cek apakah expense_categories ada dan memiliki properti 'name'
-    const categoryName = (exp.expense_categories && 'name' in exp.expense_categories && exp.expense_categories.name)
-      ? exp.expense_categories.name
+    // --- PERBAIKAN UNTUK MENGATASI ERROR TIPE DATA ---
+    const categoryObj = exp.expense_categories as any;
+    // Cek dengan aman apakah objek kategori ada dan properti 'name' adalah string
+    const categoryName = (categoryObj && typeof categoryObj.name === 'string')
+      ? categoryObj.name
       : 'Lain-lain';
+      
     const currentAmount = expensesByCategoryMap.get(categoryName) || 0;
     expensesByCategoryMap.set(categoryName, currentAmount + (exp.jumlah || 0));
   });
