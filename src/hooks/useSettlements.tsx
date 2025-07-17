@@ -39,13 +39,12 @@ export const useSettlements = () => {
   const createSettlement = async (settlementData: any) => {
     setLoading(true);
     try {
-      // Memanggil Edge Function untuk memproses transaksi secara aman
+      // Memanggil Edge Function dengan format body yang benar
       const { data, error } = await supabase.functions.invoke('create_settlement_and_update_balances', {
-        body: { settlementData },
+        body: settlementData, // Mengirim data langsung, tidak dibungkus objek lain
       });
 
       if (error) {
-        // Jika ada error dari Edge Function, tampilkan pesannya
         const errorMessage = (error as any).context?.msg || error.message;
         throw new Error(errorMessage);
       }
@@ -55,7 +54,7 @@ export const useSettlements = () => {
         description: "Pencairan dana berhasil diproses.",
       });
 
-      await fetchSettlements(); // Refresh data setelah berhasil
+      await fetchSettlements();
       return { data, error: null };
 
     } catch (error: any) {
@@ -71,13 +70,12 @@ export const useSettlements = () => {
     }
   };
 
-  // Fungsi update dan delete bisa disesuaikan nanti jika diperlukan logika yang lebih kompleks
   const updateSettlement = async (id: string, settlementData: any) => {
-    // ... (logika update jika diperlukan)
+    // Logika untuk update bisa ditambahkan di sini jika perlu
   };
 
   const deleteSettlement = async (id: string) => {
-    // ... (logika delete yang aman, misal: mengembalikan saldo)
+    // Logika untuk delete yang aman bisa ditambahkan di sini jika perlu
   };
 
   return {
