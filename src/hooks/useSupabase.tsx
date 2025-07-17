@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from './use-toast';
@@ -402,8 +401,32 @@ export const useStock = () => {
 };
 
 // Banks hooks
-import { useRef } from 'react'; // Tambahkan ini jika belum ada
-import { RealtimeChannel } from '@supabase/supabase-js'; // Tambahkan ini jika belum ada
+export const useBanks = () => {
+  const [banks, setBanks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchBanks = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('banks')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setBanks(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Gagal memuat data bank",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const createBank = async (bankData: any) => {
     try {
       const { data, error } = await supabase
@@ -955,12 +978,14 @@ export const useSuppliers = () => {
         title: "Berhasil",
         description: "Supplier berhasil ditambahkan",
       });
+      return { error: null };
     } catch (error: any) {
       toast({
         title: "Error",
         description: "Gagal menambahkan supplier",
         variant: "destructive",
       });
+      return { error };
     }
   };
 
@@ -978,12 +1003,14 @@ export const useSuppliers = () => {
         title: "Berhasil",
         description: "Supplier berhasil diupdate",
       });
+      return { error: null };
     } catch (error: any) {
       toast({
         title: "Error",
         description: "Gagal mengupdate supplier",
         variant: "destructive",
       });
+      return { error };
     }
   };
 
@@ -1324,6 +1351,7 @@ export const usePurchases = () => {
         .select(`
           *,
           supplier:suppliers(nama_supplier),
+          bank:banks(nama_bank, nama_pemilik),
           purchase_items(
             id,
             quantity,
@@ -1481,38 +1509,4 @@ export const usePlatformPerformance = (startDate: string, endDate: string) => {
 
   // Placeholder - will be implemented later
   return { data, loading };
-};// TAMBAHKAN DI AKHIR FILE src/hooks/useSupabase.ts
-
-export const useBanks = () => {
-  const [banks, setBanks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchBanks = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('banks')
-        .select('*')
-        .eq('is_active', true)
-        .order('nama_bank');
-      
-      if (error) throw error;
-      setBanks(data || []);
-    } catch (error: any) {
-      console.error('Error fetching banks:', error);
-      toast({
-        title: "Error",
-        description: "Gagal mengambil data bank: " + error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return {
-    banks,
-    loading,
-    fetchBanks
-  };
 };
