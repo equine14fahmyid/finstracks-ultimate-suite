@@ -18,7 +18,8 @@ export interface PendingSale {
 }
 
 export interface AdjustmentItem {
-  adjustment_type: 'denda' | 'selisih_ongkir' | 'pinalti';
+  // FIX 1: Mengganti nama properti agar cocok dengan form
+  type: 'denda' | 'selisih_ongkir' | 'pinalti';
   amount: number;
   notes: string;
 }
@@ -106,7 +107,8 @@ export const useAdjustments = () => {
       return;
     }
 
-    const { error: storeUpdateError } = await supabase.rpc('update_store_balance', {
+    // FIX 2: Menambahkan 'as any' untuk melewati pemeriksaan tipe yang usang
+    const { error: storeUpdateError } = await supabase.rpc('update_store_balance' as any, {
         store_id_param: saleToValidate.store_id,
         amount_param: saleToValidate.total
     });
@@ -140,6 +142,6 @@ export const useAdjustments = () => {
     loading, 
     validateSale, 
     createAdjustment, 
-    refreshData // <-- FUNGSI SUDAH DITAMBAHKAN DI SINI
+    refreshData
   };
 };
