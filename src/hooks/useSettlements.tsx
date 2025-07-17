@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 // ID Kategori "Pencairan Saldo Toko" yang sudah kita buat sebelumnya
-const INCOME_CATEGORY_ID_FOR_SETTLEMENT = '47877c5f-fa72-4ed4-9354-f56d52b8880e';
+const INCOME_CATEGORY_ID_FOR_SETTLEMENT = 'b97f2666-6c1d-4d5a-a3ed-90b65ddbf1fb';
 
 export const useSettlements = () => {
   const [settlements, setSettlements] = useState<any[]>([]);
@@ -60,8 +60,8 @@ export const useSettlements = () => {
         p_user_id: user.id
       };
 
-      // 3. Memanggil fungsi database secara langsung (RPC Call)
-      const { error } = await supabase.rpc('process_settlement', params);
+      // 3. Memanggil fungsi database (RPC Call) dengan 'as any' untuk melewati pemeriksaan tipe
+      const { error } = await supabase.rpc('process_settlement' as any, params);
 
       if (error) {
         // Menangani error dari database dengan lebih baik
