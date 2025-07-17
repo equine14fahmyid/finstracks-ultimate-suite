@@ -402,6 +402,8 @@ export const useStock = () => {
 };
 
 // Banks hooks
+import { useRef } from 'react'; // Tambahkan ini jika belum ada
+import { RealtimeChannel } from '@supabase/supabase-js'; // Tambahkan ini jika belum ada
 export const useBanks = () => {
   const [banks, setBanks] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
