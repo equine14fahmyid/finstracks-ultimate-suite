@@ -94,46 +94,66 @@ const Expenses = () => {
     }
   };
 
+  // Fixed columns dengan parameter yang benar
   const columns = [
     {
       key: 'tanggal',
       title: 'Tanggal',
-      render: (expense: Expense) => formatShortDate(expense?.tanggal)
+      render: (value: any, expense: any) => {
+        console.log('Rendering tanggal:', { value, expense }); // Debug log
+        return formatShortDate(expense?.tanggal);
+      }
     },
     {
       key: 'category',
       title: 'Kategori',
-      render: (expense: Expense) => (
-        <span className="font-medium">{expense?.category?.nama_kategori || 'Tidak dikategorikan'}</span>
-      )
+      render: (value: any, expense: any) => {
+        console.log('Rendering category:', { value, expense }); // Debug log
+        return (
+          <span className="font-medium">
+            {expense?.category?.nama_kategori || 'Tidak dikategorikan'}
+          </span>
+        );
+      }
     },
     {
       key: 'jumlah',
       title: 'Jumlah',
-      render: (expense: Expense) => (
-        <span className="font-medium text-red-600">-{formatCurrency(expense?.jumlah || 0)}</span>
-      )
+      render: (value: any, expense: any) => {
+        console.log('Rendering jumlah:', { value, expense }); // Debug log
+        return (
+          <span className="font-medium text-red-600">
+            -{formatCurrency(expense?.jumlah || 0)}
+          </span>
+        );
+      }
     },
     {
       key: 'bank',
       title: 'Dari Bank',
-      render: (expense: Expense) => (
-        <span>{expense?.bank?.nama_bank || 'Kas'}</span>
-      )
+      render: (value: any, expense: any) => {
+        console.log('Rendering bank:', { value, expense }); // Debug log
+        return (
+          <span>{expense?.bank?.nama_bank || 'Kas'}</span>
+        );
+      }
     },
     {
       key: 'keterangan',
       title: 'Keterangan',
-      render: (expense: Expense) => (
-        <span className="text-sm text-muted-foreground">
-          {expense?.keterangan || '-'}
-        </span>
-      )
+      render: (value: any, expense: any) => {
+        console.log('Rendering keterangan:', { value, expense }); // Debug log
+        return (
+          <span className="text-sm text-muted-foreground">
+            {expense?.keterangan || '-'}
+          </span>
+        );
+      }
     },
     {
       key: 'actions',
       title: 'Aksi',
-      render: (expense: Expense) => (
+      render: (value: any, expense: any) => (
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => handleEdit(expense)}>
             Edit
