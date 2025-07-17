@@ -334,7 +334,6 @@ const Expenses = () => {
             loading={loading}
             searchable={true}
             searchPlaceholder="Cari pengeluaran..."
-            debug={true}
           />
         </CardContent>
       </Card>
