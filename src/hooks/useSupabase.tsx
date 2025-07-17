@@ -1508,3 +1508,38 @@ export const usePlatformPerformance = (startDate: string, endDate: string) => {
   // Placeholder - will be implemented later
   return { data, loading };
 };
+// TAMBAHKAN DI AKHIR FILE src/hooks/useSupabase.ts
+
+export const useBanks = () => {
+  const [banks, setBanks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchBanks = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('banks')
+        .select('*')
+        .eq('is_active', true)
+        .order('nama_bank');
+      
+      if (error) throw error;
+      setBanks(data || []);
+    } catch (error: any) {
+      console.error('Error fetching banks:', error);
+      toast({
+        title: "Error",
+        description: "Gagal mengambil data bank: " + error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    banks,
+    loading,
+    fetchBanks
+  };
+};
