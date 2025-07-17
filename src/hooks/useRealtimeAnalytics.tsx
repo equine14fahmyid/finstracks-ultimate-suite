@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -56,6 +55,15 @@ export const useRealtimeDashboard = (startDate: string, endDate: string) => {
 
       if (expensesError) throw expensesError;
 
+      // Fetch real incomes data
+      const { data: incomesData, error: incomesError } = await supabase
+        .from('incomes')
+        .select('jumlah, tanggal')
+        .gte('tanggal', startDate)
+        .lte('tanggal', endDate);
+
+      if (incomesError) throw incomesError;
+
       // Fetch real bank balances
       const { data: banksData, error: banksError } = await supabase
         .from('banks')
@@ -66,12 +74,14 @@ export const useRealtimeDashboard = (startDate: string, endDate: string) => {
 
       // Calculate totals from real data
       const totalPenjualan = salesData?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
+      const totalPemasukan = incomesData?.reduce((sum, income) => sum + (income.jumlah || 0), 0) || 0;
       const totalPengeluaran = expensesData?.reduce((sum, expense) => sum + (expense.jumlah || 0), 0) || 0;
-      const labaBersih = totalPenjualan - totalPengeluaran;
+      const totalTransaksi = totalPenjualan + totalPemasukan;
+      const labaBersih = totalTransaksi - totalPengeluaran;
       const saldoKasBank = banksData?.reduce((sum, bank) => sum + (bank.saldo_akhir || 0), 0) || 0;
 
       setData({
-        total_penjualan: totalPenjualan,
+        total_penjualan: totalTransaksi,
         total_pengeluaran: totalPengeluaran,
         laba_bersih: labaBersih,
         saldo_kas_bank: saldoKasBank
@@ -111,8 +121,66 @@ export const useRealtimeDashboard = (startDate: string, endDate: string) => {
     }
   }, [startDate, endDate]);
 
+  // Setup real-time subscription
   useEffect(() => {
     fetchDashboardData();
+
+    // Create comprehensive real-time channel
+    const channel = supabase
+      .channel('financial-dashboard-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'incomes'
+        },
+        (payload) => {
+          console.log('Income change detected:', payload);
+          setTimeout(fetchDashboardData, 500);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'expenses'
+        },
+        (payload) => {
+          console.log('Expense change detected:', payload);
+          setTimeout(fetchDashboardData, 500);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'sales'
+        },
+        (payload) => {
+          console.log('Sales change detected:', payload);
+          setTimeout(fetchDashboardData, 500);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'banks'
+        },
+        (payload) => {
+          console.log('Bank balance change detected:', payload);
+          setTimeout(fetchDashboardData, 500);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchDashboardData]);
 
   const refresh = useCallback(() => {
@@ -236,27 +304,3 @@ export const useInteractiveAnalytics = (startDate: string, endDate: string) => {
     clearDrillDown
   };
 };
-// Di dalam fetchDashboardData function, setelah fetch sales dan expenses:
-
-// Fetch real incomes data
-const { data: incomesData, error: incomesError } = await supabase
-  .from('incomes')
-  .select('jumlah, tanggal')
-  .gte('tanggal', startDate)
-  .lte('tanggal', endDate);
-
-if (incomesError) throw incomesError;
-
-// Update calculation:
-const totalPenjualan = salesData?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
-const totalPemasukan = incomesData?.reduce((sum, income) => sum + (income.jumlah || 0), 0) || 0;
-const totalPengeluaran = expensesData?.reduce((sum, expense) => sum + (expense.jumlah || 0), 0) || 0;
-const totalTransaksi = totalPenjualan + totalPemasukan;
-const labaBersih = totalTransaksi - totalPengeluaran;
-
-setData({
-  total_penjualan: totalTransaksi,
-  total_pengeluaran: totalPengeluaran,
-  laba_bersih: labaBersih,
-  saldo_kas_bank: saldoKasBank
-});
