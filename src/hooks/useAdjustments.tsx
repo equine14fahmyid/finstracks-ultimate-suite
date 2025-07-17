@@ -18,7 +18,6 @@ export interface PendingSale {
 }
 
 export interface AdjustmentItem {
-  // FIX 1: Mengganti nama properti agar cocok dengan form
   type: 'denda' | 'selisih_ongkir' | 'pinalti';
   amount: number;
   notes: string;
@@ -106,12 +105,13 @@ export const useAdjustments = () => {
       toast({ title: "Error", description: "Penjualan tidak ditemukan", variant: "destructive" });
       return;
     }
+    
+    // Memanggil fungsi SQL untuk menambah saldo toko
+    const { error: storeUpdateError } = await supabase
+        .from('stores')
+        .update({ saldo_dashboard: (saleToValidate.store?.saldo_dashboard || 0) + saleToValidate.total })
+        .eq('id', saleToValidate.store_id);
 
-    // FIX 2: Menambahkan 'as any' untuk melewati pemeriksaan tipe yang usang
-    const { error: storeUpdateError } = await supabase.rpc('update_store_balance' as any, {
-        store_id_param: saleToValidate.store_id,
-        amount_param: saleToValidate.total
-    });
 
     if (storeUpdateError) {
       toast({ title: "Error", description: `Gagal update saldo toko: ${storeUpdateError.message}`, variant: "destructive" });
