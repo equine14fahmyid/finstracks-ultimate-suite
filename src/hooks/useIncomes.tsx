@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 export const useIncomes = () => {
   const [incomes, setIncomes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   const fetchIncomes = async () => {
     try {
@@ -35,20 +37,30 @@ export const useIncomes = () => {
   const createIncome = async (incomeData: any) => {
     try {
       setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      const dataWithUser = {
+        ...incomeData,
+        created_by: user?.id
+      };
+
       const { data, error } = await supabase
         .from('incomes')
-        .insert(incomeData)
-        .select()
+        .insert(dataWithUser)
+        .select(`
+          *,
+          category:categories (*),
+          bank:banks (*)
+        `)
         .single();
 
       if (error) throw error;
 
       toast({
         title: "Sukses",
-        description: "Pemasukan berhasil dibuat",
+        description: "Pemasukan berhasil dibuat dan saldo bank terupdate otomatis",
       });
 
-      await fetchIncomes();
       return { data, error: null };
     } catch (error: any) {
       console.error('Create income error:', error);
@@ -66,21 +78,25 @@ export const useIncomes = () => {
   const updateIncome = async (id: string, incomeData: any) => {
     try {
       setLoading(true);
+      
       const { data, error } = await supabase
         .from('incomes')
         .update(incomeData)
         .eq('id', id)
-        .select()
+        .select(`
+          *,
+          category:categories (*),
+          bank:banks (*)
+        `)
         .single();
 
       if (error) throw error;
 
       toast({
         title: "Sukses",
-        description: "Pemasukan berhasil diperbarui",
+        description: "Pemasukan berhasil diperbarui dan saldo bank terupdate otomatis",
       });
 
-      await fetchIncomes();
       return { data, error: null };
     } catch (error: any) {
       console.error('Update income error:', error);
@@ -107,10 +123,9 @@ export const useIncomes = () => {
 
       toast({
         title: "Sukses",
-        description: "Pemasukan berhasil dihapus",
+        description: "Pemasukan berhasil dihapus dan saldo bank terupdate otomatis",
       });
 
-      await fetchIncomes();
     } catch (error: any) {
       console.error('Delete income error:', error);
       toast({
@@ -122,6 +137,38 @@ export const useIncomes = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchIncomes();
+
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
+    const channel = supabase
+      .channel('incomes-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'incomes'
+        },
+        (payload) => {
+          console.log('Income realtime update:', payload);
+          fetchIncomes();
+        }
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+    };
+  }, []);
 
   return {
     incomes,
