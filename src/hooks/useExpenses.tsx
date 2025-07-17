@@ -1,11 +1,12 @@
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 export const useExpenses = () => {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   const fetchExpenses = async () => {
     try {
@@ -21,10 +22,9 @@ export const useExpenses = () => {
 
       if (error) throw error;
       
-      // Ensure we handle cases where bank might be null
       const processedData = (data || []).map(expense => ({
         ...expense,
-        bank: expense.bank || null // Explicitly handle null bank
+        bank: expense.bank || null
       }));
       
       setExpenses(processedData);
@@ -43,20 +43,30 @@ export const useExpenses = () => {
   const createExpense = async (expenseData: any) => {
     try {
       setLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      const dataWithUser = {
+        ...expenseData,
+        created_by: user?.id
+      };
+
       const { data, error } = await supabase
         .from('expenses')
-        .insert(expenseData)
-        .select()
+        .insert(dataWithUser)
+        .select(`
+          *,
+          category:categories (*),
+          bank:banks (*)
+        `)
         .single();
 
       if (error) throw error;
 
       toast({
         title: "Sukses",
-        description: "Pengeluaran berhasil dibuat",
+        description: "Pengeluaran berhasil dibuat dan saldo bank terupdate otomatis",
       });
 
-      await fetchExpenses();
       return { data, error: null };
     } catch (error: any) {
       console.error('Create expense error:', error);
@@ -74,21 +84,25 @@ export const useExpenses = () => {
   const updateExpense = async (id: string, expenseData: any) => {
     try {
       setLoading(true);
+      
       const { data, error } = await supabase
         .from('expenses')
         .update(expenseData)
         .eq('id', id)
-        .select()
+        .select(`
+          *,
+          category:categories (*),
+          bank:banks (*)
+        `)
         .single();
 
       if (error) throw error;
 
       toast({
         title: "Sukses",
-        description: "Pengeluaran berhasil diperbarui",
+        description: "Pengeluaran berhasil diperbarui dan saldo bank terupdate otomatis",
       });
 
-      await fetchExpenses();
       return { data, error: null };
     } catch (error: any) {
       console.error('Update expense error:', error);
@@ -115,10 +129,9 @@ export const useExpenses = () => {
 
       toast({
         title: "Sukses",
-        description: "Pengeluaran berhasil dihapus",
+        description: "Pengeluaran berhasil dihapus dan saldo bank terupdate otomatis",
       });
 
-      await fetchExpenses();
     } catch (error: any) {
       console.error('Delete expense error:', error);
       toast({
@@ -130,6 +143,38 @@ export const useExpenses = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchExpenses();
+
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
+    const channel = supabase
+      .channel('expenses-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'expenses'
+        },
+        (payload) => {
+          console.log('Expense realtime update:', payload);
+          fetchExpenses();
+        }
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+    };
+  }, []);
 
   return {
     expenses,
