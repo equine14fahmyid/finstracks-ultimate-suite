@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -64,14 +65,55 @@ export const useSettlements = () => {
   const createSettlement = async (settlementData: SettlementData) => {
     setLoading(true);
     try {
-      // Panggil Edge Function dengan format body yang sudah diperbaiki
-      const { data, error } = await supabase.functions.invoke('create_settlement_and_update_balances', {
-        body: settlementData, // Mengirim data langsung, tanpa bungkusan tambahan
+      // Cek apakah user terautentikasi
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Pengguna tidak terautentikasi');
+      }
+
+      // Ambil kategori income default untuk pencairan
+      const { data: defaultCategory, error: categoryError } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('nama_kategori', 'Pencairan Saldo Toko')
+        .eq('tipe_kategori', 'income')
+        .single();
+
+      let categoryId = defaultCategory?.id;
+
+      // Jika kategori tidak ada, buat kategori default
+      if (!categoryId) {
+        const { data: newCategory, error: createCategoryError } = await supabase
+          .from('categories')
+          .insert({
+            nama_kategori: 'Pencairan Saldo Toko',
+            tipe_kategori: 'income'
+          })
+          .select('id')
+          .single();
+
+        if (createCategoryError) {
+          console.error('Error creating category:', createCategoryError);
+          throw new Error('Gagal membuat kategori income');
+        }
+        categoryId = newCategory.id;
+      }
+
+      // Panggil database function melalui RPC
+      const { data, error } = await supabase.rpc('process_settlement', {
+        p_store_id: settlementData.store_id,
+        p_bank_id: settlementData.bank_id,
+        p_amount: settlementData.jumlah_dicairkan,
+        p_admin_fee: settlementData.biaya_admin || 0,
+        p_notes: settlementData.keterangan || '',
+        p_income_category_id: categoryId,
+        p_settlement_date: settlementData.tanggal,
+        p_user_id: user.id
       });
 
       if (error) {
-        const errorMessage = (error as any).context?.msg || error.message;
-        throw new Error(errorMessage);
+        console.error('RPC process_settlement error:', error);
+        throw new Error(error.message || 'Gagal memproses pencairan dana');
       }
 
       toast({

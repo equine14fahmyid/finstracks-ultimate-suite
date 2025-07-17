@@ -192,8 +192,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
-          nama_kategori: string
-          tipe_kategori: Database["public"]["Enums"]["category_type"]
+          nama_kategori?: string
+          tipe_kategori?: Database["public"]["Enums"]["category_type"]
           updated_at?: string | null
         }
         Update: {
@@ -528,6 +528,7 @@ export type Database = {
       }
       purchases: {
         Row: {
+          bank_id: string | null
           created_at: string | null
           created_by: string | null
           id: string
@@ -542,6 +543,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          bank_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -556,6 +558,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          bank_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -570,6 +573,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "purchases_bank_id_fkey"
+            columns: ["bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "purchases_supplier_id_fkey"
             columns: ["supplier_id"]
@@ -1107,6 +1117,98 @@ export type Database = {
     Functions: {
       check_low_stock: {
         Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      check_store_saldo: {
+        Args: { store_id_param: string }
+        Returns: {
+          store_name: string
+          current_saldo: number
+        }[]
+      }
+      create_sale_with_stock_check: {
+        Args: { sale_data: Json; sale_items: Json[] }
+        Returns: string
+      }
+      debug_settlement: {
+        Args: { p_store_id: string; p_bank_id: string; p_amount: number }
+        Returns: Json
+      }
+      get_inventory_value_on_date: {
+        Args: { p_report_date: string }
+        Returns: number
+      }
+      manual_saldo_update: {
+        Args: { store_id_param: string; amount_param: number }
+        Returns: boolean
+      }
+      process_settlement: {
+        Args: {
+          p_store_id: string
+          p_bank_id: string
+          p_amount: number
+          p_admin_fee: number
+          p_notes: string
+          p_income_category_id: string
+          p_settlement_date: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      process_settlement_debug: {
+        Args: {
+          p_store_id: string
+          p_bank_id: string
+          p_amount: number
+          p_admin_fee?: number
+          p_notes?: string
+          p_income_category_id?: string
+          p_settlement_date?: string
+          p_user_id?: string
+        }
+        Returns: Json
+      }
+      process_settlement_test: {
+        Args: {
+          p_store_id: string
+          p_bank_id: string
+          p_amount: number
+          p_admin_fee?: number
+          p_notes?: string
+          p_income_category_id?: string
+          p_settlement_date?: string
+          p_user_id?: string
+        }
+        Returns: Json
+      }
+      process_settlement_v2: {
+        Args: {
+          p_store_id: string
+          p_bank_id: string
+          p_amount: number
+          p_admin_fee?: number
+          p_notes?: string
+          p_income_category_id?: string
+          p_settlement_date?: string
+          p_user_id?: string
+        }
+        Returns: Json
+      }
+      update_sale_status_only: {
+        Args: { sale_id: string; new_status: string }
+        Returns: undefined
+      }
+      update_sale_with_stock_check: {
+        Args: {
+          sale_id: string
+          sale_data: Json
+          sale_items: Json[]
+          existing_items: Json[]
+        }
+        Returns: undefined
+      }
+      update_store_saldo: {
+        Args: { store_id: string; amount: number }
         Returns: undefined
       }
       validate_sale_with_adjustments: {
