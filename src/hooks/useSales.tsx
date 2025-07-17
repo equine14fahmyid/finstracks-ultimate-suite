@@ -49,7 +49,6 @@ export const useSales = () => {
     }
   };
 
-  // PERBAIKAN: Update status dengan error handling yang lebih baik
   const updateSaleStatus = async (saleId: string, newStatus: string) => {
     try {
       const { data, error } = await supabase
@@ -61,7 +60,6 @@ export const useSales = () => {
 
       if (error) throw error;
 
-      // Refresh data setelah update
       await fetchSales();
       
       return { success: true, data };
@@ -77,7 +75,6 @@ export const useSales = () => {
   const createSale = async (saleData: any, items: any[]) => {
     setLoading(true);
     try {
-      // Calculate subtotal and total
       const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.harga_satuan), 0);
       const total = subtotal + (saleData.ongkir || 0) - (saleData.diskon || 0);
 
@@ -87,7 +84,6 @@ export const useSales = () => {
         total
       };
 
-      // Insert sale first
       const { data: saleResult, error: saleError } = await supabase
         .from('sales')
         .insert([completeData])
@@ -96,7 +92,6 @@ export const useSales = () => {
 
       if (saleError) throw saleError;
 
-      // Insert sale items
       const saleItems = items.map(item => ({
         sale_id: saleResult.id,
         product_variant_id: item.product_variant_id,
@@ -110,9 +105,7 @@ export const useSales = () => {
 
       if (itemsError) throw itemsError;
 
-      // Update stock and create movements
       for (const item of items) {
-        // Get current stock first
         const { data: currentStock, error: stockFetchError } = await supabase
           .from('product_variants')
           .select('stok')
@@ -124,10 +117,8 @@ export const useSales = () => {
           continue;
         }
 
-        // Calculate new stock
         const newStock = (currentStock.stok || 0) - item.quantity;
 
-        // Update stock
         const { error: stockError } = await supabase
           .from('product_variants')
           .update({ stok: newStock })
@@ -137,7 +128,6 @@ export const useSales = () => {
           console.error('Stock update error:', stockError);
         }
 
-        // Create stock movement
         const { error: movementError } = await supabase
           .from('stock_movements')
           .insert([{
@@ -177,7 +167,6 @@ export const useSales = () => {
   const updateSale = async (saleId: string, saleData: any, items: any[], existingItems?: any[]) => {
     setLoading(true);
     try {
-      // Calculate subtotal and total
       const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.harga_satuan), 0);
       const total = subtotal + (saleData.ongkir || 0) - (saleData.diskon || 0);
 
@@ -187,7 +176,6 @@ export const useSales = () => {
         total
       };
 
-      // Update sale
       const { error: saleError } = await supabase
         .from('sales')
         .update(completeData)
@@ -195,7 +183,6 @@ export const useSales = () => {
 
       if (saleError) throw saleError;
 
-      // Delete existing sale items
       const { error: deleteError } = await supabase
         .from('sale_items')
         .delete()
@@ -203,10 +190,8 @@ export const useSales = () => {
 
       if (deleteError) throw deleteError;
 
-      // Revert existing stock if provided
       if (existingItems && existingItems.length > 0) {
         for (const item of existingItems) {
-          // Get current stock
           const { data: currentStock, error: stockFetchError } = await supabase
             .from('product_variants')
             .select('stok')
@@ -218,7 +203,6 @@ export const useSales = () => {
             continue;
           }
 
-          // Add back stock
           const newStock = (currentStock.stok || 0) + item.quantity;
           
           const { error: revertError } = await supabase
@@ -232,7 +216,6 @@ export const useSales = () => {
         }
       }
 
-      // Delete existing stock movements
       const { error: deleteMoveError } = await supabase
         .from('stock_movements')
         .delete()
@@ -243,7 +226,6 @@ export const useSales = () => {
         console.error('Delete movement error:', deleteMoveError);
       }
 
-      // Insert new sale items
       const newSaleItems = items.map(item => ({
         sale_id: saleId,
         product_variant_id: item.product_variant_id,
@@ -257,9 +239,7 @@ export const useSales = () => {
 
       if (newItemsError) throw newItemsError;
 
-      // Update stock and create new movements
       for (const item of items) {
-        // Get current stock
         const { data: currentStock, error: stockFetchError } = await supabase
           .from('product_variants')
           .select('stok')
@@ -271,10 +251,8 @@ export const useSales = () => {
           continue;
         }
 
-        // Calculate new stock
         const newStock = (currentStock.stok || 0) - item.quantity;
 
-        // Update stock
         const { error: stockError } = await supabase
           .from('product_variants')
           .update({ stok: newStock })
@@ -284,7 +262,6 @@ export const useSales = () => {
           console.error('Stock update error:', stockError);
         }
 
-        // Create stock movement
         const { error: movementError } = await supabase
           .from('stock_movements')
           .insert([{
@@ -324,7 +301,6 @@ export const useSales = () => {
   const deleteSale = async (saleId: string) => {
     setLoading(true);
     try {
-      // Get sale data first to revert stock
       const { data: saleData, error: fetchError } = await supabase
         .from('sales')
         .select(`
@@ -339,10 +315,8 @@ export const useSales = () => {
 
       if (fetchError) throw fetchError;
 
-      // Revert stock movements
       if (saleData?.sale_items) {
         for (const item of saleData.sale_items) {
-          // Get current stock
           const { data: currentStock, error: stockFetchError } = await supabase
             .from('product_variants')
             .select('stok')
@@ -354,7 +328,6 @@ export const useSales = () => {
             continue;
           }
 
-          // Add back stock
           const newStock = (currentStock.stok || 0) + item.quantity;
           
           const { error: stockError } = await supabase
@@ -368,20 +341,17 @@ export const useSales = () => {
         }
       }
 
-      // Delete stock movements
       await supabase
         .from('stock_movements')
         .delete()
         .eq('reference_id', saleId)
         .eq('reference_type', 'sale');
 
-      // Delete sale items
       await supabase
         .from('sale_items')
         .delete()
         .eq('sale_id', saleId);
 
-      // Delete sale
       const { error } = await supabase
         .from('sales')
         .delete()
