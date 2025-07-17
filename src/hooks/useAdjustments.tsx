@@ -11,6 +11,7 @@ export interface PendingSale {
   store_id: string;
   store: {
     nama_toko: string;
+    saldo_dashboard?: number; // Tambahkan properti ini
     platform: {
       nama_platform: string;
     } | null;
@@ -40,6 +41,7 @@ export const useAdjustments = () => {
         store_id,
         store:stores(
           nama_toko,
+          saldo_dashboard,
           platform:platforms(nama_platform)
         )
       `)
@@ -101,23 +103,26 @@ export const useAdjustments = () => {
 
   const validateSale = async (saleId: string) => {
     const saleToValidate = pendingSales.find(s => s.id === saleId);
-    if (!saleToValidate) {
-      toast({ title: "Error", description: "Penjualan tidak ditemukan", variant: "destructive" });
+    if (!saleToValidate || !saleToValidate.store) {
+      toast({ title: "Error", description: "Penjualan atau data toko tidak ditemukan", variant: "destructive" });
       return;
     }
     
-    // Memanggil fungsi SQL untuk menambah saldo toko
+    // Menambah saldo toko secara langsung
+    const currentSaldo = saleToValidate.store.saldo_dashboard || 0;
+    const newSaldo = currentSaldo + saleToValidate.total;
+    
     const { error: storeUpdateError } = await supabase
         .from('stores')
-        .update({ saldo_dashboard: (saleToValidate.store?.saldo_dashboard || 0) + saleToValidate.total })
+        .update({ saldo_dashboard: newSaldo })
         .eq('id', saleToValidate.store_id);
-
 
     if (storeUpdateError) {
       toast({ title: "Error", description: `Gagal update saldo toko: ${storeUpdateError.message}`, variant: "destructive" });
       return;
     }
 
+    // Menandai penjualan sebagai sudah divalidasi
     const { error: saleUpdateError } = await supabase
       .from('sales')
       .update({ validated_at: new Date().toISOString() })
@@ -125,6 +130,8 @@ export const useAdjustments = () => {
 
     if (saleUpdateError) {
       toast({ title: "Error", description: `Gagal validasi penjualan: ${saleUpdateError.message}`, variant: "destructive" });
+      // Pertimbangkan untuk mengembalikan saldo jika langkah ini gagal
+      await supabase.from('stores').update({ saldo_dashboard: currentSaldo }).eq('id', saleToValidate.store_id);
       return;
     }
 
