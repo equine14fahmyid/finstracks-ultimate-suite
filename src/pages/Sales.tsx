@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Plus, ShoppingCart, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSales, useStock, useExpeditions, useStores } from '@/hooks/useSupabase';
+import type { SaleStatus } from '@/hooks/useSales'; // <-- Tipe diimpor dari file aslinya
 import { DataTable } from '@/components/common/DataTable';
 import { formatCurrency, formatShortDate } from '@/utils/format';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -68,9 +69,11 @@ const Sales = () => {
     fetchStores();
   }, []);
 
+  // --- FUNGSI YANG DIPERBAIKI ---
   const handleStatusUpdate = async (saleId: string, newStatus: string, currentSale: any) => {
     try {
-      const result = await updateSaleStatus(saleId, newStatus);
+      // Melakukan 'casting' tipe dan menunggu hasil dari fungsi update
+      const result = await updateSaleStatus(saleId, newStatus as SaleStatus);
       
       if (result.success) {
         toast({
@@ -80,7 +83,8 @@ const Sales = () => {
         
         await handleSaldoUpdate(currentSale, newStatus);
       } else {
-        throw new Error(result.message || 'Failed to update status');
+        // Melemparkan error jika gagal, sesuai pesan dari hook
+        throw new Error(result.message || 'Gagal mengubah status');
       }
     } catch (error) {
       console.error('Error in handleStatusUpdate:', error);
