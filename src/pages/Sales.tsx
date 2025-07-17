@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Plus, ShoppingCart, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSales, useStock, useExpeditions, useStores } from '@/hooks/useSupabase';
-import type { SaleStatus } from '@/hooks/useSales';
+import type { SaleStatus } from '@/hooks/useSales'; // <-- Tipe diimpor dari file aslinya
 import { DataTable } from '@/components/common/DataTable';
 import { formatCurrency, formatShortDate } from '@/utils/format';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -16,8 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-// --- PERBAIKAN 1: IMPORT KOMPONEN BARU ---
-import { CurrencyInput } from '@/components/ui/CurrencyInput';
 
 interface SaleFormData {
   tanggal: string;
@@ -71,11 +69,10 @@ const Sales = () => {
     fetchStores();
   }, []);
 
-  // Fungsi-fungsi lain (handleStatusUpdate, handleSubmit, dll.) tetap sama...
-  // ... (kode dari handleStatusUpdate sampai calculateTotal tidak diubah)
-
+  // --- FUNGSI YANG DIPERBAIKI ---
   const handleStatusUpdate = async (saleId: string, newStatus: string, currentSale: any) => {
     try {
+      // Melakukan 'casting' tipe dan menunggu hasil dari fungsi update
       const result = await updateSaleStatus(saleId, newStatus as SaleStatus);
       
       if (result.success) {
@@ -86,6 +83,7 @@ const Sales = () => {
         
         await handleSaldoUpdate(currentSale, newStatus);
       } else {
+        // Melemparkan error jika gagal, sesuai pesan dari hook
         throw new Error(result.message || 'Gagal mengubah status');
       }
     } catch (error) {
@@ -566,11 +564,12 @@ const Sales = () => {
                           />
                         </div>
                         <div>
-                          {/* --- PERBAIKAN 2: GANTI INPUT HARGA SATUAN --- */}
                           <Label>Harga Satuan</Label>
-                          <CurrencyInput
+                          <Input
+                            type="number"
                             value={item.harga_satuan}
-                            onValueChange={(value) => updateItem(index, 'harga_satuan', value)}
+                            onChange={(e) => updateItem(index, 'harga_satuan', Number(e.target.value))}
+                            min="0"
                           />
                         </div>
                         <div className="flex items-end">
@@ -599,19 +598,23 @@ const Sales = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    {/* --- PERBAIKAN 3: GANTI INPUT ONGKIR --- */}
                     <Label htmlFor="ongkir">Ongkos Kirim</Label>
-                    <CurrencyInput
+                    <Input
+                      id="ongkir"
+                      type="number"
                       value={formData.ongkir}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, ongkir: value }))}
+                      onChange={(e) => setFormData(prev => ({ ...prev, ongkir: Number(e.target.value) }))}
+                      min="0"
                     />
                   </div>
                   <div>
-                    {/* --- PERBAIKAN 4: GANTI INPUT DISKON --- */}
                     <Label htmlFor="diskon">Diskon</Label>
-                    <CurrencyInput
+                    <Input
+                      id="diskon"
+                      type="number"
                       value={formData.diskon}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, diskon: value }))}
+                      onChange={(e) => setFormData(prev => ({ ...prev, diskon: Number(e.target.value) }))}
+                      min="0"
                     />
                   </div>
                   <div>
