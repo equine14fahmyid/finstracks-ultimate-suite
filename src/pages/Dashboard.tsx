@@ -1,12 +1,10 @@
-
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Download, Eye, Plus, ShoppingCart, CreditCard, FileText, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import DateFilter from '@/components/dashboard/DateFilter';
 import SummaryCards from '@/components/dashboard/SummaryCards';
@@ -17,41 +15,29 @@ import { formatDate } from '@/utils/format';
 import { useRealtimeDashboard, useInteractiveAnalytics } from '@/hooks/useRealtimeAnalytics';
 import { useTopProducts, usePlatformPerformance } from '@/hooks/useSupabase';
 import { exportToPDF } from '@/utils/pdfExport';
-import { exportToCSV, formatDataForCSV } from '@/utils/csvExport';
+import { exportToCSV } from '@/utils/csvExport';
 
+// Interface untuk rentang tanggal
 interface DateRange {
   from: Date | undefined;
   to: Date | undefined;
-}
-
-interface DashboardData {
-  total_penjualan: number;
-  total_pengeluaran: number;
-  laba_bersih: number;
-  saldo_kas_bank: number;
-}
-
-interface SalesData {
-  date: string;
-  total: number;
-  transaction_count: number;
 }
 
 const Dashboard = () => {
   const { profile, hasPermission } = useAuth();
   const navigate = useNavigate();
   const [dateRange, setDateRange] = useState<DateRange>({
-    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // First day of current month
-    to: new Date() // Today
+    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // Hari pertama bulan ini
+    to: new Date() // Hari ini
   });
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  // Use the enhanced analytics hooks
+  // Menggunakan hooks analitik yang telah ditingkatkan
   const startDate = dateRange.from?.toISOString().split('T')[0] || '';
   const endDate = dateRange.to?.toISOString().split('T')[0] || '';
   
-  // Real-time dashboard data
+  // Data dashboard real-time
   const { 
     data: dashboardData, 
     salesChart: salesData, 
@@ -60,7 +46,7 @@ const Dashboard = () => {
     refresh: refreshDashboard
   } = useRealtimeDashboard(startDate, endDate);
 
-  // Top products and platform data
+  // Data produk terlaris dan platform
   const { 
     data: topProductsData, 
     loading: topProductsLoading 
@@ -71,7 +57,7 @@ const Dashboard = () => {
     loading: platformLoading 
   } = usePlatformPerformance(startDate, endDate);
 
-  // Interactive analytics for drill-down
+  // Analitik interaktif untuk drill-down
   const {
     selectedProduct,
     selectedPlatform,
@@ -82,10 +68,10 @@ const Dashboard = () => {
     clearDrillDown,
   } = useInteractiveAnalytics(startDate, endDate);
 
-  // Set loading based on analytics loading
+  // Mengatur loading berdasarkan loading analitik
   const loading = analyticsLoading;
 
-  // Manual refresh
+  // Fungsi refresh manual
   const handleRefresh = async () => {
     setRefreshing(true);
     await refreshDashboard();
@@ -96,7 +82,7 @@ const Dashboard = () => {
     });
   };
 
-  // Export functionality
+  // Fungsionalitas ekspor
   const handleExportPDF = async () => {
     try {
       setExporting(true);
@@ -114,7 +100,7 @@ const Dashboard = () => {
       });
       toast({
         title: "Berhasil",
-        description: "Dashboard berhasil diexport ke PDF",
+        description: "Dashboard berhasil diekspor ke PDF",
       });
     } catch (error: any) {
       toast({
@@ -131,7 +117,7 @@ const Dashboard = () => {
     try {
       setExporting(true);
       
-      // Prepare dashboard summary data for CSV
+      // Menyiapkan data ringkasan dashboard untuk CSV
       const summaryData = [{
         'Periode': `${formatDate(dateRange.from || new Date())} - ${formatDate(dateRange.to || new Date())}`,
         'Total Penjualan': dashboardData?.total_penjualan || 0,
@@ -149,7 +135,7 @@ const Dashboard = () => {
 
       toast({
         title: "Berhasil",
-        description: "Data dashboard berhasil diexport ke CSV",
+        description: "Data dashboard berhasil diekspor ke CSV",
       });
     } catch (error: any) {
       toast({
@@ -162,7 +148,7 @@ const Dashboard = () => {
     }
   };
 
-  // Check permissions
+  // Pengecekan hak akses
   if (!hasPermission('dashboard.view')) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -179,7 +165,7 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6 p-6" id="dashboard-content">
-      {/* Header Section */}
+      {/* Bagian Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold gradient-text">Dashboard</h1>
@@ -227,14 +213,14 @@ const Dashboard = () => {
                 className="gradient-primary"
               >
                 <Download className="h-4 w-4 mr-2" />
-                {exporting ? 'Exporting...' : 'PDF'}
+                {exporting ? 'Mengekspor...' : 'PDF'}
               </Button>
             </>
           )}
         </div>
       </div>
 
-      {/* Date Filter */}
+      {/* Filter Tanggal */}
       <Card className="glass-card border-0">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -253,17 +239,17 @@ const Dashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Summary Cards */}
+      {/* Kartu Ringkasan */}
       <SummaryCards data={dashboardData} loading={loading} />
 
-      {/* Charts Section */}
+      {/* Bagian Grafik */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Sales Trend Chart */}
+        {/* Grafik Tren Penjualan */}
         <div className="lg:col-span-2">
           <SalesChart data={salesData} loading={loading} />
         </div>
 
-        {/* Interactive Charts with Drill-down - Simplified for now */}
+        {/* Grafik Interaktif dengan Drill-down */}
         <InteractiveTopProductsChart 
           data={topProductsData} 
           loading={topProductsLoading}
@@ -285,7 +271,7 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Quick Actions */}
+      {/* Aksi Cepat */}
       <Card className="glass-card border-0">
         <CardHeader>
           <CardTitle className="text-lg">Aksi Cepat</CardTitle>
