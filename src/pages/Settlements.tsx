@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,7 @@ import { formatCurrency } from '@/utils/format';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { useSettlements, type SettlementData } from '@/hooks/useSettlements';
+import { toast } from '@/hooks/use-toast';
 
 const Settlements = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
