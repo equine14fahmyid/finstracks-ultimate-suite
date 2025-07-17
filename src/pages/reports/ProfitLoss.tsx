@@ -1,16 +1,14 @@
-
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Download } from 'lucide-react';
+import { CalendarIcon, Download, AlertTriangle, FileSearch } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/utils/format';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { calculateProfitLoss, ProfitLossCalculation } from '@/utils/financialCalculations';
 
@@ -18,21 +16,31 @@ const ProfitLoss = () => {
   const [startDate, setStartDate] = useState<Date>(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [endDate, setEndDate] = useState<Date>(new Date());
 
-  const { data: profitLossData, isLoading } = useQuery({
+  // --- PERBAIKAN 1: Mengambil state 'isError' dan 'error' dari useQuery ---
+  const { data: profitLossData, isLoading, isError, error } = useQuery({
     queryKey: ['profit-loss', startDate, endDate],
     queryFn: async (): Promise<ProfitLossCalculation> => {
       try {
-        return await calculateProfitLoss(startDate, endDate);
-      } catch (error) {
+        // Menambahkan log untuk debugging
+        console.log(`[ProfitLoss] Menghitung Laba Rugi untuk periode: ${startDate.toISOString()} - ${endDate.toISOString()}`);
+        const result = await calculateProfitLoss(startDate, endDate);
+        console.log('[ProfitLoss] Hasil kalkulasi:', result);
+        return result;
+      } catch (err) {
+        // Menambahkan log error yang lebih detail
+        console.error('[ProfitLoss] Gagal menjalankan calculateProfitLoss:', err);
         toast({
-          title: "Error",
-          description: "Gagal memuat data laporan laba rugi",
+          title: "Error Kalkulasi",
+          description: (err as Error).message || "Terjadi kesalahan pada fungsi kalkulasi.",
           variant: "destructive"
         });
-        throw error;
+        throw err;
       }
     }
   });
+
+  // --- PERBAIKAN 2: Cek apakah ada data transaksi yang valid ---
+  const hasTransactions = profitLossData && (profitLossData.revenue.total_penjualan > 0 || profitLossData.expenses.total_expenses > 0);
 
   const exportToPDF = () => {
     toast({
@@ -52,7 +60,7 @@ const ProfitLoss = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={exportToPDF} variant="outline">
+          <Button onClick={exportToPDF} variant="outline" disabled={!hasTransactions}>
             <Download className="h-4 w-4 mr-2" />
             Export PDF
           </Button>
@@ -108,14 +116,39 @@ const ProfitLoss = () => {
         </CardContent>
       </Card>
 
-      {/* Profit Loss Report */}
-      {isLoading ? (
+      {/* --- PERBAIKAN 3: Menampilkan state Loading, Error, dan Data Kosong --- */}
+      {isLoading && (
         <Card>
           <CardContent className="p-8 text-center">
             <p>Memuat data laporan...</p>
           </CardContent>
         </Card>
-      ) : (
+      )}
+
+      {isError && (
+        <Card className="bg-destructive/10 border-destructive">
+          <CardHeader className="flex flex-row items-center gap-3 space-y-0">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <CardTitle className="text-destructive">Gagal Memuat Laporan</CardTitle>
+          </CardHeader>
+          <CardContent className="text-destructive">
+            <p>Terjadi kesalahan saat mengambil data. Silakan coba lagi.</p>
+            <p className="text-xs mt-2">Detail: {(error as Error).message}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && !isError && !hasTransactions && (
+         <Card>
+          <CardContent className="p-8 text-center">
+            <FileSearch className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold">Tidak Ada Data</h3>
+            <p className="text-muted-foreground">Tidak ditemukan data penjualan atau pengeluaran pada periode yang dipilih.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && !isError && hasTransactions && (
         <div className="grid gap-6">
           {/* Revenue Section */}
           <Card>
