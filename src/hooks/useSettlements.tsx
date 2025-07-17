@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 // ID Kategori "Pencairan Saldo Toko" yang sudah kita buat sebelumnya
-const INCOME_CATEGORY_ID_FOR_SETTLEMENT = 'b97f2666-6c1d-4d5a-a3ed-90b65ddbf1fb';
+const INCOME_CATEGORY_ID_FOR_SETTLEMENT = '47877c5f-fa72-4ed4-9354-f56d52b8880e';
 
 export const useSettlements = () => {
   const [settlements, setSettlements] = useState<any[]>([]);
