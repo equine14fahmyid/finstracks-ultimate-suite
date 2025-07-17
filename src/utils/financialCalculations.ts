@@ -3,7 +3,6 @@ import { format } from 'date-fns';
 
 // --- INTERFACE & TIPE DATA ---
 
-// Interface untuk hasil kalkulasi Laba Rugi
 export interface ProfitLossCalculation {
   revenue: {
     total_penjualan: number;
@@ -21,53 +20,34 @@ export interface ProfitLossCalculation {
   net_profit: number;
 }
 
-// Interface untuk pengaturan perusahaan yang akan kita ambil
 interface CompanySettings {
     modal_awal: number;
-    // Tambahkan pengaturan lain jika dibutuhkan di masa depan
 }
-
 
 // --- FUNGSI UTAMA UNTUK MENGHITUNG LABA RUGI ---
 
-/**
- * Menghitung Laporan Laba Rugi berdasarkan rentang tanggal.
- * @param startDate - Tanggal mulai periode
- * @param endDate - Tanggal akhir periode
- * @returns Object ProfitLossCalculation yang berisi semua detail laba rugi.
- */
 export const calculateProfitLoss = async (startDate: Date, endDate: Date): Promise<ProfitLossCalculation> => {
   const startDateStr = format(startDate, 'yyyy-MM-dd');
   const endDateStr = format(endDate, 'yyyy-MM-dd');
 
-  // --- 1. MENGAMBIL DATA PENGATURAN PERUSAHAAN (MODAL, DLL) ---
-  // Ini adalah bagian yang diperbaiki. Tidak ada lagi hardcode.
   const companySettings = await getCompanySettings();
 
-  // --- 2. MENGAMBIL DATA TRANSAKSIONAL ---
+  // --- PERBAIKAN PADA QUERY PENGELUARAN ---
+  // Kita akan mengambil semua kolom dari expense_categories untuk penanganan error yang lebih baik
   const [salesData, expensesData, purchasesData] = await Promise.all([
-    // Ambil data penjualan
     supabase
       .from('sales')
-      .select(`
-        total,
-        stores!inner(platforms!inner(nama_platform))
-      `)
+      .select(`total, stores!inner(platforms!inner(nama_platform))`)
       .gte('tanggal', startDateStr)
       .lte('tanggal', endDateStr)
       .eq('status', 'delivered'),
     
-    // Ambil data pengeluaran
     supabase
       .from('expenses')
-      .select(`
-        jumlah,
-        expense_categories(name)
-      `)
+      .select(`jumlah, expense_categories(*)`) // Mengambil semua kolom dari kategori
       .gte('tanggal', startDateStr)
       .lte('tanggal', endDateStr),
 
-    // Ambil data pembelian (untuk HPP, jika menggunakan metode sederhana)
     supabase
         .from('purchases')
         .select('total')
@@ -80,9 +60,9 @@ export const calculateProfitLoss = async (startDate: Date, endDate: Date): Promi
   if (expensesData.error) throw new Error('Gagal mengambil data pengeluaran: ' + expensesData.error.message);
   if (purchasesData.error) throw new Error('Gagal mengambil data pembelian: ' + purchasesData.error.message);
 
-  // --- 3. KALKULASI ---
+  // --- KALKULASI ---
 
-  // a. Pendapatan (Revenue)
+  // a. Pendapatan
   const total_penjualan = salesData.data?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
   const penjualanByPlatformMap = new Map<string, number>();
   salesData.data?.forEach(sale => {
@@ -92,20 +72,22 @@ export const calculateProfitLoss = async (startDate: Date, endDate: Date): Promi
   });
   const penjualan_by_platform = Array.from(penjualanByPlatformMap, ([platform, amount]) => ({ platform, amount }));
 
-  // b. Harga Pokok Penjualan (COGS)
-  // NOTE: Ini adalah metode HPP sederhana berdasarkan total pembelian.
-  // Untuk HPP yang lebih akurat, diperlukan perhitungan stok awal dan akhir.
+  // b. HPP
   const total_hpp = purchasesData.data?.reduce((sum, p) => sum + p.total, 0) || 0;
 
   // c. Laba Kotor
   const gross_profit = total_penjualan - total_hpp;
   const gross_margin = total_penjualan > 0 ? (gross_profit / total_penjualan) * 100 : 0;
 
-  // d. Biaya Operasional (Expenses)
+  // d. Biaya Operasional
   const total_expenses = expensesData.data?.reduce((sum, exp) => sum + (exp.jumlah || 0), 0) || 0;
   const expensesByCategoryMap = new Map<string, number>();
   expensesData.data?.forEach(exp => {
-    const categoryName = exp.expense_categories?.name || 'Lainnya';
+    // --- PENANGANAN ERROR YANG LEBIH AMAN ---
+    // Cek apakah expense_categories ada dan memiliki properti 'name'
+    const categoryName = (exp.expense_categories && 'name' in exp.expense_categories && exp.expense_categories.name)
+      ? exp.expense_categories.name
+      : 'Lain-lain';
     const currentAmount = expensesByCategoryMap.get(categoryName) || 0;
     expensesByCategoryMap.set(categoryName, currentAmount + (exp.jumlah || 0));
   });
@@ -114,7 +96,6 @@ export const calculateProfitLoss = async (startDate: Date, endDate: Date): Promi
   // e. Laba Bersih
   const net_profit = gross_profit - total_expenses;
 
-  // --- 4. MENGEMBALIKAN HASIL ---
   return {
     revenue: { total_penjualan, penjualan_by_platform },
     cogs: { total_hpp },
@@ -125,30 +106,19 @@ export const calculateProfitLoss = async (startDate: Date, endDate: Date): Promi
   };
 };
 
-
-// --- FUNGSI HELPER UNTUK MENGAMBIL PENGATURAN PERUSAHAAN ---
-
-/**
- * Mengambil pengaturan penting perusahaan dari tabel 'user_settings'.
- * Fungsi ini memastikan tidak ada nilai hardcoded.
- * @returns Object CompanySettings yang berisi modal awal.
- */
+// --- FUNGSI HELPER (TIDAK BERUBAH) ---
 export const getCompanySettings = async (): Promise<CompanySettings> => {
-    // Mengambil data dari user_settings. Diasumsikan hanya ada satu baris per user/perusahaan.
     const { data, error } = await supabase
         .from('user_settings')
         .select('modal_awal')
         .limit(1)
         .single();
 
-    if (error && error.code !== 'PGRST116') { // Abaikan jika tidak ada baris, tapi catat error lain
+    if (error && error.code !== 'PGRST116') {
         console.error("Error fetching company settings:", error);
-        // Jika gagal, kembalikan nilai default yang aman untuk mencegah aplikasi crash.
         return { modal_awal: 0 };
     }
 
-    // Jika tidak ada data (misal user baru), kembalikan nilai default.
-    // Jika ada data, gunakan nilai dari database.
     return {
         modal_awal: data?.modal_awal || 0
     };
