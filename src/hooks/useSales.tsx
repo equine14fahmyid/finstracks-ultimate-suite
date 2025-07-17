@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
+// Definisikan tipe spesifik untuk status penjualan
+export type SaleStatus = "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "returned";
+
 export const useSales = () => {
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,7 +52,8 @@ export const useSales = () => {
     }
   };
 
-  const updateSaleStatus = async (saleId: string, newStatus: string) => {
+  // Gunakan tipe SaleStatus yang sudah dibuat
+  const updateSaleStatus = async (saleId: string, newStatus: SaleStatus) => {
     try {
       const { data, error } = await supabase
         .from('sales')
@@ -75,8 +79,8 @@ export const useSales = () => {
   const createSale = async (saleData: any, items: any[]) => {
     setLoading(true);
     try {
-      const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.harga_satuan), 0);
-      const total = subtotal + (saleData.ongkir || 0) - (saleData.diskon || 0);
+      const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.harga_satuan)), 0);
+      const total = subtotal + (Number(saleData.ongkir) || 0) - (Number(saleData.diskon) || 0);
 
       const completeData = {
         ...saleData,
@@ -92,11 +96,13 @@ export const useSales = () => {
 
       if (saleError) throw saleError;
 
+      // Tambahkan properti 'subtotal' untuk setiap item
       const saleItems = items.map(item => ({
         sale_id: saleResult.id,
         product_variant_id: item.product_variant_id,
-        quantity: item.quantity,
-        harga_satuan: item.harga_satuan
+        quantity: Number(item.quantity),
+        harga_satuan: Number(item.harga_satuan),
+        subtotal: Number(item.quantity) * Number(item.harga_satuan) // Hitung subtotal per item
       }));
 
       const { error: itemsError } = await supabase
@@ -117,7 +123,7 @@ export const useSales = () => {
           continue;
         }
 
-        const newStock = (currentStock.stok || 0) - item.quantity;
+        const newStock = (currentStock.stok || 0) - Number(item.quantity);
 
         const { error: stockError } = await supabase
           .from('product_variants')
@@ -133,7 +139,7 @@ export const useSales = () => {
           .insert([{
             product_variant_id: item.product_variant_id,
             movement_type: 'out',
-            quantity: item.quantity,
+            quantity: Number(item.quantity),
             reference_type: 'sale',
             reference_id: saleResult.id,
             notes: `Penjualan: ${saleData.no_pesanan_platform}`
@@ -167,8 +173,8 @@ export const useSales = () => {
   const updateSale = async (saleId: string, saleData: any, items: any[], existingItems?: any[]) => {
     setLoading(true);
     try {
-      const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.harga_satuan), 0);
-      const total = subtotal + (saleData.ongkir || 0) - (saleData.diskon || 0);
+      const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.harga_satuan)), 0);
+      const total = subtotal + (Number(saleData.ongkir) || 0) - (Number(saleData.diskon) || 0);
 
       const completeData = {
         ...saleData,
@@ -203,7 +209,7 @@ export const useSales = () => {
             continue;
           }
 
-          const newStock = (currentStock.stok || 0) + item.quantity;
+          const newStock = (currentStock.stok || 0) + Number(item.quantity);
           
           const { error: revertError } = await supabase
             .from('product_variants')
@@ -226,11 +232,13 @@ export const useSales = () => {
         console.error('Delete movement error:', deleteMoveError);
       }
 
+      // Tambahkan properti 'subtotal' untuk setiap item baru
       const newSaleItems = items.map(item => ({
         sale_id: saleId,
         product_variant_id: item.product_variant_id,
-        quantity: item.quantity,
-        harga_satuan: item.harga_satuan
+        quantity: Number(item.quantity),
+        harga_satuan: Number(item.harga_satuan),
+        subtotal: Number(item.quantity) * Number(item.harga_satuan) // Hitung subtotal per item
       }));
 
       const { error: newItemsError } = await supabase
@@ -251,7 +259,7 @@ export const useSales = () => {
           continue;
         }
 
-        const newStock = (currentStock.stok || 0) - item.quantity;
+        const newStock = (currentStock.stok || 0) - Number(item.quantity);
 
         const { error: stockError } = await supabase
           .from('product_variants')
@@ -267,7 +275,7 @@ export const useSales = () => {
           .insert([{
             product_variant_id: item.product_variant_id,
             movement_type: 'out',
-            quantity: item.quantity,
+            quantity: Number(item.quantity),
             reference_type: 'sale',
             reference_id: saleId,
             notes: `Update penjualan: ${saleData.no_pesanan_platform}`
@@ -328,7 +336,7 @@ export const useSales = () => {
             continue;
           }
 
-          const newStock = (currentStock.stok || 0) + item.quantity;
+          const newStock = (currentStock.stok || 0) + Number(item.quantity);
           
           const { error: stockError } = await supabase
             .from('product_variants')
