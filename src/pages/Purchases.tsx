@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, ShoppingBag, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { usePurchases, useStock, useSuppliers } from '@/hooks/useSupabase';
+import { usePurchases, useStock, useSuppliers, useBanks } from '@/hooks/useSupabase';
 import { DataTable } from '@/components/common/DataTable';
 import { formatCurrency, formatShortDate } from '@/utils/format';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -20,6 +20,7 @@ interface PurchaseFormData {
   no_invoice_supplier: string;
   payment_method: 'cash' | 'transfer' | 'credit';
   payment_status: string;
+  bank_id: string;
   notes: string;
   items: {
     product_variant_id: string;
@@ -35,6 +36,7 @@ const Purchases = () => {
   const { purchases, loading, fetchPurchases, createPurchase, updatePurchase, deletePurchase } = usePurchases();
   const { stock: stockProducts, fetchStock } = useStock();
   const { suppliers, fetchSuppliers } = useSuppliers();
+  const { banks, fetchBanks } = useBanks();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<any>(null);
   const [formData, setFormData] = useState<PurchaseFormData>({
@@ -43,6 +45,7 @@ const Purchases = () => {
     no_invoice_supplier: '',
     payment_method: 'cash',
     payment_status: 'pending',
+    bank_id: '',
     notes: '',
     items: [{ product_variant_id: '', quantity: 1, harga_beli_satuan: 0 }]
   });
@@ -51,6 +54,7 @@ const Purchases = () => {
     fetchPurchases();
     fetchStock();
     fetchSuppliers();
+    fetchBanks();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,7 +69,31 @@ const Purchases = () => {
       return;
     }
 
-    // Validate items
+    // Validasi bank untuk payment yang bukan credit
+    if (formData.payment_method !== 'credit' && !formData.bank_id) {
+      toast({
+        title: "Error",
+        description: "Bank account wajib dipilih untuk metode pembayaran ini",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validasi saldo bank jika payment status = paid
+    if (formData.payment_status === 'paid' && formData.payment_method !== 'credit') {
+      const selectedBank = banks?.find(b => b.id === formData.bank_id);
+      const totalAmount = calculateSubtotal();
+      
+      if (selectedBank && (selectedBank.saldo_akhir || 0) < totalAmount) {
+        toast({
+          title: "Saldo Tidak Mencukupi",
+          description: `Saldo bank: ${formatCurrency(selectedBank.saldo_akhir || 0)}, Total: ${formatCurrency(totalAmount)}`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     const validItems = formData.items.filter(item => 
       item.product_variant_id && item.quantity > 0 && item.harga_beli_satuan > 0
     );
@@ -79,13 +107,13 @@ const Purchases = () => {
       return;
     }
 
-    // Clean purchase data - remove items field and any other non-schema fields
     const purchaseData = {
       tanggal: formData.tanggal,
       supplier_id: formData.supplier_id,
       no_invoice_supplier: formData.no_invoice_supplier || null,
       payment_method: formData.payment_method,
       payment_status: formData.payment_status,
+      bank_id: formData.bank_id || null,
       notes: formData.notes || null,
     };
 
@@ -110,6 +138,7 @@ const Purchases = () => {
       no_invoice_supplier: purchase.no_invoice_supplier || '',
       payment_method: purchase.payment_method,
       payment_status: purchase.payment_status,
+      bank_id: purchase.bank_id || '',
       notes: purchase.notes || '',
       items: purchase.purchase_items && purchase.purchase_items.length > 0 
         ? purchase.purchase_items.map((item: any) => ({
@@ -136,6 +165,7 @@ const Purchases = () => {
       no_invoice_supplier: '',
       payment_method: 'cash',
       payment_status: 'pending',
+      bank_id: '',
       notes: '',
       items: [{ product_variant_id: '', quantity: 1, harga_beli_satuan: 0 }]
     });
@@ -162,7 +192,6 @@ const Purchases = () => {
         if (i === index) {
           const updatedItem = { ...item, [field]: value };
           
-          // Auto-fill info when product is selected
           if (field === 'product_variant_id' && value) {
             const product = stockProducts?.find(p => p?.id === value);
             if (product) {
@@ -198,6 +227,16 @@ const Purchases = () => {
         <div>
           <div className="font-medium">{purchase?.supplier?.nama_supplier || '-'}</div>
           <div className="text-sm text-muted-foreground">{purchase?.no_invoice_supplier || 'Tanpa invoice'}</div>
+        </div>
+      )
+    },
+    {
+      key: 'bank',
+      title: 'Bank',
+      render: (value: any, purchase: any) => (
+        <div>
+          <div className="font-medium">{purchase?.bank?.nama_bank || '-'}</div>
+          <div className="text-sm text-muted-foreground">{purchase?.bank?.nama_pemilik || '-'}</div>
         </div>
       )
     },
@@ -349,7 +388,7 @@ const Purchases = () => {
                     <Label htmlFor="payment_method">Metode Pembayaran</Label>
                     <Select 
                       value={formData.payment_method} 
-                      onValueChange={(value: any) => setFormData(prev => ({ ...prev, payment_method: value }))}
+                      onValueChange={(value: any) => setFormData(prev => ({ ...prev, payment_method: value, bank_id: value === 'credit' ? '' : prev.bank_id }))}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -361,6 +400,30 @@ const Purchases = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                  
+                  {/* Bank Selection - Only show if not credit */}
+                  {formData.payment_method !== 'credit' && (
+                    <div>
+                      <Label htmlFor="bank_id">Bank Account *</Label>
+                      <Select 
+                        value={formData.bank_id} 
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, bank_id: value }))}
+                        required
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih bank" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {banks?.filter(bank => bank.is_active).map((bank) => (
+                            <SelectItem key={bank.id} value={bank.id}>
+                              {bank.nama_bank} - {bank.nama_pemilik} (Saldo: {formatCurrency(bank.saldo_akhir || 0)})
+                            </SelectItem>
+                          )) || <SelectItem value="" disabled>Tidak ada bank tersedia</SelectItem>}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  
                   <div>
                     <Label htmlFor="payment_status">Status Pembayaran</Label>
                     <Select 
@@ -387,6 +450,49 @@ const Purchases = () => {
                     />
                   </div>
                 </div>
+
+                {/* Bank Balance Warning */}
+                {formData.payment_method !== 'credit' && formData.bank_id && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <h4 className="text-sm font-medium text-blue-800 mb-2">Informasi Bank</h4>
+                    {(() => {
+                      const bank = banks?.find(b => b.id === formData.bank_id);
+                      const total = calculateSubtotal();
+                      const remaining = (bank?.saldo_akhir || 0) - total;
+                      
+                      return (
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <span>Bank:</span>
+                            <span className="font-medium">{bank?.nama_bank} - {bank?.nama_pemilik}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Saldo Saat Ini:</span>
+                            <span className="font-medium">{formatCurrency(bank?.saldo_akhir || 0)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Total Pembelian:</span>
+                            <span className="font-medium">{formatCurrency(total)}</span>
+                          </div>
+                          <hr className="border-blue-200" />
+                          <div className="flex justify-between">
+                            <span>Sisa Saldo:</span>
+                            <span className={`font-bold ${remaining < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              {formatCurrency(remaining)}
+                            </span>
+                          </div>
+                          {remaining < 0 && (
+                            <div className="bg-red-100 border border-red-200 rounded p-2 mt-2">
+                              <span className="text-red-700 text-xs font-medium">
+                                ⚠️ Peringatan: Saldo bank tidak mencukupi untuk transaksi ini!
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
 
                 {/* Product Items */}
                 <div>
