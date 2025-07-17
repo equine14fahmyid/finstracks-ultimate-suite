@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -8,47 +7,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/common/DataTable';
 import { formatCurrency } from '@/utils/format';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-
-// ... (interfaces Settlement, Store, Bank tetap sama) ...
-interface Settlement {
-  id: string;
-  tanggal: string;
-  store_id: string;
-  jumlah_dicairkan: number;
-  bank_id: string;
-  biaya_admin: number;
-  keterangan: string;
-  created_at: string;
-  stores: {
-    nama_toko: string;
-  };
-  banks: {
-    nama_bank: string;
-  };
-}
-
-interface Store {
-  id: string;
-  nama_toko: string;
-  saldo_dashboard: number;
-}
-
-interface Bank {
-  id: string;
-  nama_bank: string;
-}
-
+import { useSettlements, type SettlementData } from '@/hooks/useSettlements';
 
 const Settlements = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<SettlementData>({
     tanggal: new Date().toISOString().split('T')[0],
     store_id: '',
     jumlah_dicairkan: 0,
@@ -57,115 +24,92 @@ const Settlements = () => {
     keterangan: ''
   });
 
-  const queryClient = useQueryClient();
-
-  // Fetching data (tetap sama)
-  const { data: settlements = [], isLoading } = useQuery({
-    queryKey: ['settlements'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('settlements')
-        .select(`*, stores!inner(nama_toko), banks!inner(nama_bank)`)
-        .order('tanggal', { ascending: false });
-      if (error) throw error;
-      return data as Settlement[];
-    }
-  });
-
-  const { data: stores = [] } = useQuery({
-    queryKey: ['stores'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('stores').select('id, nama_toko, saldo_dashboard').eq('is_active', true);
-      if (error) throw error;
-      return data as Store[];
-    }
-  });
-
-  const { data: banks = [] } = useQuery({
-    queryKey: ['banks'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('banks').select('id, nama_bank').eq('is_active', true);
-      if (error) throw error;
-      return data as Bank[];
-    }
-  });
-
-  // --- MUTATION YANG DIPERBARUI ---
-  const createSettlementMutation = useMutation({
-    mutationFn: async (settlementData: typeof formData) => {
-      const selectedStore = stores.find(s => s.id === settlementData.store_id);
-      if (selectedStore && settlementData.jumlah_dicairkan > selectedStore.saldo_dashboard) {
-        throw new Error("Jumlah pencairan melebihi saldo toko yang tersedia.");
-      }
-
-      // Memanggil Edge Function
-      const { data, error } = await supabase.functions.invoke('create_settlement_and_update_balances', {
-        body: { settlementData },
-      });
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settlements'] });
-      queryClient.invalidateQueries({ queryKey: ['stores'] });
-      queryClient.invalidateQueries({ queryKey: ['banks'] });
-      queryClient.invalidateQueries({ queryKey: ['incomes'] });
-      toast({ title: "Berhasil", description: "Pencairan dana berhasil diproses. Saldo toko dan bank telah diperbarui." });
-      setIsAddDialogOpen(false);
-      resetForm();
-    },
-    onError: (error) => {
-      toast({ title: "Error", description: `Gagal memproses pencairan: ${(error as Error).message}`, variant: "destructive" });
-    }
-  });
+  const {
+    settlements,
+    stores,
+    banks,
+    loading,
+    createSettlement,
+  } = useSettlements();
 
   const resetForm = () => {
     setFormData({
-        tanggal: new Date().toISOString().split('T')[0],
-        store_id: '',
-        jumlah_dicairkan: 0,
-        bank_id: '',
-        biaya_admin: 0,
-        keterangan: ''
+      tanggal: new Date().toISOString().split('T')[0],
+      store_id: '',
+      jumlah_dicairkan: 0,
+      bank_id: '',
+      biaya_admin: 0,
+      keterangan: ''
     });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await createSettlementMutation.mutateAsync(formData);
+    
+    // Validasi form
+    if (!formData.store_id || !formData.bank_id || !formData.jumlah_dicairkan || !formData.tanggal) {
+      return;
+    }
+
+    try {
+      const result = await createSettlement(formData);
+      
+      if (result.error) {
+        console.error('Settlement creation failed:', result.error);
+        return;
+      }
+
+      // Success - tutup dialog dan reset form
+      setIsAddDialogOpen(false);
+      resetForm();
+    } catch (error) {
+      console.error('Submit error:', error);
+    }
+  };
+
+  const handleInputChange = (field: keyof SettlementData, value: string | number) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const columns = [
     {
       key: 'tanggal',
       title: 'Tanggal',
-      render: (value: any, record: Settlement) => format(new Date(record.tanggal), 'dd MMM yyyy', { locale: id })
+      render: (value: any, record: any) => {
+        try {
+          return format(new Date(record.tanggal), 'dd MMM yyyy', { locale: id });
+        } catch {
+          return record.tanggal;
+        }
+      }
     },
     {
       key: 'store_info',
       title: 'Dari Toko',
-      render: (value: any, record: Settlement) => record.stores?.nama_toko || 'N/A'
+      render: (value: any, record: any) => record.stores?.nama_toko || 'N/A'
     },
     {
       key: 'jumlah_dicairkan',
       title: 'Jumlah Dicairkan',
-      render: (value: any, record: Settlement) => formatCurrency(record.jumlah_dicairkan)
+      render: (value: any, record: any) => formatCurrency(record.jumlah_dicairkan)
     },
     {
       key: 'bank_info',
       title: 'Ke Bank',
-      render: (value: any, record: Settlement) => record.banks?.nama_bank || 'N/A'
+      render: (value: any, record: any) => record.banks?.nama_bank || 'N/A'
     },
     {
       key: 'biaya_admin',
       title: 'Biaya Admin',
-      render: (value: any, record: Settlement) => formatCurrency(record.biaya_admin || 0)
+      render: (value: any, record: any) => formatCurrency(record.biaya_admin || 0)
     },
     {
       key: 'keterangan',
       title: 'Keterangan',
-      render: (value: any, record: Settlement) => record.keterangan || '-'
+      render: (value: any, record: any) => record.keterangan || '-'
     },
   ];
 
@@ -187,12 +131,24 @@ const Settlements = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="tanggal">Tanggal</Label>
-                <Input id="tanggal" type="date" value={formData.tanggal} onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })} required />
+                <Input 
+                  id="tanggal" 
+                  type="date" 
+                  value={formData.tanggal} 
+                  onChange={(e) => handleInputChange('tanggal', e.target.value)}
+                  required 
+                />
               </div>
+              
               <div>
                 <Label htmlFor="store_id">Toko</Label>
-                <Select value={formData.store_id} onValueChange={(value) => setFormData({ ...formData, store_id: value })}>
-                  <SelectTrigger><SelectValue placeholder="Pilih toko" /></SelectTrigger>
+                <Select 
+                  value={formData.store_id} 
+                  onValueChange={(value) => handleInputChange('store_id', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih toko" />
+                  </SelectTrigger>
                   <SelectContent>
                     {stores.map((store) => (
                       <SelectItem key={store.id} value={store.id}>
@@ -202,41 +158,94 @@ const Settlements = () => {
                   </SelectContent>
                 </Select>
               </div>
+              
               <div>
                 <Label htmlFor="jumlah_dicairkan">Jumlah Dicairkan</Label>
-                <Input id="jumlah_dicairkan" type="number" value={formData.jumlah_dicairkan} onChange={(e) => setFormData({ ...formData, jumlah_dicairkan: parseInt(e.target.value) || 0 })} placeholder="0" required />
+                <Input 
+                  id="jumlah_dicairkan" 
+                  type="number" 
+                  value={formData.jumlah_dicairkan} 
+                  onChange={(e) => handleInputChange('jumlah_dicairkan', parseInt(e.target.value) || 0)}
+                  placeholder="0" 
+                  min="0"
+                  required 
+                />
               </div>
+              
               <div>
                 <Label htmlFor="bank_id">Bank Tujuan</Label>
-                <Select value={formData.bank_id} onValueChange={(value) => setFormData({ ...formData, bank_id: value })}>
-                  <SelectTrigger><SelectValue placeholder="Pilih bank" /></SelectTrigger>
+                <Select 
+                  value={formData.bank_id} 
+                  onValueChange={(value) => handleInputChange('bank_id', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih bank" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {banks.map((bank) => (<SelectItem key={bank.id} value={bank.id}>{bank.nama_bank}</SelectItem>))}
+                    {banks.map((bank) => (
+                      <SelectItem key={bank.id} value={bank.id}>
+                        {bank.nama_bank}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+              
               <div>
                 <Label htmlFor="biaya_admin">Biaya Admin</Label>
-                <Input id="biaya_admin" type="number" value={formData.biaya_admin} onChange={(e) => setFormData({ ...formData, biaya_admin: parseInt(e.target.value) || 0 })} placeholder="0" />
+                <Input 
+                  id="biaya_admin" 
+                  type="number" 
+                  value={formData.biaya_admin} 
+                  onChange={(e) => handleInputChange('biaya_admin', parseInt(e.target.value) || 0)}
+                  placeholder="0" 
+                  min="0"
+                />
               </div>
+              
               <div>
                 <Label htmlFor="keterangan">Keterangan</Label>
-                <Textarea id="keterangan" value={formData.keterangan} onChange={(e) => setFormData({ ...formData, keterangan: e.target.value })} placeholder="Keterangan pencairan (opsional)" rows={3} />
+                <Textarea 
+                  id="keterangan" 
+                  value={formData.keterangan} 
+                  onChange={(e) => handleInputChange('keterangan', e.target.value)}
+                  placeholder="Keterangan pencairan (opsional)" 
+                  rows={3} 
+                />
               </div>
+              
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>Batal</Button>
-                <Button type="submit" disabled={createSettlementMutation.isPending}>
-                  {createSettlementMutation.isPending ? 'Memproses...' : 'Simpan & Proses'}
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsAddDialogOpen(false)}
+                >
+                  Batal
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={loading}
+                >
+                  {loading ? 'Memproses...' : 'Simpan & Proses'}
                 </Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
+
       <Card>
-        <CardHeader><CardTitle>Riwayat Pencairan Dana</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Riwayat Pencairan Dana</CardTitle>
+        </CardHeader>
         <CardContent>
-          <DataTable data={settlements} columns={columns} loading={isLoading} searchable={true} searchPlaceholder="Cari toko..." />
+          <DataTable 
+            data={settlements} 
+            columns={columns} 
+            loading={loading} 
+            searchable={true} 
+            searchPlaceholder="Cari toko..." 
+          />
         </CardContent>
       </Card>
     </div>
