@@ -1,11 +1,4 @@
-<DataTable
-  columns={columns}
-  data={incomes}
-  loading={loading}
-  searchable={true}
-  searchPlaceholder="Cari pemasukan..."
-  debug={true}  // Tambah ini untuk debugging
-/>
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
