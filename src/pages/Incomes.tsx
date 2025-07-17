@@ -342,7 +342,6 @@ const Incomes = () => {
             loading={loading}
             searchable={true}
             searchPlaceholder="Cari pemasukan..."
-            debug={true}  
           />
         </CardContent>
       </Card>
