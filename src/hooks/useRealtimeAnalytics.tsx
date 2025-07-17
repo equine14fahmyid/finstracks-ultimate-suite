@@ -236,3 +236,27 @@ export const useInteractiveAnalytics = (startDate: string, endDate: string) => {
     clearDrillDown
   };
 };
+// Di dalam fetchDashboardData function, setelah fetch sales dan expenses:
+
+// Fetch real incomes data
+const { data: incomesData, error: incomesError } = await supabase
+  .from('incomes')
+  .select('jumlah, tanggal')
+  .gte('tanggal', startDate)
+  .lte('tanggal', endDate);
+
+if (incomesError) throw incomesError;
+
+// Update calculation:
+const totalPenjualan = salesData?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
+const totalPemasukan = incomesData?.reduce((sum, income) => sum + (income.jumlah || 0), 0) || 0;
+const totalPengeluaran = expensesData?.reduce((sum, expense) => sum + (expense.jumlah || 0), 0) || 0;
+const totalTransaksi = totalPenjualan + totalPemasukan;
+const labaBersih = totalTransaksi - totalPengeluaran;
+
+setData({
+  total_penjualan: totalTransaksi,
+  total_pengeluaran: totalPengeluaran,
+  laba_bersih: labaBersih,
+  saldo_kas_bank: saldoKasBank
+});
