@@ -58,8 +58,44 @@ export const useUserSettings = () => {
       if (error && error.code !== 'PGRST116') {
         throw error;
       }
-
-      setSettings(data);
+      
+      // --- PERBAIKAN ERROR TIPE DATA ---
+      // Jika ada data, petakan secara manual untuk memastikan tipe datanya 100% cocok
+      if (data) {
+        setSettings({
+          id: data.id,
+          modal_awal: data.modal_awal,
+          company_name: data.company_name,
+          company_address: data.company_address,
+          company_phone: data.company_phone,
+          company_email: data.company_email,
+          company_website: data.company_website,
+          tax_number: data.tax_number,
+          logo_url: data.logo_url,
+          // Lakukan type casting untuk properti dengan tipe spesifik
+          theme: (data.theme as 'light' | 'dark' | 'auto') || 'auto',
+          language: (data.language as 'id' | 'en') || 'id',
+          timezone: data.timezone || 'Asia/Jakarta',
+          date_format: data.date_format || 'dd/MM/yyyy',
+          currency: data.currency || 'IDR',
+          // Gunakan nullish coalescing (??) untuk nilai boolean sebagai fallback
+          email_notifications: data.email_notifications ?? true,
+          push_notifications: data.push_notifications ?? true,
+          sms_notifications: data.sms_notifications ?? false,
+          low_stock_alerts: data.low_stock_alerts ?? true,
+          payment_reminders: data.payment_reminders ?? true,
+          daily_reports: data.daily_reports ?? false,
+          weekly_reports: data.weekly_reports ?? true,
+          monthly_reports: data.monthly_reports ?? true,
+          two_factor_auth: data.two_factor_auth ?? false,
+          session_timeout: data.session_timeout,
+          password_expiry: data.password_expiry,
+          login_attempts: data.login_attempts,
+        });
+      } else {
+        // Jika tidak ada data (user baru), set state menjadi null
+        setSettings(null);
+      }
 
     } catch (error) {
       console.error('Error fetching user settings:', error);
@@ -69,7 +105,6 @@ export const useUserSettings = () => {
     }
   }, [user]);
 
-  // --- KODE YANG DIPERBAIKI ADA DI SINI ---
   // Fungsi ini sekarang bisa menangani UPDATE (jika data sudah ada) dan INSERT (jika data belum ada)
   const updateSettings = async (newSettings: Partial<UserSettings>) => {
     // 1. Validasi user tetap dibutuhkan
