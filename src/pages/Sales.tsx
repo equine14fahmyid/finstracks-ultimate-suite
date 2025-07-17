@@ -68,7 +68,6 @@ const Sales = () => {
     fetchStores();
   }, []);
 
-  // PERBAIKAN: Quick status update dengan proper error handling
   const handleStatusUpdate = async (saleId: string, newStatus: string, currentSale: any) => {
     try {
       const result = await updateSaleStatus(saleId, newStatus);
@@ -79,7 +78,6 @@ const Sales = () => {
           description: `Status pesanan berhasil diubah ke ${getStatusLabel(newStatus)}`,
         });
         
-        // Update saldo toko manual
         await handleSaldoUpdate(currentSale, newStatus);
       } else {
         throw new Error(result.message || 'Failed to update status');
@@ -94,22 +92,18 @@ const Sales = () => {
     }
   };
 
-  // PERBAIKAN: Manual saldo update
   const handleSaldoUpdate = async (currentSale: any, newStatus: string) => {
     try {
       let saldoChange = 0;
       
-      // Jika status berubah ke delivered dan sebelumnya bukan delivered
       if (newStatus === 'delivered' && currentSale.status !== 'delivered') {
         saldoChange = currentSale.total;
       }
-      // Jika status berubah dari delivered ke status lain
       else if (currentSale.status === 'delivered' && newStatus !== 'delivered') {
         saldoChange = -currentSale.total;
       }
 
       if (saldoChange !== 0) {
-        // Get current saldo first
         const { data: currentStore, error: fetchError } = await supabase
           .from('stores')
           .select('saldo_dashboard')
@@ -121,10 +115,8 @@ const Sales = () => {
           return;
         }
 
-        // Calculate new saldo
         const newSaldo = (currentStore.saldo_dashboard || 0) + saldoChange;
 
-        // Update saldo
         const { error } = await supabase
           .from('stores')
           .update({ saldo_dashboard: newSaldo })
@@ -165,7 +157,6 @@ const Sales = () => {
       return;
     }
 
-    // Validate items
     const validItems = formData.items.filter(item => 
       item.product_variant_id && item.quantity > 0 && item.harga_satuan > 0
     );
@@ -195,7 +186,6 @@ const Sales = () => {
 
     let result;
     if (editingSale) {
-      // PERBAIKAN: Saat edit, kirim data existing items untuk mencegah duplikasi stock movement
       result = await updateSale(editingSale.id, saleData, validItems, editingSale.sale_items);
     } else {
       result = await createSale(saleData, validItems);
@@ -210,9 +200,8 @@ const Sales = () => {
   const handleEdit = (sale: any) => {
     setEditingSale(sale);
     
-    // PERBAIKAN: Pertahankan data produk yang sudah ada dengan struktur lengkap
     const existingItems = sale.sale_items?.map((item: any) => ({
-      id: item.id, // Simpan ID untuk tracking
+      id: item.id,
       product_variant_id: item.product_variant_id,
       quantity: item.quantity,
       harga_satuan: item.harga_satuan,
@@ -280,7 +269,6 @@ const Sales = () => {
         if (i === index) {
           const updatedItem = { ...item, [field]: value };
           
-          // Auto-fill price when product is selected HANYA jika belum ada data
           if (field === 'product_variant_id' && value && !item.product_name) {
             const product = stockProducts?.find(p => p?.id === value);
             if (product?.products) {
@@ -305,20 +293,6 @@ const Sales = () => {
 
   const calculateTotal = () => {
     return calculateSubtotal() + formData.ongkir - formData.diskon;
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, any> = {
-      pending: { variant: "secondary", label: "Pending" },
-      processing: { variant: "default", label: "Diproses" },
-      shipped: { variant: "outline", label: "Dikirim" },
-      delivered: { variant: "default", label: "Selesai" },
-      cancelled: { variant: "destructive", label: "Dibatal" },
-      returned: { variant: "destructive", label: "Retur" }
-    };
-    
-    const config = variants[status] || variants.pending;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
   const columns = [
@@ -386,7 +360,6 @@ const Sales = () => {
       title: 'Status',
       render: (value: any, sale: any) => (
         <div className="space-y-2">
-          {/* FITUR BARU: Quick Status Update Dropdown */}
           <Select 
             value={sale?.status || 'pending'} 
             onValueChange={(newStatus) => handleStatusUpdate(sale.id, newStatus, sale)}
@@ -454,7 +427,6 @@ const Sales = () => {
 
   return (
     <div className="space-y-6 p-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold gradient-text">Manajemen Penjualan</h1>
@@ -476,7 +448,6 @@ const Sales = () => {
                 <DialogTitle>{editingSale ? 'Edit Penjualan' : 'Tambah Penjualan Baru'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Basic Info */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="tanggal">Tanggal *</Label>
@@ -547,7 +518,6 @@ const Sales = () => {
                   </div>
                 </div>
 
-                {/* Product Items */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <Label>Detail Produk *</Label>
@@ -622,7 +592,6 @@ const Sales = () => {
                   </div>
                 </div>
 
-                {/* Pricing & Status */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="ongkir">Ongkos Kirim</Label>
@@ -664,7 +633,6 @@ const Sales = () => {
                   </div>
                 </div>
 
-                {/* Total Summary */}
                 <div className="bg-muted p-4 rounded-lg">
                   <div className="space-y-2">
                     <div className="flex justify-between">
@@ -700,7 +668,6 @@ const Sales = () => {
         )}
       </div>
 
-      {/* Sales Table */}
       <Card className="glass-card border-0">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
