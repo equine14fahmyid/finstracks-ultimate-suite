@@ -108,7 +108,6 @@ export const useRealtimeDashboard = (startDate: string, endDate: string) => {
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      // Set empty data if error occurs
       setData({
         total_penjualan: 0,
         total_pengeluaran: 0,
@@ -125,7 +124,6 @@ export const useRealtimeDashboard = (startDate: string, endDate: string) => {
   useEffect(() => {
     fetchDashboardData();
 
-    // Create comprehensive real-time channel
     const channel = supabase
       .channel('financial-dashboard-updates')
       .on(
