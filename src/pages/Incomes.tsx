@@ -102,51 +102,71 @@ const Incomes = () => {
     }
   };
 
+  // Fixed columns dengan parameter yang benar
   const columns = [
     {
       key: 'tanggal',
       title: 'Tanggal',
-      render: (income: any) => formatShortDate(income.tanggal)
+      render: (value: any, income: any) => {
+        console.log('Rendering tanggal:', { value, income }); // Debug log
+        return formatShortDate(income?.tanggal);
+      }
     },
     {
       key: 'category',
       title: 'Kategori',
-      render: (income: any) => (
-        <span className="font-medium">{income?.category?.nama_kategori || 'Tidak dikategorikan'}</span>
-      )
+      render: (value: any, income: any) => {
+        console.log('Rendering category:', { value, income }); // Debug log
+        return (
+          <span className="font-medium">
+            {income?.category?.nama_kategori || 'Tidak dikategorikan'}
+          </span>
+        );
+      }
     },
     {
       key: 'jumlah',
       title: 'Jumlah',
-      render: (income: any) => (
-        <span className="font-medium text-green-600">+{formatCurrency(income.jumlah)}</span>
-      )
+      render: (value: any, income: any) => {
+        console.log('Rendering jumlah:', { value, income }); // Debug log
+        return (
+          <span className="font-medium text-green-600">
+            +{formatCurrency(income?.jumlah || 0)}
+          </span>
+        );
+      }
     },
     {
       key: 'bank',
       title: 'Ke Bank',
-      render: (income: any) => (
-        <span>{income?.bank?.nama_bank || 'Kas'}</span>
-      )
+      render: (value: any, income: any) => {
+        console.log('Rendering bank:', { value, income }); // Debug log
+        return (
+          <span>{income?.bank?.nama_bank || 'Kas'}</span>
+        );
+      }
     },
     {
       key: 'keterangan',
       title: 'Keterangan',
-      render: (income: any) => (
-        <span className="text-sm text-muted-foreground">
-          {income.keterangan || '-'}
-        </span>
-      )
+      render: (value: any, income: any) => {
+        console.log('Rendering keterangan:', { value, income }); // Debug log
+        return (
+          <span className="text-sm text-muted-foreground">
+            {income?.keterangan || '-'}
+          </span>
+        );
+      }
     },
     {
       key: 'actions',
       title: 'Aksi',
-      render: (income: any) => (
+      render: (value: any, income: any) => (
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => handleEdit(income)}>
             Edit
           </Button>
-          <Button size="sm" variant="destructive" onClick={() => handleDelete(income.id)}>
+          <Button size="sm" variant="destructive" onClick={() => handleDelete(income?.id)}>
             Hapus
           </Button>
         </div>
