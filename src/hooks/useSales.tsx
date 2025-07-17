@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -8,22 +7,29 @@ export const useSales = () => {
   const [loading, setLoading] = useState(false);
 
   const fetchSales = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('sales')
         .select(`
           *,
-          store:stores (
-            *,
-            platform:platforms (*)
+          store:stores(
+            id,
+            nama_toko,
+            platform:platforms(nama_platform)
           ),
-          expedition:expeditions (*),
-          sale_items (
-            *,
-            product_variant:product_variants (
-              *,
-              product:products (*)
+          sale_items(
+            id,
+            quantity,
+            harga_satuan,
+            product_variant:product_variants(
+              id,
+              warna,
+              size,
+              product:products(
+                id,
+                nama_produk
+              )
             )
           )
         `)
@@ -31,11 +37,11 @@ export const useSales = () => {
 
       if (error) throw error;
       setSales(data || []);
-    } catch (error: any) {
-      console.error('Fetch sales error:', error);
+    } catch (error) {
+      console.error('Error fetching sales:', error);
       toast({
         title: "Error",
-        description: `Gagal memuat data penjualan: ${error.message}`,
+        description: "Gagal memuat data penjualan",
         variant: "destructive",
       });
     } finally {
@@ -44,105 +50,68 @@ export const useSales = () => {
   };
 
   const createSale = async (saleData: any, items: any[]) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      
       // Calculate subtotal and total
       const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.harga_satuan), 0);
       const total = subtotal + (saleData.ongkir || 0) - (saleData.diskon || 0);
 
-      // Create the sale first
-      const { data: sale, error: saleError } = await supabase
-        .from('sales')
-        .insert({
-          ...saleData,
-          subtotal,
-          total
-        })
-        .select()
-        .single();
+      const completeData = {
+        ...saleData,
+        subtotal,
+        total
+      };
 
-      if (saleError) throw saleError;
+      // PERBAIKAN: Gunakan function untuk mencegah duplikasi stock movement
+      const { data, error } = await supabase.rpc('create_sale_with_stock_check', {
+        sale_data: completeData,
+        sale_items: items
+      });
 
-      // Create sale items
-      const saleItems = items.map(item => ({
-        sale_id: sale.id,
-        product_variant_id: item.product_variant_id,
-        quantity: item.quantity,
-        harga_satuan: item.harga_satuan,
-        subtotal: item.quantity * item.harga_satuan
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('sale_items')
-        .insert(saleItems);
-
-      if (itemsError) throw itemsError;
+      if (error) throw error;
 
       toast({
         title: "Sukses",
-        description: "Penjualan berhasil dibuat",
+        description: "Penjualan berhasil ditambahkan",
       });
 
       await fetchSales();
-      return { data: sale, error: null };
-    } catch (error: any) {
-      console.error('Create sale error:', error);
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error creating sale:', error);
       toast({
         title: "Error",
-        description: `Gagal membuat penjualan: ${error.message}`,
+        description: "Gagal menambahkan penjualan: " + (error as Error).message,
         variant: "destructive",
       });
-      return { data: null, error };
+      return { error: true };
     } finally {
       setLoading(false);
     }
   };
 
-  const updateSale = async (id: string, saleData: any, items: any[]) => {
+  const updateSale = async (saleId: string, saleData: any, items: any[], existingItems?: any[]) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      
       // Calculate subtotal and total
       const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.harga_satuan), 0);
       const total = subtotal + (saleData.ongkir || 0) - (saleData.diskon || 0);
 
-      // Update the sale
-      const { data: sale, error: saleError } = await supabase
-        .from('sales')
-        .update({
-          ...saleData,
-          subtotal,
-          total
-        })
-        .eq('id', id)
-        .select()
-        .single();
+      const completeData = {
+        ...saleData,
+        subtotal,
+        total
+      };
 
-      if (saleError) throw saleError;
+      // PERBAIKAN: Gunakan function untuk update dengan pengecekan stock movement
+      const { error } = await supabase.rpc('update_sale_with_stock_check', {
+        sale_id: saleId,
+        sale_data: completeData,
+        sale_items: items,
+        existing_items: existingItems || []
+      });
 
-      // Delete existing sale items
-      const { error: deleteError } = await supabase
-        .from('sale_items')
-        .delete()
-        .eq('sale_id', id);
-
-      if (deleteError) throw deleteError;
-
-      // Create new sale items
-      const saleItems = items.map(item => ({
-        sale_id: id,
-        product_variant_id: item.product_variant_id,
-        quantity: item.quantity,
-        harga_satuan: item.harga_satuan,
-        subtotal: item.quantity * item.harga_satuan
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('sale_items')
-        .insert(saleItems);
-
-      if (itemsError) throw itemsError;
+      if (error) throw error;
 
       toast({
         title: "Sukses",
@@ -150,56 +119,100 @@ export const useSales = () => {
       });
 
       await fetchSales();
-      return { data: sale, error: null };
-    } catch (error: any) {
-      console.error('Update sale error:', error);
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating sale:', error);
       toast({
-        title: "Error",
-        description: `Gagal memperbarui penjualan: ${error.message}`,
+        title: "Error", 
+        description: "Gagal memperbarui penjualan: " + (error as Error).message,
         variant: "destructive",
       });
-      return { data: null, error };
+      return { error: true };
     } finally {
       setLoading(false);
     }
   };
 
-  const deleteSale = async (id: string) => {
+  // FITUR BARU: Update status saja tanpa mengubah item
+  const updateSaleStatus = async (saleId: string, newStatus: string) => {
+    setLoading(true);
     try {
-      setLoading(true);
+      const { error } = await supabase.rpc('update_sale_status_only', {
+        sale_id: saleId,
+        new_status: newStatus
+      });
 
-      // Check if sale has adjustments
-      const { data: adjustments, error: adjustmentError } = await supabase
-        .from('sales_adjustments')
-        .select('id')
-        .eq('sale_id', id);
+      if (error) throw error;
 
-      if (adjustmentError) throw adjustmentError;
+      await fetchSales();
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating sale status:', error);
+      toast({
+        title: "Error",
+        description: "Gagal mengubah status penjualan: " + (error as Error).message,
+        variant: "destructive",
+      });
+      return { error: true };
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      if (adjustments && adjustments.length > 0) {
-        toast({
-          title: "Error",
-          description: "Tidak dapat menghapus penjualan yang sudah memiliki penyesuaian",
-          variant: "destructive",
-        });
-        return { data: null, error: 'Has adjustments' };
+  const deleteSale = async (saleId: string) => {
+    setLoading(true);
+    try {
+      // Get sale data first to revert stock
+      const { data: saleData, error: fetchError } = await supabase
+        .from('sales')
+        .select(`
+          *,
+          sale_items(
+            product_variant_id,
+            quantity
+          )
+        `)
+        .eq('id', saleId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Revert stock movements
+      if (saleData?.sale_items) {
+        for (const item of saleData.sale_items) {
+          // Add back stock
+          await supabase
+            .from('product_variants')
+            .update({ 
+              stok: supabase.rpc('increment_stock', { 
+                variant_id: item.product_variant_id, 
+                amount: item.quantity 
+              })
+            })
+            .eq('id', item.product_variant_id);
+        }
       }
 
-      // Delete sale items first
-      const { error: deleteItemsError } = await supabase
+      // Delete stock movements
+      await supabase
+        .from('stock_movements')
+        .delete()
+        .eq('reference_id', saleId)
+        .eq('reference_type', 'sale');
+
+      // Delete sale items
+      await supabase
         .from('sale_items')
         .delete()
-        .eq('sale_id', id);
+        .eq('sale_id', saleId);
 
-      if (deleteItemsError) throw deleteItemsError;
-
-      // Delete the sale
-      const { error: deleteSaleError } = await supabase
+      // Delete sale
+      const { error } = await supabase
         .from('sales')
         .delete()
-        .eq('id', id);
+        .eq('id', saleId);
 
-      if (deleteSaleError) throw deleteSaleError;
+      if (error) throw error;
 
       toast({
         title: "Sukses",
@@ -207,15 +220,15 @@ export const useSales = () => {
       });
 
       await fetchSales();
-      return { data: true, error: null };
-    } catch (error: any) {
-      console.error('Delete sale error:', error);
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting sale:', error);
       toast({
         title: "Error",
-        description: `Gagal menghapus penjualan: ${error.message}`,
+        description: "Gagal menghapus penjualan: " + (error as Error).message,
         variant: "destructive",
       });
-      return { data: null, error };
+      return { error: true };
     } finally {
       setLoading(false);
     }
@@ -227,6 +240,7 @@ export const useSales = () => {
     fetchSales,
     createSale,
     updateSale,
-    deleteSale,
+    updateSaleStatus, // FITUR BARU
+    deleteSale
   };
 };
