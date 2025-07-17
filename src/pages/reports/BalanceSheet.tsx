@@ -199,7 +199,7 @@ const BalanceSheet = () => {
         const labaDitahan = totalSales - totalExpenses;
 
         // Modal awal from user settings or default
-        const modalAwal = userSettings?.company_name ? 50000000 : 50000000; // Could be configurable in user_settings
+        const modalAwal = userSettings?.modal_awal || 0; // Could be configurable in user_settings
         const totalEquity = modalAwal + labaDitahan;
 
         console.log('Balance Sheet Calculations:', {
