@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, ShoppingCart, Eye, Edit, Trash2, Calendar } from 'lucide-react';
+import { Plus, ShoppingCart, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSales, useStock, useExpeditions, useStores } from '@/hooks/useSupabase';
 import { DataTable } from '@/components/common/DataTable';
@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SaleFormData {
   tanggal: string;
@@ -28,7 +29,7 @@ interface SaleFormData {
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned';
   notes: string;
   items: {
-    id?: string; // Tambah ID untuk tracking existing items
+    id?: string;
     product_variant_id: string;
     quantity: number;
     harga_satuan: number;
@@ -66,6 +67,91 @@ const Sales = () => {
     fetchExpeditions();
     fetchStores();
   }, []);
+
+  // PERBAIKAN: Quick status update dengan proper error handling
+  const handleStatusUpdate = async (saleId: string, newStatus: string, currentSale: any) => {
+    try {
+      const result = await updateSaleStatus(saleId, newStatus);
+      
+      if (result.success) {
+        toast({
+          title: "Sukses",
+          description: `Status pesanan berhasil diubah ke ${getStatusLabel(newStatus)}`,
+        });
+        
+        // Update saldo toko manual
+        await handleSaldoUpdate(currentSale, newStatus);
+      } else {
+        throw new Error(result.message || 'Failed to update status');
+      }
+    } catch (error) {
+      console.error('Error in handleStatusUpdate:', error);
+      toast({
+        title: "Error",
+        description: `Gagal mengubah status pesanan: ${(error as any)?.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // PERBAIKAN: Manual saldo update
+  const handleSaldoUpdate = async (currentSale: any, newStatus: string) => {
+    try {
+      let saldoChange = 0;
+      
+      // Jika status berubah ke delivered dan sebelumnya bukan delivered
+      if (newStatus === 'delivered' && currentSale.status !== 'delivered') {
+        saldoChange = currentSale.total;
+      }
+      // Jika status berubah dari delivered ke status lain
+      else if (currentSale.status === 'delivered' && newStatus !== 'delivered') {
+        saldoChange = -currentSale.total;
+      }
+
+      if (saldoChange !== 0) {
+        // Get current saldo first
+        const { data: currentStore, error: fetchError } = await supabase
+          .from('stores')
+          .select('saldo_dashboard')
+          .eq('id', currentSale.store_id)
+          .single();
+
+        if (fetchError) {
+          console.error('Error fetching store:', fetchError);
+          return;
+        }
+
+        // Calculate new saldo
+        const newSaldo = (currentStore.saldo_dashboard || 0) + saldoChange;
+
+        // Update saldo
+        const { error } = await supabase
+          .from('stores')
+          .update({ saldo_dashboard: newSaldo })
+          .eq('id', currentSale.store_id);
+
+        if (error) {
+          console.error('Error updating store saldo:', error);
+        } else {
+          console.log('Store saldo updated:', { storeId: currentSale.store_id, change: saldoChange, newSaldo });
+        }
+      }
+    } catch (error) {
+      console.error('Error in handleSaldoUpdate:', error);
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      pending: "Pending",
+      processing: "Diproses", 
+      shipped: "Dikirim",
+      delivered: "Selesai",
+      cancelled: "Dibatal",
+      returned: "Retur"
+    };
+    return labels[status] || status;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,64 +241,6 @@ const Sales = () => {
     await deleteSale(id);
   };
 
-  // FITUR BARU: Quick status update
-  const handleStatusUpdate = async (saleId: string, newStatus: string, currentSale: any) => {
-    try {
-      const result = await updateSaleStatus(saleId, newStatus);
-      if (!result.error) {
-        toast({
-          title: "Sukses",
-          description: `Status pesanan berhasil diubah ke ${getStatusLabel(newStatus)}`,
-        });
-        
-        // PERBAIKAN: Update saldo toko jika status berubah ke delivered
-        if (newStatus === 'delivered' && currentSale.status !== 'delivered') {
-          await updateStoreSaldo(currentSale.store_id, currentSale.total, 'add');
-        }
-        // Jika status dari delivered ke status lain, kurangi saldo
-        else if (currentSale.status === 'delivered' && newStatus !== 'delivered') {
-          await updateStoreSaldo(currentSale.store_id, currentSale.total, 'subtract');
-        }
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Gagal mengubah status pesanan",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // FITUR BARU: Update saldo toko
-  const updateStoreSaldo = async (storeId: string, amount: number, operation: 'add' | 'subtract') => {
-    try {
-      // Call API untuk update saldo toko
-      const { data, error } = await supabase
-        .rpc('update_store_saldo', {
-          store_id: storeId,
-          amount: operation === 'add' ? amount : -amount
-        });
-      
-      if (error) {
-        console.error('Error updating store saldo:', error);
-      }
-    } catch (error) {
-      console.error('Error in updateStoreSaldo:', error);
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    const labels: Record<string, string> = {
-      pending: "Pending",
-      processing: "Diproses", 
-      shipped: "Dikirim",
-      delivered: "Selesai",
-      cancelled: "Dibatal",
-      returned: "Retur"
-    };
-    return labels[status] || status;
-  };
-
   const resetForm = () => {
     setEditingSale(null);
     setFormData({
@@ -252,8 +280,8 @@ const Sales = () => {
         if (i === index) {
           const updatedItem = { ...item, [field]: value };
           
-          // Auto-fill price when product is selected
-          if (field === 'product_variant_id' && value) {
+          // Auto-fill price when product is selected HANYA jika belum ada data
+          if (field === 'product_variant_id' && value && !item.product_name) {
             const product = stockProducts?.find(p => p?.id === value);
             if (product?.products) {
               updatedItem.harga_satuan = product.products.harga_jual_default || 0;
