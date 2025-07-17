@@ -30,11 +30,14 @@ export const calculateProfitLoss = async (startDate: Date, endDate: Date): Promi
   const startDateStr = format(startDate, 'yyyy-MM-dd');
   const endDateStr = format(endDate, 'yyyy-MM-dd');
 
-  const companySettings = await getCompanySettings();
-
-  // --- PERBAIKAN PADA QUERY PENGELUARAN ---
-  // Kita akan mengambil semua kolom dari expense_categories untuk penanganan error yang lebih baik
-  const [salesData, expensesData, purchasesData] = await Promise.all([
+  // --- PERBAIKAN: Mengambil data secara terpisah untuk menghindari error relasi ---
+  const [
+    salesData, 
+    expensesResponse,
+    purchasesData,
+    categoriesData // Query baru untuk mengambil kategori
+  ] = await Promise.all([
+    // 1. Ambil data penjualan (tidak berubah)
     supabase
       .from('sales')
       .select(`total, stores!inner(platforms!inner(nama_platform))`)
@@ -42,25 +45,40 @@ export const calculateProfitLoss = async (startDate: Date, endDate: Date): Promi
       .lte('tanggal', endDateStr)
       .eq('status', 'delivered'),
     
+    // 2. Ambil data pengeluaran (TANPA join)
     supabase
       .from('expenses')
-      .select(`jumlah, expense_categories(*)`) // Mengambil semua kolom dari kategori
+      .select(`jumlah, expense_category_id`) // Asumsi: nama kolom foreign key adalah 'expense_category_id'
       .gte('tanggal', startDateStr)
       .lte('tanggal', endDateStr),
 
+    // 3. Ambil data pembelian (tidak berubah)
     supabase
         .from('purchases')
         .select('total')
         .gte('tanggal', startDateStr)
         .lte('tanggal', endDateStr)
-        .in('payment_status', ['paid', 'partial'])
+        .in('payment_status', ['paid', 'partial']),
+    
+    // 4. Ambil SEMUA kategori pengeluaran
+    supabase
+        .from('expense_categories')
+        .select('id, name')
   ]);
 
+  // Penanganan error untuk setiap query
   if (salesData.error) throw new Error('Gagal mengambil data penjualan: ' + salesData.error.message);
-  if (expensesData.error) throw new Error('Gagal mengambil data pengeluaran: ' + expensesData.error.message);
+  if (expensesResponse.error) throw new Error('Gagal mengambil data pengeluaran: ' + expensesResponse.error.message);
   if (purchasesData.error) throw new Error('Gagal mengambil data pembelian: ' + purchasesData.error.message);
+  if (categoriesData.error) throw new Error('Gagal mengambil kategori pengeluaran: ' + categoriesData.error.message);
 
-  // --- KALKULASI ---
+  // Membuat "kamus" untuk kategori agar mudah dicari
+  const categoryMap = new Map<string, string>();
+  categoriesData.data?.forEach(cat => {
+    categoryMap.set(cat.id, cat.name);
+  });
+
+  // --- KALKULASI (Logika tidak berubah, hanya sumber data yang berbeda) ---
 
   // a. Pendapatan
   const total_penjualan = salesData.data?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
@@ -79,17 +97,11 @@ export const calculateProfitLoss = async (startDate: Date, endDate: Date): Promi
   const gross_profit = total_penjualan - total_hpp;
   const gross_margin = total_penjualan > 0 ? (gross_profit / total_penjualan) * 100 : 0;
 
-  // d. Biaya Operasional
-  const total_expenses = expensesData.data?.reduce((sum, exp) => sum + (exp.jumlah || 0), 0) || 0;
+  // d. Biaya Operasional (dengan lookup ke "kamus" kategori)
+  const total_expenses = expensesResponse.data?.reduce((sum, exp) => sum + (exp.jumlah || 0), 0) || 0;
   const expensesByCategoryMap = new Map<string, number>();
-  expensesData.data?.forEach(exp => {
-    // --- PERBAIKAN UNTUK MENGATASI ERROR TIPE DATA ---
-    const categoryObj = exp.expense_categories as any;
-    // Cek dengan aman apakah objek kategori ada dan properti 'name' adalah string
-    const categoryName = (categoryObj && typeof categoryObj.name === 'string')
-      ? categoryObj.name
-      : 'Lain-lain';
-      
+  expensesResponse.data?.forEach(exp => {
+    const categoryName = exp.expense_category_id ? categoryMap.get(exp.expense_category_id) || 'Lain-lain' : 'Lain-lain';
     const currentAmount = expensesByCategoryMap.get(categoryName) || 0;
     expensesByCategoryMap.set(categoryName, currentAmount + (exp.jumlah || 0));
   });
