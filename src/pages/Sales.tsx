@@ -28,6 +28,7 @@ interface SaleFormData {
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned';
   notes: string;
   items: {
+    id?: string; // Tambah ID untuk tracking existing items
     product_variant_id: string;
     quantity: number;
     harga_satuan: number;
@@ -38,13 +39,12 @@ interface SaleFormData {
 
 const Sales = () => {
   const { hasPermission } = useAuth();
-  const { sales, loading, fetchSales, createSale, updateSale, deleteSale } = useSales();
+  const { sales, loading, fetchSales, createSale, updateSale, deleteSale, updateSaleStatus } = useSales();
   const { stock: stockProducts, fetchStock } = useStock();
   const { expeditions, fetchExpeditions } = useExpeditions();
   const { stores, fetchStores } = useStores();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<any>(null);
-  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState<SaleFormData>({
     tanggal: new Date().toISOString().split('T')[0],
     no_pesanan_platform: '',
@@ -93,46 +93,6 @@ const Sales = () => {
       return;
     }
 
-    // Validate stock availability
-    const stockValidationErrors: string[] = [];
-    
-    for (const item of validItems) {
-      const product = stockProducts?.find(p => p.id === item.product_variant_id);
-      if (!product) {
-        stockValidationErrors.push(`Produk dengan ID ${item.product_variant_id} tidak ditemukan`);
-        continue;
-      }
-      
-      if ((product.stok || 0) < item.quantity) {
-        stockValidationErrors.push(
-          `${product.products?.nama_produk || 'Produk'} ${product.warna}-${product.size}: ` +
-          `Stok tersedia ${product.stok || 0}, diminta ${item.quantity}`
-        );
-      }
-    }
-    
-    if (stockValidationErrors.length > 0) {
-      toast({
-        title: "Validasi Stok Gagal",
-        description: stockValidationErrors.join('; '),
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Check for duplicate products
-    const productIds = validItems.map(item => item.product_variant_id);
-    const duplicates = productIds.filter((id, index) => productIds.indexOf(id) !== index);
-    
-    if (duplicates.length > 0) {
-      toast({
-        title: "Produk Duplikat",
-        description: "Tidak boleh memilih produk yang sama dalam satu transaksi",
-        variant: "destructive",
-      });
-      return;
-    }
-
     const saleData = {
       tanggal: formData.tanggal,
       no_pesanan_platform: formData.no_pesanan_platform,
@@ -149,7 +109,8 @@ const Sales = () => {
 
     let result;
     if (editingSale) {
-      result = await updateSale(editingSale.id, saleData, validItems);
+      // PERBAIKAN: Saat edit, kirim data existing items untuk mencegah duplikasi stock movement
+      result = await updateSale(editingSale.id, saleData, validItems, editingSale.sale_items);
     } else {
       result = await createSale(saleData, validItems);
     }
@@ -163,22 +124,16 @@ const Sales = () => {
   const handleEdit = (sale: any) => {
     setEditingSale(sale);
     
-    // Reset selected products set untuk edit mode
-    const editSelectedProducts = new Set<string>();
-    
-    const saleItems = sale.sale_items?.map((item: any) => {
-      editSelectedProducts.add(item.product_variant_id);
-      return {
-        product_variant_id: item.product_variant_id,
-        quantity: item.quantity,
-        harga_satuan: item.harga_satuan,
-        product_name: item.product_variant?.product?.nama_produk,
-        variant_display: `${item.product_variant?.warna} - ${item.product_variant?.size}`
-      };
-    }) || [{ product_variant_id: '', quantity: 1, harga_satuan: 0 }];
-    
-    setSelectedProducts(editSelectedProducts);
-    
+    // PERBAIKAN: Pertahankan data produk yang sudah ada dengan struktur lengkap
+    const existingItems = sale.sale_items?.map((item: any) => ({
+      id: item.id, // Simpan ID untuk tracking
+      product_variant_id: item.product_variant_id,
+      quantity: item.quantity,
+      harga_satuan: item.harga_satuan,
+      product_name: item.product_variant?.product?.nama_produk || 'Produk tidak dikenal',
+      variant_display: `${item.product_variant?.warna || 'N/A'} - ${item.product_variant?.size || 'N/A'}`
+    })) || [{ product_variant_id: '', quantity: 1, harga_satuan: 0 }];
+
     setFormData({
       tanggal: sale.tanggal,
       no_pesanan_platform: sale.no_pesanan_platform,
@@ -191,7 +146,7 @@ const Sales = () => {
       no_resi: sale.no_resi || '',
       status: sale.status,
       notes: sale.notes || '',
-      items: saleItems
+      items: existingItems
     });
     setDialogOpen(true);
   };
@@ -200,9 +155,66 @@ const Sales = () => {
     await deleteSale(id);
   };
 
+  // FITUR BARU: Quick status update
+  const handleStatusUpdate = async (saleId: string, newStatus: string, currentSale: any) => {
+    try {
+      const result = await updateSaleStatus(saleId, newStatus);
+      if (!result.error) {
+        toast({
+          title: "Sukses",
+          description: `Status pesanan berhasil diubah ke ${getStatusLabel(newStatus)}`,
+        });
+        
+        // PERBAIKAN: Update saldo toko jika status berubah ke delivered
+        if (newStatus === 'delivered' && currentSale.status !== 'delivered') {
+          await updateStoreSaldo(currentSale.store_id, currentSale.total, 'add');
+        }
+        // Jika status dari delivered ke status lain, kurangi saldo
+        else if (currentSale.status === 'delivered' && newStatus !== 'delivered') {
+          await updateStoreSaldo(currentSale.store_id, currentSale.total, 'subtract');
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Gagal mengubah status pesanan",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // FITUR BARU: Update saldo toko
+  const updateStoreSaldo = async (storeId: string, amount: number, operation: 'add' | 'subtract') => {
+    try {
+      // Call API untuk update saldo toko
+      const { data, error } = await supabase
+        .rpc('update_store_saldo', {
+          store_id: storeId,
+          amount: operation === 'add' ? amount : -amount
+        });
+      
+      if (error) {
+        console.error('Error updating store saldo:', error);
+      }
+    } catch (error) {
+      console.error('Error in updateStoreSaldo:', error);
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      pending: "Pending",
+      processing: "Diproses", 
+      shipped: "Dikirim",
+      delivered: "Selesai",
+      cancelled: "Dibatal",
+      returned: "Retur"
+    };
+    return labels[status] || status;
+  };
+
   const resetForm = () => {
     setEditingSale(null);
-    setSelectedProducts(new Set());
     setFormData({
       tanggal: new Date().toISOString().split('T')[0],
       no_pesanan_platform: '',
@@ -227,17 +239,6 @@ const Sales = () => {
   };
 
   const removeItem = (index: number) => {
-    const itemToRemove = formData.items[index];
-    
-    // Remove from selected products set
-    if (itemToRemove.product_variant_id) {
-      setSelectedProducts(prevSelected => {
-        const newSelected = new Set(prevSelected);
-        newSelected.delete(itemToRemove.product_variant_id);
-        return newSelected;
-      });
-    }
-    
     setFormData(prev => ({
       ...prev,
       items: prev.items.filter((_, i) => i !== index)
@@ -251,43 +252,13 @@ const Sales = () => {
         if (i === index) {
           const updatedItem = { ...item, [field]: value };
           
-          // Handle product selection change
-          if (field === 'product_variant_id') {
-            // Remove old product from selected set
-            if (item.product_variant_id) {
-              setSelectedProducts(prevSelected => {
-                const newSelected = new Set(prevSelected);
-                newSelected.delete(item.product_variant_id);
-                return newSelected;
-              });
-            }
-            
-            // Add new product to selected set
-            if (value) {
-              setSelectedProducts(prevSelected => new Set(prevSelected).add(value));
-              
-              // Auto-fill price when product is selected
-              const product = stockProducts?.find(p => p?.id === value);
-              if (product?.products) {
-                updatedItem.harga_satuan = product.products.harga_jual_default || 0;
-                updatedItem.product_name = product.products.nama_produk || '';
-                updatedItem.variant_display = `${product.warna || ''} - ${product.size || ''}`;
-              }
-            }
-          }
-          
-          // Handle quantity change with stock validation
-          if (field === 'quantity') {
-            const selectedProduct = stockProducts?.find(p => p.id === item.product_variant_id);
-            const availableStock = selectedProduct?.stok || 0;
-            
-            if (value > availableStock) {
-              toast({
-                title: "Stok Tidak Mencukupi",
-                description: `Stok tersedia: ${availableStock}, diminta: ${value}`,
-                variant: "destructive"
-              });
-              return item; // Don't update if exceeds stock
+          // Auto-fill price when product is selected
+          if (field === 'product_variant_id' && value) {
+            const product = stockProducts?.find(p => p?.id === value);
+            if (product?.products) {
+              updatedItem.harga_satuan = product.products.harga_jual_default || 0;
+              updatedItem.product_name = product.products.nama_produk || '';
+              updatedItem.variant_display = `${product.warna || ''} - ${product.size || ''}`;
             }
           }
           
@@ -385,7 +356,39 @@ const Sales = () => {
     {
       key: 'status',
       title: 'Status',
-      render: (value: any, sale: any) => getStatusBadge(sale?.status || 'pending')
+      render: (value: any, sale: any) => (
+        <div className="space-y-2">
+          {/* FITUR BARU: Quick Status Update Dropdown */}
+          <Select 
+            value={sale?.status || 'pending'} 
+            onValueChange={(newStatus) => handleStatusUpdate(sale.id, newStatus, sale)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">
+                <Badge variant="secondary">Pending</Badge>
+              </SelectItem>
+              <SelectItem value="processing">
+                <Badge variant="default">Diproses</Badge>
+              </SelectItem>
+              <SelectItem value="shipped">
+                <Badge variant="outline">Dikirim</Badge>
+              </SelectItem>
+              <SelectItem value="delivered">
+                <Badge variant="default" className="bg-green-500">Selesai</Badge>
+              </SelectItem>
+              <SelectItem value="cancelled">
+                <Badge variant="destructive">Dibatal</Badge>
+              </SelectItem>
+              <SelectItem value="returned">
+                <Badge variant="destructive">Retur</Badge>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )
     },
     {
       key: 'actions',
@@ -423,6 +426,7 @@ const Sales = () => {
 
   return (
     <div className="space-y-6 p-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold gradient-text">Manajemen Penjualan</h1>
@@ -444,6 +448,7 @@ const Sales = () => {
                 <DialogTitle>{editingSale ? 'Edit Penjualan' : 'Tambah Penjualan Baru'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Basic Info */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="tanggal">Tanggal *</Label>
@@ -514,6 +519,7 @@ const Sales = () => {
                   </div>
                 </div>
 
+                {/* Product Items */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <Label>Detail Produk *</Label>
@@ -524,121 +530,71 @@ const Sales = () => {
                   </div>
                   <div className="space-y-3">
                     {formData.items.map((item, index) => (
-                      <div key={index} className="p-3 border rounded-lg space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-                          <div className="md:col-span-2">
-                            <Label>Produk</Label>
-                            <Select 
-                              value={item.product_variant_id} 
-                              onValueChange={(value) => updateItem(index, 'product_variant_id', value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Pilih produk" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {stockProducts?.filter(product => {
-                                  const hasStock = (product?.stok || 0) > 0;
-                                  const isNotSelected = !selectedProducts.has(product.id) || product.id === item.product_variant_id;
-                                  return hasStock && isNotSelected;
-                                }).map((product) => (
-                                  <SelectItem key={product.id} value={product.id}>
-                                    <div className="flex justify-between items-center w-full">
-                                      <span>
-                                        {product?.products?.nama_produk || 'Produk tidak diketahui'} - {product?.warna || '-'} {product?.size || '-'}
-                                      </span>
-                                      <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                                        (product?.stok || 0) <= 5 ? 'bg-red-100 text-red-800' : 
-                                        (product?.stok || 0) <= 10 ? 'bg-yellow-100 text-yellow-800' : 
-                                        'bg-green-100 text-green-800'
-                                      }`}>
-                                        Stok: {product?.stok || 0}
-                                      </span>
-                                    </div>
-                                  </SelectItem>
-                                )) || <SelectItem value="" disabled>Tidak ada produk dengan stok tersedia</SelectItem>}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="flex flex-col">
-                            <Label>Qty</Label>
-                            <Input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
-                              min="1"
-                              max={(() => {
-                                const selectedProduct = stockProducts?.find(p => p.id === item.product_variant_id);
-                                return selectedProduct?.stok || 1;
-                              })()}
-                            />
-                            {item.product_variant_id && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                Max: {stockProducts?.find(p => p.id === item.product_variant_id)?.stok || 0} unit
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <Label>Harga Satuan</Label>
-                            <Input
-                              type="number"
-                              value={item.harga_satuan}
-                              onChange={(e) => updateItem(index, 'harga_satuan', Number(e.target.value))}
-                              min="0"
-                            />
-                          </div>
-                          <div className="flex items-end">
-                            <div className="w-full">
-                              <Label>Subtotal</Label>
-                              <div className="text-sm font-medium p-2 bg-muted rounded">
-                                {formatCurrency(item.quantity * item.harga_satuan)}
-                              </div>
-                            </div>
-                            {formData.items.length > 1 && (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => removeItem(index)}
-                                className="ml-2"
-                              >
-                                ×
-                              </Button>
-                            )}
-                          </div>
+                      <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-2 p-3 border rounded-lg">
+                        <div className="md:col-span-2">
+                          <Label>Produk</Label>
+                          <Select 
+                            value={item.product_variant_id} 
+                            onValueChange={(value) => updateItem(index, 'product_variant_id', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder={item.product_name && item.variant_display ? 
+                                `${item.product_name} - ${item.variant_display}` : 
+                                "Pilih produk"
+                              } />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {stockProducts?.map((product) => (
+                                <SelectItem key={product.id} value={product.id}>
+                                  {product?.products?.nama_produk || 'Produk tidak diketahui'} - {product?.warna || '-'} {product?.size || '-'} (Stok: {product?.stok || 0})
+                                </SelectItem>
+                              )) || <SelectItem value="" disabled>Tidak ada produk tersedia</SelectItem>}
+                            </SelectContent>
+                          </Select>
                         </div>
-                        
-                        {item.product_variant_id && (
-                          <div className="mt-2 p-2 bg-muted rounded-md">
-                            {(() => {
-                              const product = stockProducts?.find(p => p.id === item.product_variant_id);
-                              const stock = product?.stok || 0;
-                              return (
-                                <div className="flex justify-between items-center">
-                                  <span className="text-sm font-medium">
-                                    {product?.products?.nama_produk} - {product?.warna} {product?.size}
-                                  </span>
-                                  <div className="flex items-center gap-2">
-                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                      stock <= 5 ? 'bg-red-100 text-red-800' : 
-                                      stock <= 10 ? 'bg-yellow-100 text-yellow-800' : 
-                                      'bg-green-100 text-green-800'
-                                    }`}>
-                                      Stok: {stock}
-                                    </span>
-                                    {stock <= 5 && (
-                                      <span className="text-red-600 text-xs">⚠️ Stok Rendah</span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })()}
+                        <div>
+                          <Label>Qty</Label>
+                          <Input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
+                            min="1"
+                          />
+                        </div>
+                        <div>
+                          <Label>Harga Satuan</Label>
+                          <Input
+                            type="number"
+                            value={item.harga_satuan}
+                            onChange={(e) => updateItem(index, 'harga_satuan', Number(e.target.value))}
+                            min="0"
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <div className="w-full">
+                            <Label>Subtotal</Label>
+                            <div className="text-sm font-medium p-2 bg-muted rounded">
+                              {formatCurrency(item.quantity * item.harga_satuan)}
+                            </div>
                           </div>
-                        )}
+                          {formData.items.length > 1 && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => removeItem(index)}
+                              className="ml-2"
+                            >
+                              ×
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
+                {/* Pricing & Status */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="ongkir">Ongkos Kirim</Label>
@@ -680,6 +636,7 @@ const Sales = () => {
                   </div>
                 </div>
 
+                {/* Total Summary */}
                 <div className="bg-muted p-4 rounded-lg">
                   <div className="space-y-2">
                     <div className="flex justify-between">
@@ -715,6 +672,7 @@ const Sales = () => {
         )}
       </div>
 
+      {/* Sales Table */}
       <Card className="glass-card border-0">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
