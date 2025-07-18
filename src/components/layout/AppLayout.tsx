@@ -48,12 +48,11 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           <Sidebar 
             isOpen={sidebarOpen} 
             onClose={closeSidebar}
-            isMobile={isMobile}
           />
           
           {/* Main Content */}
           <main className="flex-1 min-h-[calc(100vh-3rem)] md:min-h-[calc(100vh-4rem)] bg-gradient-to-br from-background via-background to-primary/5">
-            <div className="container mx-auto max-w-7xl w-full">
+            <div className="container mx-auto max-w-7xl w-full px-3 md:px-4 lg:px-6 py-4 md:py-6">
               {children}
             </div>
           </main>
