@@ -124,119 +124,141 @@ const Sales = () => {
 
   // **[PERBAIKAN 1] - GANTI FUNGSI INI**
   const handleStatusUpdate = async (saleId: string, newStatus: string, currentSale: any) => {
-    try {
-      // Ambil data sale items untuk kalkulasi stok
-      const { data: saleItems, error: itemsError } = await supabase
-        .from('sale_items')
-        .select(`
-          *,
-          product_variant:product_variants(
-            id, 
-            stok,
-            products(nama_produk)
-          )
-        `)
-        .eq('sale_id', saleId);
-      if (itemsError) {
-        throw new Error('Gagal mengambil data item penjualan');
-      }
-      const oldStatus = currentSale.status;
-      // Logika perubahan stok berdasarkan status
-      for (const item of saleItems || []) {
-        const { data: currentStock, error: stockFetchError } = await supabase
-          .from('product_variants')
-          .select('stok')
-          .eq('id', item.product_variant_id)
-          .single();
-        if (stockFetchError) {
-          console.error('Error fetching stock:', stockFetchError);
-          continue;
-        }
-        let stockChange = 0;
-        let movementType: 'in' | 'out' | null = null;
-        let notes = '';
-        // Tentukan perubahan stok berdasarkan transisi status
-        if (oldStatus !== 'shipped' && oldStatus !== 'delivered' &&
-          (newStatus === 'shipped' || newStatus === 'delivered')) {
-          // Dari pending/processing ke shipped/delivered = kurangi stok
-          stockChange = -item.quantity;
-          movementType = 'out';
-          notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
-          // Validasi stok mencukupi
-          if ((currentStock.stok || 0) < item.quantity) {
-            throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
-          }
-        }
-        else if ((oldStatus === 'shipped' || oldStatus === 'delivered') &&
-          (newStatus === 'cancelled' || newStatus === 'returned')) {
-          // Dari shipped/delivered ke cancelled/returned = tambah stok kembali
-          stockChange = item.quantity;
-          movementType = 'in';
-          notes = `Pengembalian stok - status berubah ke ${getStatusLabel(newStatus)}`;
-        }
-        else if ((oldStatus === 'cancelled' || oldStatus === 'returned') &&
-          (newStatus === 'shipped' || newStatus === 'delivered')) {
-          // Dari cancelled/returned ke shipped/delivered = kurangi stok lagi
-          stockChange = -item.quantity;
-          movementType = 'out';
-          notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
-          // Validasi stok mencukupi
-          if ((currentStock.stok || 0) < item.quantity) {
-            throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
-          }
-        }
-        // Update stok jika ada perubahan
-        if (stockChange !== 0 && movementType) {
-          const newStockLevel = (currentStock.stok || 0) + stockChange;
-          const { error: stockUpdateError } = await supabase
-            .from('product_variants')
-            .update({ stok: newStockLevel })
-            .eq('id', item.product_variant_id);
-          if (stockUpdateError) {
-            console.error('Error updating stock:', stockUpdateError);
-            continue;
-          }
-          // Insert stock movement record
-          const { error: movementError } = await supabase
-            .from('stock_movements')
-            .insert([{
-              product_variant_id: item.product_variant_id,
-              movement_type: movementType,
-              quantity: Math.abs(stockChange),
-              reference_type: 'sale_status_change',
-              reference_id: saleId,
-              notes: notes
-            }]);
-          if (movementError) {
-            console.error('Error inserting movement:', movementError);
-          }
-        }
-      }
-      // Update status penjualan
+  try {
+    // *** SKIP STOCK UPDATE JIKA SEDANG EDIT ***
+    if (editingSale && editingSale.id === saleId) {
+      // Hanya update status, skip stock logic
       const result = await updateSaleStatus(saleId, newStatus as SaleStatus);
       if (result.success) {
         toast({
-          title: "Sukses",
+          title: "Sukses", 
           description: `Status pesanan berhasil diubah ke ${getStatusLabel(newStatus)}`,
         });
-        // Update saldo toko
         await handleSaldoUpdate(currentSale, newStatus);
-        // Refresh data
         await fetchSales();
-        await fetchStock();
-      } else {
-        throw new Error(result.message || 'Gagal mengubah status');
       }
-    } catch (error) {
-      console.error('Error in handleStatusUpdate:', error);
-      toast({
-        title: "Error",
-        description: `Gagal mengubah status pesanan: ${(error as any)?.message || 'Unknown error'}`,
-        variant: "destructive",
-      });
+      return;
     }
-  };
 
+    // Ambil data sale items untuk kalkulasi stok
+    const { data: saleItems, error: itemsError } = await supabase
+      .from('sale_items')
+      .select(`
+        *,
+        product_variant:product_variants(
+          id, 
+          stok,
+          products(nama_produk)
+        )
+      `)
+      .eq('sale_id', saleId);
+
+    if (itemsError) {
+      throw new Error('Gagal mengambil data item penjualan');
+    }
+
+    const oldStatus = currentSale.status;
+    
+    // Logika perubahan stok berdasarkan status
+    for (const item of saleItems || []) {
+      const { data: currentStock, error: stockFetchError } = await supabase
+        .from('product_variants')
+        .select('stok')
+        .eq('id', item.product_variant_id)
+        .single();
+
+      if (stockFetchError) {
+        console.error('Error fetching stock:', stockFetchError);
+        continue;
+      }
+
+      let stockChange = 0;
+      let movementType: 'in' | 'out' | null = null;
+      let notes = '';
+
+      // Tentukan perubahan stok berdasarkan transisi status
+      if (oldStatus !== 'shipped' && oldStatus !== 'delivered' && 
+          (newStatus === 'shipped' || newStatus === 'delivered')) {
+        stockChange = -item.quantity;
+        movementType = 'out';
+        notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
+        
+        if ((currentStock.stok || 0) < item.quantity) {
+          throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
+        }
+      } 
+      else if ((oldStatus === 'shipped' || oldStatus === 'delivered') && 
+               (newStatus === 'cancelled' || newStatus === 'returned')) {
+        stockChange = item.quantity;
+        movementType = 'in';
+        notes = `Pengembalian stok - status berubah ke ${getStatusLabel(newStatus)}`;
+      }
+      else if ((oldStatus === 'cancelled' || oldStatus === 'returned') && 
+               (newStatus === 'shipped' || newStatus === 'delivered')) {
+        stockChange = -item.quantity;
+        movementType = 'out';
+        notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
+        
+        if ((currentStock.stok || 0) < item.quantity) {
+          throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
+        }
+      }
+
+      // Update stok jika ada perubahan
+      if (stockChange !== 0 && movementType) {
+        const newStockLevel = (currentStock.stok || 0) + stockChange;
+        
+        const { error: stockUpdateError } = await supabase
+          .from('product_variants')
+          .update({ stok: newStockLevel })
+          .eq('id', item.product_variant_id);
+
+        if (stockUpdateError) {
+          console.error('Error updating stock:', stockUpdateError);
+          continue;
+        }
+
+        const { error: movementError } = await supabase
+          .from('stock_movements')
+          .insert([{
+            product_variant_id: item.product_variant_id,
+            movement_type: movementType,
+            quantity: Math.abs(stockChange),
+            reference_type: 'sale_status_change',
+            reference_id: saleId,
+            notes: notes
+          }]);
+
+        if (movementError) {
+          console.error('Error inserting movement:', movementError);
+        }
+      }
+    }
+
+    // Update status penjualan
+    const result = await updateSaleStatus(saleId, newStatus as SaleStatus);
+    
+    if (result.success) {
+      toast({
+        title: "Sukses",
+        description: `Status pesanan berhasil diubah ke ${getStatusLabel(newStatus)}`,
+      });
+      
+      await handleSaldoUpdate(currentSale, newStatus);
+      await fetchSales();
+      await fetchStock();
+    } else {
+      throw new Error(result.message || 'Gagal mengubah status');
+    }
+  } catch (error) {
+    console.error('Error in handleStatusUpdate:', error);
+    toast({
+      title: "Error",
+      description: `Gagal mengubah status pesanan: ${(error as any)?.message || 'Unknown error'}`,
+      variant: "destructive",
+    });
+  }
+};
   // **[PERBAIKAN 2] - GANTI FUNGSI INI**
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -251,10 +273,6 @@ const Sales = () => {
     const validItems = formData.items.filter(item =>
       item.product_variant_id && item.quantity > 0 && item.harga_satuan > 0
     );
-    console.log('Form Data Items:', formData.items);
-console.log('Valid Items:', validItems);
-console.log('Editing Sale:', editingSale);
-
     if (validItems.length === 0) {
       toast({
         title: "Error",
