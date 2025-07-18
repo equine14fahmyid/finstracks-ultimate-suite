@@ -1,8 +1,13 @@
 import * as React from "react"
-
 import { cn } from "@/lib/utils"
 
-const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
+// ========================================================================
+// KOMPONEN INPUT ASLI (TIDAK ADA PERUBAHAN)
+// ========================================================================
+
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, ...props }, ref) => {
     return (
       <input
@@ -18,6 +23,11 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   }
 )
 Input.displayName = "Input"
+
+// ========================================================================
+// [BARU] KOMPONEN INPUT CURRENCY DITAMBAHKAN DI SINI
+// ========================================================================
+
 const formatNumber = (value: number | string): string => {
   const num = typeof value === 'string' ? parseInt(value.replace(/[^0-9]/g, ''), 10) : value;
   if (isNaN(num)) return '';
@@ -54,4 +64,10 @@ const InputCurrency = React.forwardRef<HTMLInputElement, InputCurrencyProps>(
   }
 )
 InputCurrency.displayName = "InputCurrency"
-export { Input }
+
+
+// ========================================================================
+// [PERBAIKAN] PASTIKAN KEDUA KOMPONEN DIEKSPOR
+// ========================================================================
+
+export { Input, InputCurrency }
