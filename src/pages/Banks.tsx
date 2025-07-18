@@ -3,7 +3,7 @@ import { Plus, Edit, Trash2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { Input, InputCurrency } from '@/components/ui/input'; // Impor InputCurrency
 import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
@@ -117,6 +117,7 @@ const Banks = () => {
       });
 
       setEditingBank(null);
+      setIsAddDialogOpen(false);
       resetForm();
       return true;
     } catch (error: any) {
@@ -135,7 +136,6 @@ const Banks = () => {
     try {
       setLoading(true);
 
-      // Check if bank has transactions
       const { data: incomes } = await supabase
         .from('incomes')
         .select('id')
@@ -210,51 +210,18 @@ const Banks = () => {
       saldo_awal: bank.saldo_awal,
       saldo_akhir: bank.saldo_akhir
     });
+    setIsAddDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    await deleteBank(id);
-  };
-
-  // Setup real-time subscription
   useEffect(() => {
     fetchBanks();
 
-    // Cleanup previous channel
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
     }
 
-    // Create new real-time channel for banks
     const channel = supabase
       .channel('banks-realtime-page')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'banks'
-        },
-        (payload) => {
-          console.log('🏦 Bank balance updated in real-time:', payload);
-          
-          if (payload.new.saldo_akhir !== payload.old?.saldo_akhir) {
-            const bankName = payload.new.nama_bank;
-            const oldBalance = payload.old?.saldo_akhir || 0;
-            const newBalance = payload.new.saldo_akhir || 0;
-            const difference = newBalance - oldBalance;
-            
-            toast({
-              title: "💰 Saldo Bank Terupdate",
-              description: `${bankName}: ${difference > 0 ? '+' : ''}Rp ${Math.abs(difference).toLocaleString('id-ID')}`,
-              variant: difference > 0 ? "default" : "destructive",
-            });
-          }
-          
-          // Refresh bank data
-          fetchBanks();
-        }
-      )
       .on(
         'postgres_changes',
         {
@@ -282,7 +249,7 @@ const Banks = () => {
     {
       key: 'bank_info',
       title: 'Informasi Bank',
-      render: (value: any, bank: Bank) => (
+      render: (_: any, bank: Bank) => (
         <div>
           <div className="font-medium">{bank.nama_bank}</div>
           <div className="text-sm text-muted-foreground">{bank.nama_pemilik}</div>
@@ -293,7 +260,7 @@ const Banks = () => {
     {
       key: 'saldo_awal',
       title: 'Saldo Awal',
-      render: (value: any, bank: Bank) => (
+      render: (_: any, bank: Bank) => (
         <div className="text-blue-600 font-medium">
           {formatCurrency(bank.saldo_awal)}
         </div>
@@ -302,7 +269,7 @@ const Banks = () => {
     {
       key: 'saldo_akhir',
       title: 'Saldo Akhir',
-      render: (value: any, bank: Bank) => {
+      render: (_: any, bank: Bank) => {
         const difference = bank.saldo_akhir - bank.saldo_awal;
         return (
           <div>
@@ -321,7 +288,7 @@ const Banks = () => {
     {
       key: 'actions',
       title: 'Aksi',
-      render: (value: any, bank: Bank) => (
+      render: (_: any, bank: Bank) => (
         <div className="flex gap-2">
           <Button
             variant="ghost"
@@ -332,7 +299,7 @@ const Banks = () => {
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
@@ -345,7 +312,7 @@ const Banks = () => {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Batal</AlertDialogCancel>
-                <AlertDialogAction onClick={() => handleDelete(bank.id)}>
+                <AlertDialogAction onClick={() => deleteBank(bank.id)} className="bg-destructive hover:bg-destructive/90">
                   Hapus
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -372,9 +339,9 @@ const Banks = () => {
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Dialog open={isAddDialogOpen || !!editingBank} onOpenChange={(open) => {
+          <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+            setIsAddDialogOpen(open);
             if (!open) {
-              setIsAddDialogOpen(false);
               setEditingBank(null);
               resetForm();
             }
@@ -422,33 +389,32 @@ const Banks = () => {
                 </div>
                 <div>
                   <Label htmlFor="saldo_awal">Saldo Awal</Label>
-                  <Input
+                  <InputCurrency
                     id="saldo_awal"
-                    type="number"
                     value={formData.saldo_awal}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value) || 0;
+                    onValueChange={(value) => {
                       setFormData({ 
                         ...formData, 
                         saldo_awal: value,
-                        saldo_akhir: value // Auto set saldo_akhir = saldo_awal untuk bank baru
+                        saldo_akhir: editingBank ? formData.saldo_akhir : value
                       });
                     }}
-                    placeholder="0"
+                    placeholder="Rp 0"
+                    disabled={!!editingBank}
                   />
+                   {editingBank && <p className="text-xs text-muted-foreground mt-1">Saldo awal tidak dapat diubah.</p>}
                 </div>
                 {editingBank && (
                   <div>
-                    <Label htmlFor="saldo_akhir">Saldo Akhir (Manual Adjustment)</Label>
-                    <Input
+                    <Label htmlFor="saldo_akhir">Saldo Akhir (Penyesuaian Manual)</Label>
+                    <InputCurrency
                       id="saldo_akhir"
-                      type="number"
                       value={formData.saldo_akhir}
-                      onChange={(e) => setFormData({ ...formData, saldo_akhir: parseInt(e.target.value) || 0 })}
-                      placeholder="0"
+                      onValueChange={(value) => setFormData({ ...formData, saldo_akhir: value })}
+                      placeholder="Rp 0"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      ⚠️ Hati-hati mengubah saldo akhir secara manual
+                      ⚠️ Hati-hati mengubah saldo akhir secara manual.
                     </p>
                   </div>
                 )}
