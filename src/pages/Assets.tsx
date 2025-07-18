@@ -13,10 +13,12 @@ import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 
+// PERBAIKAN: Tambahkan umur_ekonomis_bulan
 interface AssetFormData {
   nama_aset: string;
   tanggal_perolehan: string;
   harga_perolehan: number;
+  umur_ekonomis_bulan: number;
   deskripsi: string;
 }
 
@@ -30,6 +32,7 @@ const Assets = () => {
     nama_aset: '',
     tanggal_perolehan: new Date().toISOString().split('T')[0],
     harga_perolehan: 0,
+    umur_ekonomis_bulan: 0,
     deskripsi: ''
   });
 
@@ -90,10 +93,10 @@ const Assets = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.nama_aset || formData.harga_perolehan <= 0) {
+    if (!formData.nama_aset || formData.harga_perolehan <= 0 || formData.umur_ekonomis_bulan <= 0) {
       toast({
         title: "Error",
-        description: "Nama Aset dan Harga Perolehan wajib diisi",
+        description: "Semua field wajib diisi dengan benar",
         variant: "destructive",
       });
       return;
@@ -115,6 +118,7 @@ const Assets = () => {
       nama_aset: asset.nama_aset,
       tanggal_perolehan: asset.tanggal_perolehan,
       harga_perolehan: asset.harga_perolehan,
+      umur_ekonomis_bulan: asset.umur_ekonomis_bulan || 0,
       deskripsi: asset.deskripsi || ''
     });
     setDialogOpen(true);
@@ -130,6 +134,7 @@ const Assets = () => {
       nama_aset: '',
       tanggal_perolehan: new Date().toISOString().split('T')[0],
       harga_perolehan: 0,
+      umur_ekonomis_bulan: 0,
       deskripsi: ''
     });
   };
@@ -152,6 +157,13 @@ const Assets = () => {
       title: 'Harga Perolehan',
       render: (_: any, asset: any) => (
         <span className="font-medium">{formatCurrency(asset.harga_perolehan)}</span>
+      )
+    },
+    {
+      key: 'umur_ekonomis_bulan',
+      title: 'Umur Ekonomis',
+      render: (_: any, asset: any) => (
+        <span>{asset.umur_ekonomis_bulan} bulan</span>
       )
     },
     {
@@ -250,6 +262,17 @@ const Assets = () => {
                       required
                     />
                   </div>
+                </div>
+                <div>
+                  <Label htmlFor="umur_ekonomis_bulan">Umur Ekonomis (Bulan) *</Label>
+                  <Input
+                    id="umur_ekonomis_bulan"
+                    type="number"
+                    value={formData.umur_ekonomis_bulan}
+                    onChange={(e) => setFormData(prev => ({ ...prev, umur_ekonomis_bulan: parseInt(e.target.value) || 0 }))}
+                    placeholder="Contoh: 48"
+                    required
+                  />
                 </div>
                 <div>
                   <Label htmlFor="deskripsi">Deskripsi</Label>
