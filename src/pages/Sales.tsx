@@ -69,142 +69,22 @@ const Sales = () => {
     fetchStores();
   }, []);
 
-  // --- FUNGSI STATUS UPDATE DENGAN STOCK MANAGEMENT ---
-  const handleStatusUpdate = async (saleId: string, newStatus: string, currentSale: any) => {
-    try {
-      // Ambil data sale items untuk kalkulasi stok
-      const { data: saleItems, error: itemsError } = await supabase
-        .from('sale_items')
-        .select(`
-          *,
-          product_variant:product_variants(
-            id, 
-            stok,
-            products(nama_produk)
-          )
-        `)
-        .eq('sale_id', saleId);
-
-      if (itemsError) {
-        throw new Error('Gagal mengambil data item penjualan');
-      }
-
-      const oldStatus = currentSale.status;
-      
-      // Logika perubahan stok berdasarkan status
-      for (const item of saleItems || []) {
-        const { data: currentStock, error: stockFetchError } = await supabase
-          .from('product_variants')
-          .select('stok')
-          .eq('id', item.product_variant_id)
-          .single();
-
-        if (stockFetchError) {
-          console.error('Error fetching stock:', stockFetchError);
-          continue;
-        }
-
-        let stockChange = 0;
-        let movementType: 'in' | 'out' | null = null;
-        let notes = '';
-
-        // Tentukan perubahan stok berdasarkan transisi status
-        if (oldStatus !== 'shipped' && oldStatus !== 'delivered' && 
-            (newStatus === 'shipped' || newStatus === 'delivered')) {
-          // Dari pending/processing ke shipped/delivered = kurangi stok
-          stockChange = -item.quantity;
-          movementType = 'out';
-          notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
-          
-          // Validasi stok mencukupi
-          if ((currentStock.stok || 0) < item.quantity) {
-            throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
-          }
-        } 
-        else if ((oldStatus === 'shipped' || oldStatus === 'delivered') && 
-                 (newStatus === 'cancelled' || newStatus === 'returned')) {
-          // Dari shipped/delivered ke cancelled/returned = tambah stok kembali
-          stockChange = item.quantity;
-          movementType = 'in';
-          notes = `Pengembalian stok - status berubah ke ${getStatusLabel(newStatus)}`;
-        }
-        else if ((oldStatus === 'cancelled' || oldStatus === 'returned') && 
-                 (newStatus === 'shipped' || newStatus === 'delivered')) {
-          // Dari cancelled/returned ke shipped/delivered = kurangi stok lagi
-          stockChange = -item.quantity;
-          movementType = 'out';
-          notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
-          
-          // Validasi stok mencukupi
-          if ((currentStock.stok || 0) < item.quantity) {
-            throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
-          }
-        }
-
-        // Update stok jika ada perubahan
-        if (stockChange !== 0 && movementType) {
-          const newStockLevel = (currentStock.stok || 0) + stockChange;
-          
-          const { error: stockUpdateError } = await supabase
-            .from('product_variants')
-            .update({ stok: newStockLevel })
-            .eq('id', item.product_variant_id);
-
-          if (stockUpdateError) {
-            console.error('Error updating stock:', stockUpdateError);
-            continue;
-          }
-
-          // Insert stock movement record
-          const { error: movementError } = await supabase
-            .from('stock_movements')
-            .insert([{
-              product_variant_id: item.product_variant_id,
-              movement_type: movementType,
-              quantity: Math.abs(stockChange),
-              reference_type: 'sale_status_change',
-              reference_id: saleId,
-              notes: notes
-            }]);
-
-          if (movementError) {
-            console.error('Error inserting movement:', movementError);
-          }
-        }
-      }
-
-      // Update status penjualan
-      const result = await updateSaleStatus(saleId, newStatus as SaleStatus);
-      
-      if (result.success) {
-        toast({
-          title: "Sukses",
-          description: `Status pesanan berhasil diubah ke ${getStatusLabel(newStatus)}`,
-        });
-        
-        // Update saldo toko
-        await handleSaldoUpdate(currentSale, newStatus);
-        
-        // Refresh data
-        await fetchSales();
-        await fetchStock();
-      } else {
-        throw new Error(result.message || 'Gagal mengubah status');
-      }
-    } catch (error) {
-      console.error('Error in handleStatusUpdate:', error);
-      toast({
-        title: "Error",
-        description: `Gagal mengubah status pesanan: ${(error as any)?.message || 'Unknown error'}`,
-        variant: "destructive",
-      });
-    }
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      pending: "Pending",
+      processing: "Diproses",
+      shipped: "Dikirim",
+      delivered: "Selesai",
+      cancelled: "Dibatal",
+      returned: "Retur"
+    };
+    return labels[status] || status;
   };
 
   const handleSaldoUpdate = async (currentSale: any, newStatus: string) => {
     try {
       let saldoChange = 0;
-      
+
       if (newStatus === 'delivered' && currentSale.status !== 'delivered') {
         saldoChange = currentSale.total;
       }
@@ -242,21 +122,124 @@ const Sales = () => {
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    const labels: Record<string, string> = {
-      pending: "Pending",
-      processing: "Diproses", 
-      shipped: "Dikirim",
-      delivered: "Selesai",
-      cancelled: "Dibatal",
-      returned: "Retur"
-    };
-    return labels[status] || status;
+  // **[PERBAIKAN 1] - GANTI FUNGSI INI**
+  const handleStatusUpdate = async (saleId: string, newStatus: string, currentSale: any) => {
+    try {
+      // Ambil data sale items untuk kalkulasi stok
+      const { data: saleItems, error: itemsError } = await supabase
+        .from('sale_items')
+        .select(`
+          *,
+          product_variant:product_variants(
+            id, 
+            stok,
+            products(nama_produk)
+          )
+        `)
+        .eq('sale_id', saleId);
+      if (itemsError) {
+        throw new Error('Gagal mengambil data item penjualan');
+      }
+      const oldStatus = currentSale.status;
+      // Logika perubahan stok berdasarkan status
+      for (const item of saleItems || []) {
+        const { data: currentStock, error: stockFetchError } = await supabase
+          .from('product_variants')
+          .select('stok')
+          .eq('id', item.product_variant_id)
+          .single();
+        if (stockFetchError) {
+          console.error('Error fetching stock:', stockFetchError);
+          continue;
+        }
+        let stockChange = 0;
+        let movementType: 'in' | 'out' | null = null;
+        let notes = '';
+        // Tentukan perubahan stok berdasarkan transisi status
+        if (oldStatus !== 'shipped' && oldStatus !== 'delivered' &&
+          (newStatus === 'shipped' || newStatus === 'delivered')) {
+          // Dari pending/processing ke shipped/delivered = kurangi stok
+          stockChange = -item.quantity;
+          movementType = 'out';
+          notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
+          // Validasi stok mencukupi
+          if ((currentStock.stok || 0) < item.quantity) {
+            throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
+          }
+        }
+        else if ((oldStatus === 'shipped' || oldStatus === 'delivered') &&
+          (newStatus === 'cancelled' || newStatus === 'returned')) {
+          // Dari shipped/delivered ke cancelled/returned = tambah stok kembali
+          stockChange = item.quantity;
+          movementType = 'in';
+          notes = `Pengembalian stok - status berubah ke ${getStatusLabel(newStatus)}`;
+        }
+        else if ((oldStatus === 'cancelled' || oldStatus === 'returned') &&
+          (newStatus === 'shipped' || newStatus === 'delivered')) {
+          // Dari cancelled/returned ke shipped/delivered = kurangi stok lagi
+          stockChange = -item.quantity;
+          movementType = 'out';
+          notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
+          // Validasi stok mencukupi
+          if ((currentStock.stok || 0) < item.quantity) {
+            throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
+          }
+        }
+        // Update stok jika ada perubahan
+        if (stockChange !== 0 && movementType) {
+          const newStockLevel = (currentStock.stok || 0) + stockChange;
+          const { error: stockUpdateError } = await supabase
+            .from('product_variants')
+            .update({ stok: newStockLevel })
+            .eq('id', item.product_variant_id);
+          if (stockUpdateError) {
+            console.error('Error updating stock:', stockUpdateError);
+            continue;
+          }
+          // Insert stock movement record
+          const { error: movementError } = await supabase
+            .from('stock_movements')
+            .insert([{
+              product_variant_id: item.product_variant_id,
+              movement_type: movementType,
+              quantity: Math.abs(stockChange),
+              reference_type: 'sale_status_change',
+              reference_id: saleId,
+              notes: notes
+            }]);
+          if (movementError) {
+            console.error('Error inserting movement:', movementError);
+          }
+        }
+      }
+      // Update status penjualan
+      const result = await updateSaleStatus(saleId, newStatus as SaleStatus);
+      if (result.success) {
+        toast({
+          title: "Sukses",
+          description: `Status pesanan berhasil diubah ke ${getStatusLabel(newStatus)}`,
+        });
+        // Update saldo toko
+        await handleSaldoUpdate(currentSale, newStatus);
+        // Refresh data
+        await fetchSales();
+        await fetchStock();
+      } else {
+        throw new Error(result.message || 'Gagal mengubah status');
+      }
+    } catch (error) {
+      console.error('Error in handleStatusUpdate:', error);
+      toast({
+        title: "Error",
+        description: `Gagal mengubah status pesanan: ${(error as any)?.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    }
   };
 
+  // **[PERBAIKAN 2] - GANTI FUNGSI INI**
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!formData.no_pesanan_platform || !formData.customer_name || !formData.store_id || formData.items.length === 0) {
       toast({
         title: "Error",
@@ -265,11 +248,9 @@ const Sales = () => {
       });
       return;
     }
-
-    const validItems = formData.items.filter(item => 
+    const validItems = formData.items.filter(item =>
       item.product_variant_id && item.quantity > 0 && item.harga_satuan > 0
     );
-
     if (validItems.length === 0) {
       toast({
         title: "Error",
@@ -278,7 +259,6 @@ const Sales = () => {
       });
       return;
     }
-
     // *** VALIDASI STOK ***
     for (const item of validItems) {
       const product = stockProducts?.find(p => p?.id === item.product_variant_id);
@@ -290,20 +270,17 @@ const Sales = () => {
         });
         return;
       }
-
       const availableStock = product.stok || 0;
-      
       // Jika edit, hitung stok yang akan dikembalikan
       let adjustedStock = availableStock;
       if (editingSale) {
-        const existingItem = editingSale.sale_items?.find((existing: any) => 
+        const existingItem = editingSale.sale_items?.find((existing: any) =>
           existing.product_variant_id === item.product_variant_id
         );
         if (existingItem) {
           adjustedStock += existingItem.quantity; // Tambah stok yang akan dikembalikan
         }
       }
-
       if (item.quantity > adjustedStock) {
         toast({
           title: "Stok Tidak Mencukupi",
@@ -313,7 +290,6 @@ const Sales = () => {
         return;
       }
     }
-
     const saleData = {
       tanggal: formData.tanggal,
       no_pesanan_platform: formData.no_pesanan_platform,
@@ -327,14 +303,12 @@ const Sales = () => {
       status: formData.status,
       notes: formData.notes || null,
     };
-
     let result;
     if (editingSale) {
       result = await updateSale(editingSale.id, saleData, validItems, editingSale.sale_items);
     } else {
       result = await createSale(saleData, validItems);
     }
-
     if (!result.error) {
       setDialogOpen(false);
       resetForm();
@@ -343,7 +317,7 @@ const Sales = () => {
 
   const handleEdit = (sale: any) => {
     setEditingSale(sale);
-    
+
     const existingItems = sale.sale_items?.map((item: any) => ({
       id: item.id,
       product_variant_id: item.product_variant_id,
@@ -412,7 +386,7 @@ const Sales = () => {
       items: prev.items.map((item, i) => {
         if (i === index) {
           const updatedItem = { ...item, [field]: value };
-          
+
           if (field === 'product_variant_id' && value && !item.product_name) {
             const product = stockProducts?.find(p => p?.id === value);
             if (product?.products) {
@@ -421,7 +395,7 @@ const Sales = () => {
               updatedItem.variant_display = `${product.warna || ''} - ${product.size || ''}`;
             }
           }
-          
+
           return updatedItem;
         }
         return item;
@@ -430,7 +404,7 @@ const Sales = () => {
   };
 
   const calculateSubtotal = () => {
-    return formData.items.reduce((sum, item) => 
+    return formData.items.reduce((sum, item) =>
       sum + (item.quantity * item.harga_satuan), 0
     );
   };
@@ -472,7 +446,7 @@ const Sales = () => {
         <div className="space-y-1">
           {sale?.sale_items?.slice(0, 2).map((item: any, index: number) => (
             <div key={index} className="text-sm">
-              {item?.product_variant?.product?.nama_produk || 'Produk tidak diketahui'} 
+              {item?.product_variant?.product?.nama_produk || 'Produk tidak diketahui'}
               <span className="text-muted-foreground">
                 ({item?.product_variant?.warna || '-'} - {item?.product_variant?.size || '-'})
               </span>
@@ -504,8 +478,8 @@ const Sales = () => {
       title: 'Status',
       render: (value: any, sale: any) => (
         <div className="space-y-2">
-          <Select 
-            value={sale?.status || 'pending'} 
+          <Select
+            value={sale?.status || 'pending'}
             onValueChange={(newStatus) => handleStatusUpdate(sale.id, newStatus, sale)}
           >
             <SelectTrigger className="w-full">
@@ -615,8 +589,8 @@ const Sales = () => {
                   </div>
                   <div>
                     <Label htmlFor="store_id">Toko *</Label>
-                    <Select 
-                      value={formData.store_id} 
+                    <Select
+                      value={formData.store_id}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, store_id: value }))}
                     >
                       <SelectTrigger>
@@ -675,40 +649,39 @@ const Sales = () => {
                       <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-2 p-3 border rounded-lg">
                         <div className="md:col-span-2">
                           <Label>Produk</Label>
-                          <Select 
-                            value={item.product_variant_id} 
+                          <Select
+                            value={item.product_variant_id}
                             onValueChange={(value) => updateItem(index, 'product_variant_id', value)}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder={item.product_name && item.variant_display ? 
-                                `${item.product_name} - ${item.variant_display}` : 
+                              <SelectValue placeholder={item.product_name && item.variant_display ?
+                                `${item.product_name} - ${item.variant_display}` :
                                 "Pilih produk"
                               } />
                             </SelectTrigger>
+                            {/* **[PERBAIKAN 3] - GANTI BAGIAN INI** */}
                             <SelectContent>
                               {stockProducts?.map((product) => {
                                 const availableStock = product?.stok || 0;
                                 const isOutOfStock = availableStock <= 0;
-                                
                                 // Jika edit, hitung stok yang tersedia + yang akan dikembalikan
                                 let adjustedStock = availableStock;
                                 if (editingSale && item.product_variant_id === product.id) {
-                                  const existingItem = editingSale.sale_items?.find((existing: any) => 
+                                  const existingItem = editingSale.sale_items?.find((existing: any) =>
                                     existing.product_variant_id === product.id
                                   );
                                   if (existingItem) {
                                     adjustedStock += existingItem.quantity;
                                   }
                                 }
-
                                 return (
-                                  <SelectItem 
-                                    key={product.id} 
+                                  <SelectItem
+                                    key={product.id}
                                     value={product.id}
                                     disabled={isOutOfStock && !editingSale}
                                     className={isOutOfStock && !editingSale ? "opacity-50 cursor-not-allowed" : ""}
                                   >
-                                    {product?.products?.nama_produk || 'Produk tidak diketahui'} - {product?.warna || '-'} {product?.size || '-'} 
+                                    {product?.products?.nama_produk || 'Produk tidak diketahui'} - {product?.warna || '-'} {product?.size || '-'}
                                     <span className={`ml-2 ${adjustedStock <= 0 ? 'text-red-500' : adjustedStock <= 5 ? 'text-yellow-500' : 'text-green-500'}`}>
                                       (Stok: {adjustedStock})
                                     </span>
@@ -784,8 +757,8 @@ const Sales = () => {
                   </div>
                   <div>
                     <Label htmlFor="status">Status</Label>
-                    <Select 
-                      value={formData.status} 
+                    <Select
+                      value={formData.status}
                       onValueChange={(value: any) => setFormData(prev => ({ ...prev, status: value }))}
                     >
                       <SelectTrigger>
