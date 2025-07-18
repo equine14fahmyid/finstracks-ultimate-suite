@@ -244,7 +244,6 @@ const Incomes = () => {
     required
   />
 </div>
-              </div>
 
               <div>
                 <Label htmlFor="bank_id">Masuk ke</Label>
