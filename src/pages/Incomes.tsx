@@ -97,10 +97,10 @@ const Incomes = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus pemasukan ini?')) {
-      await deleteIncome(id);
-    }
-  };
+  if (confirm('Apakah Anda yakin ingin menghapus pemasukan ini?')) {
+    await deleteIncome(id);
+  }
+};
 
   // Fixed columns dengan parameter yang benar
   const columns = [
