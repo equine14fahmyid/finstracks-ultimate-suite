@@ -13,8 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { supabase } from '@/integrations/supabase/client';
 
-// PERBAIKAN: Menyelaraskan nama properti dengan hook
 interface SettlementFormData {
   tanggal: string;
   store_id: string;
@@ -26,9 +26,15 @@ interface SettlementFormData {
 
 const Settlements = () => {
   const { hasPermission } = useAuth();
-  const { settlements, loading, fetchSettlements, createSettlement, updateSettlement, deleteSettlement } = useSettlements();
+  // PERBAIKAN: Ambil fungsi yang ada dari hook
+  const { createSettlement, deleteSettlement } = useSettlements();
   const { stores, fetchStores } = useStores();
   const { banks, fetchBanks } = useBanks();
+
+  // PERBAIKAN: Kelola state secara lokal di dalam komponen ini
+  const [settlements, setSettlements] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSettlement, setEditingSettlement] = useState<any>(null);
   const [formData, setFormData] = useState<SettlementFormData>({
@@ -39,6 +45,55 @@ const Settlements = () => {
     biaya_admin: 0,
     keterangan: ''
   });
+
+  // PERBAIKAN: Tambahkan fungsi fetchSettlements yang hilang di sini
+  const fetchSettlements = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('settlements')
+        .select(`
+          *,
+          store:stores(nama_toko, platform:platforms(nama_platform)),
+          bank:banks(nama_bank, nama_pemilik)
+        `)
+        .order('tanggal', { ascending: false });
+      if (error) throw error;
+      setSettlements(data || []);
+    } catch (error) {
+      console.error("Error fetching settlements:", error);
+      toast({ title: "Error", description: "Gagal memuat data pencairan", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // PERBAIKAN: Tambahkan fungsi updateSettlement yang hilang di sini
+  const updateSettlement = async (id: string, settlementData: SettlementFormData) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('settlements')
+        .update(settlementData)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      
+      toast({ 
+          title: "Sukses", 
+          description: "Pencairan diperbarui. CATATAN: Saldo bank/toko tidak disesuaikan ulang. Hapus dan buat ulang jika jumlah berubah." 
+      });
+      await fetchSettlements();
+      return { success: true, data };
+    } catch (error: any) {
+        toast({ title: "Error", description: `Gagal memperbarui: ${error.message}`, variant: "destructive" });
+        return { error: true };
+    } finally {
+        setLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     fetchSettlements();
@@ -65,6 +120,7 @@ const Settlements = () => {
     if (result && !result.error) {
       setDialogOpen(false);
       resetForm();
+      await fetchSettlements(); // Panggil fetch lokal
     }
   };
 
@@ -82,7 +138,10 @@ const Settlements = () => {
   };
 
   const handleDelete = async (id: string) => {
-    await deleteSettlement(id);
+    const result = await deleteSettlement(id);
+    if(result && !result.error) {
+      await fetchSettlements(); // Panggil fetch lokal
+    }
   };
 
   const resetForm = () => {
