@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, InputCurrency } from '@/components/ui/input'; // Impor InputCurrency
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, ShoppingBag, Edit, Trash2 } from 'lucide-react';
@@ -69,7 +69,6 @@ const Purchases = () => {
       return;
     }
 
-    // Validasi bank untuk payment yang bukan credit
     if (formData.payment_method !== 'credit' && !formData.bank_id) {
       toast({
         title: "Error",
@@ -79,7 +78,6 @@ const Purchases = () => {
       return;
     }
 
-    // Validasi saldo bank jika payment status = paid
     if (formData.payment_status === 'paid' && formData.payment_method !== 'credit') {
       const selectedBank = banks?.find(b => b.id === formData.bank_id);
       const totalAmount = calculateSubtotal();
@@ -95,7 +93,7 @@ const Purchases = () => {
     }
 
     const validItems = formData.items.filter(item => 
-      item.product_variant_id && item.quantity > 0 && item.harga_beli_satuan > 0
+      item.product_variant_id && item.quantity > 0 && item.harga_beli_satuan >= 0
     );
 
     if (validItems.length === 0) {
@@ -124,10 +122,9 @@ const Purchases = () => {
       result = await createPurchase(purchaseData, validItems);
     }
 
-    if (!result.error) {
+    if (result && !result.error) {
       setDialogOpen(false);
       resetForm();
-      // Refresh stock data setelah purchase
       await fetchStock();
     }
   };
@@ -158,7 +155,6 @@ const Purchases = () => {
   const handleDelete = async (id: string) => {
     const result = await deletePurchase(id);
     if (result.success) {
-      // Refresh stock data setelah delete
       await fetchStock();
     }
   };
@@ -224,12 +220,12 @@ const Purchases = () => {
     {
       key: 'tanggal',
       title: 'Tanggal',
-      render: (value: any, purchase: any) => formatShortDate(purchase?.tanggal)
+      render: (_: any, purchase: any) => formatShortDate(purchase?.tanggal)
     },
     {
       key: 'supplier',
       title: 'Supplier',
-      render: (value: any, purchase: any) => (
+      render: (_: any, purchase: any) => (
         <div>
           <div className="font-medium">{purchase?.supplier?.nama_supplier || '-'}</div>
           <div className="text-sm text-muted-foreground">{purchase?.no_invoice_supplier || 'Tanpa invoice'}</div>
@@ -239,17 +235,17 @@ const Purchases = () => {
     {
       key: 'bank',
       title: 'Bank',
-      render: (value: any, purchase: any) => (
+      render: (_: any, purchase: any) => (
         <div>
-          <div className="font-medium">{purchase?.bank?.nama_bank || '-'}</div>
-          <div className="text-sm text-muted-foreground">{purchase?.bank?.nama_pemilik || '-'}</div>
+          <div className="font-medium">{purchase?.bank?.nama_bank || 'N/A'}</div>
+          <div className="text-sm text-muted-foreground">{purchase?.bank?.nama_pemilik || ''}</div>
         </div>
       )
     },
     {
       key: 'items',
       title: 'Produk',
-      render: (value: any, purchase: any) => (
+      render: (_: any, purchase: any) => (
         <div className="space-y-1">
           {purchase?.purchase_items?.slice(0, 2).map((item: any, index: number) => (
             <div key={index} className="text-sm">
@@ -271,7 +267,7 @@ const Purchases = () => {
     {
       key: 'total',
       title: 'Total',
-      render: (value: any, purchase: any) => (
+      render: (_: any, purchase: any) => (
         <div>
           <div className="font-medium">{formatCurrency(purchase?.total || 0)}</div>
           <div className="text-sm text-muted-foreground">
@@ -283,7 +279,7 @@ const Purchases = () => {
     {
       key: 'payment_status',
       title: 'Status Pembayaran',
-      render: (value: any, purchase: any) => (
+      render: (_: any, purchase: any) => (
         <span className={`px-2 py-1 rounded text-xs font-medium ${
           purchase?.payment_status === 'paid' 
             ? 'bg-green-100 text-green-800' 
@@ -296,7 +292,7 @@ const Purchases = () => {
     {
       key: 'actions',
       title: 'Aksi',
-      render: (value: any, purchase: any) => (
+      render: (_: any, purchase: any) => (
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => handleEdit(purchase)}>
             <Edit className="h-4 w-4" />
@@ -329,7 +325,6 @@ const Purchases = () => {
 
   return (
     <div className="space-y-6 p-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold gradient-text">Manajemen Pembelian</h1>
@@ -351,7 +346,6 @@ const Purchases = () => {
                 <DialogTitle>{editingPurchase ? 'Edit Pembelian' : 'Tambah Pembelian Baru'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Basic Info */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="tanggal">Tanggal *</Label>
@@ -407,7 +401,6 @@ const Purchases = () => {
                     </Select>
                   </div>
                   
-                  {/* Bank Selection - Only show if not credit */}
                   {formData.payment_method !== 'credit' && (
                     <div>
                       <Label htmlFor="bank_id">Bank Account *</Label>
@@ -457,7 +450,6 @@ const Purchases = () => {
                   </div>
                 </div>
 
-                {/* Bank Balance Warning */}
                 {formData.payment_method !== 'credit' && formData.bank_id && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <h4 className="text-sm font-medium text-blue-800 mb-2">Informasi Bank</h4>
@@ -500,7 +492,6 @@ const Purchases = () => {
                   </div>
                 )}
 
-                {/* Product Items */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <Label>Detail Produk *</Label>
@@ -541,11 +532,10 @@ const Purchases = () => {
                         </div>
                         <div>
                           <Label>Harga Beli Satuan</Label>
-                          <Input
-                            type="number"
+                          <InputCurrency
                             value={item.harga_beli_satuan}
-                            onChange={(e) => updateItem(index, 'harga_beli_satuan', Number(e.target.value))}
-                            min="0"
+                            onValueChange={(value) => updateItem(index, 'harga_beli_satuan', value)}
+                            placeholder="Rp 0"
                           />
                         </div>
                         <div className="flex items-end">
@@ -572,7 +562,6 @@ const Purchases = () => {
                   </div>
                 </div>
 
-                {/* Total Summary */}
                 <div className="bg-muted p-4 rounded-lg">
                   <div className="space-y-2">
                     <div className="flex justify-between font-bold text-lg">
@@ -599,7 +588,6 @@ const Purchases = () => {
         )}
       </div>
 
-      {/* Purchases Table */}
       <Card className="glass-card border-0">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
