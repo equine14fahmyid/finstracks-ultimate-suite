@@ -122,146 +122,146 @@ const Sales = () => {
     }
   };
 
-  // **[PERBAIKAN 1] - GANTI FUNGSI INI**
   const handleStatusUpdate = async (saleId: string, newStatus: string, currentSale: any) => {
-  try {
-    // *** SKIP STOCK UPDATE JIKA SEDANG EDIT ***
-    if (editingSale && editingSale.id === saleId) {
-      // Hanya update status, skip stock logic
-      const result = await updateSaleStatus(saleId, newStatus as SaleStatus);
-      if (result.success) {
-        toast({
-          title: "Sukses", 
-          description: `Status pesanan berhasil diubah ke ${getStatusLabel(newStatus)}`,
-        });
-        await handleSaldoUpdate(currentSale, newStatus);
-        await fetchSales();
-      }
-      return;
-    }
-
-    // Ambil data sale items untuk kalkulasi stok
-    const { data: saleItems, error: itemsError } = await supabase
-      .from('sale_items')
-      .select(`
-        *,
-        product_variant:product_variants(
-          id, 
-          stok,
-          products(nama_produk)
-        )
-      `)
-      .eq('sale_id', saleId);
-
-    if (itemsError) {
-      throw new Error('Gagal mengambil data item penjualan');
-    }
-
-    const oldStatus = currentSale.status;
-    
-    // Logika perubahan stok berdasarkan status
-    for (const item of saleItems || []) {
-      const { data: currentStock, error: stockFetchError } = await supabase
-        .from('product_variants')
-        .select('stok')
-        .eq('id', item.product_variant_id)
-        .single();
-
-      if (stockFetchError) {
-        console.error('Error fetching stock:', stockFetchError);
-        continue;
-      }
-
-      let stockChange = 0;
-      let movementType: 'in' | 'out' | null = null;
-      let notes = '';
-
-      // Tentukan perubahan stok berdasarkan transisi status
-      if (oldStatus !== 'shipped' && oldStatus !== 'delivered' && 
-          (newStatus === 'shipped' || newStatus === 'delivered')) {
-        stockChange = -item.quantity;
-        movementType = 'out';
-        notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
-        
-        if ((currentStock.stok || 0) < item.quantity) {
-          throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
+    try {
+      // *** SKIP STOCK UPDATE JIKA SEDANG EDIT ***
+      if (editingSale && editingSale.id === saleId) {
+        // Hanya update status, skip stock logic
+        const result = await updateSaleStatus(saleId, newStatus as SaleStatus);
+        if (result.success) {
+          toast({
+            title: "Sukses", 
+            description: `Status pesanan berhasil diubah ke ${getStatusLabel(newStatus)}`,
+          });
+          await handleSaldoUpdate(currentSale, newStatus);
+          await fetchSales();
         }
-      } 
-      else if ((oldStatus === 'shipped' || oldStatus === 'delivered') && 
-               (newStatus === 'cancelled' || newStatus === 'returned')) {
-        stockChange = item.quantity;
-        movementType = 'in';
-        notes = `Pengembalian stok - status berubah ke ${getStatusLabel(newStatus)}`;
-      }
-      else if ((oldStatus === 'cancelled' || oldStatus === 'returned') && 
-               (newStatus === 'shipped' || newStatus === 'delivered')) {
-        stockChange = -item.quantity;
-        movementType = 'out';
-        notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
-        
-        if ((currentStock.stok || 0) < item.quantity) {
-          throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
-        }
+        return;
       }
 
-      // Update stok jika ada perubahan
-      if (stockChange !== 0 && movementType) {
-        const newStockLevel = (currentStock.stok || 0) + stockChange;
-        
-        const { error: stockUpdateError } = await supabase
+      // Ambil data sale items untuk kalkulasi stok
+      const { data: saleItems, error: itemsError } = await supabase
+        .from('sale_items')
+        .select(`
+          *,
+          product_variant:product_variants(
+            id, 
+            stok,
+            products(nama_produk)
+          )
+        `)
+        .eq('sale_id', saleId);
+
+      if (itemsError) {
+        throw new Error('Gagal mengambil data item penjualan');
+      }
+
+      const oldStatus = currentSale.status;
+      
+      // Logika perubahan stok berdasarkan status
+      for (const item of saleItems || []) {
+        const { data: currentStock, error: stockFetchError } = await supabase
           .from('product_variants')
-          .update({ stok: newStockLevel })
-          .eq('id', item.product_variant_id);
+          .select('stok')
+          .eq('id', item.product_variant_id)
+          .single();
 
-        if (stockUpdateError) {
-          console.error('Error updating stock:', stockUpdateError);
+        if (stockFetchError) {
+          console.error('Error fetching stock:', stockFetchError);
           continue;
         }
 
-        const { error: movementError } = await supabase
-          .from('stock_movements')
-          .insert([{
-            product_variant_id: item.product_variant_id,
-            movement_type: movementType,
-            quantity: Math.abs(stockChange),
-            reference_type: 'sale_status_change',
-            reference_id: saleId,
-            notes: notes
-          }]);
+        let stockChange = 0;
+        let movementType: 'in' | 'out' | null = null;
+        let notes = '';
 
-        if (movementError) {
-          console.error('Error inserting movement:', movementError);
+        // Tentukan perubahan stok berdasarkan transisi status
+        if (oldStatus !== 'shipped' && oldStatus !== 'delivered' && 
+            (newStatus === 'shipped' || newStatus === 'delivered')) {
+          stockChange = -item.quantity;
+          movementType = 'out';
+          notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
+          
+          if ((currentStock.stok || 0) < item.quantity) {
+            throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
+          }
+        } 
+        else if ((oldStatus === 'shipped' || oldStatus === 'delivered') && 
+                 (newStatus === 'cancelled' || newStatus === 'returned')) {
+          stockChange = item.quantity;
+          movementType = 'in';
+          notes = `Pengembalian stok - status berubah ke ${getStatusLabel(newStatus)}`;
+        }
+        else if ((oldStatus === 'cancelled' || oldStatus === 'returned') && 
+                 (newStatus === 'shipped' || newStatus === 'delivered')) {
+          stockChange = -item.quantity;
+          movementType = 'out';
+          notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
+          
+          if ((currentStock.stok || 0) < item.quantity) {
+            throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
+          }
+        }
+
+        // Update stok jika ada perubahan
+        if (stockChange !== 0 && movementType) {
+          const newStockLevel = (currentStock.stok || 0) + stockChange;
+          
+          const { error: stockUpdateError } = await supabase
+            .from('product_variants')
+            .update({ stok: newStockLevel })
+            .eq('id', item.product_variant_id);
+
+          if (stockUpdateError) {
+            console.error('Error updating stock:', stockUpdateError);
+            continue;
+          }
+
+          const { error: movementError } = await supabase
+            .from('stock_movements')
+            .insert([{
+              product_variant_id: item.product_variant_id,
+              movement_type: movementType,
+              quantity: Math.abs(stockChange),
+              reference_type: 'sale_status_change',
+              reference_id: saleId,
+              notes: notes
+            }]);
+
+          if (movementError) {
+            console.error('Error inserting movement:', movementError);
+          }
         }
       }
-    }
 
-    // Update status penjualan
-    const result = await updateSaleStatus(saleId, newStatus as SaleStatus);
-    
-    if (result.success) {
-      toast({
-        title: "Sukses",
-        description: `Status pesanan berhasil diubah ke ${getStatusLabel(newStatus)}`,
-      });
+      // Update status penjualan
+      const result = await updateSaleStatus(saleId, newStatus as SaleStatus);
       
-      await handleSaldoUpdate(currentSale, newStatus);
-      await fetchSales();
-      await fetchStock();
-    } else {
-      throw new Error(result.message || 'Gagal mengubah status');
+      if (result.success) {
+        toast({
+          title: "Sukses",
+          description: `Status pesanan berhasil diubah ke ${getStatusLabel(newStatus)}`,
+        });
+        
+        await handleSaldoUpdate(currentSale, newStatus);
+        await fetchSales();
+        await fetchStock();
+      } else {
+        throw new Error(result.message || 'Gagal mengubah status');
+      }
+    } catch (error) {
+      console.error('Error in handleStatusUpdate:', error);
+      toast({
+        title: "Error",
+        description: `Gagal mengubah status pesanan: ${(error as any)?.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
     }
-  } catch (error) {
-    console.error('Error in handleStatusUpdate:', error);
-    toast({
-      title: "Error",
-      description: `Gagal mengubah status pesanan: ${(error as any)?.message || 'Unknown error'}`,
-      variant: "destructive",
-    });
-  }
-};
-  // **[PERBAIKAN 2] - GANTI FUNGSI INI**
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!formData.no_pesanan_platform || !formData.customer_name || !formData.store_id || formData.items.length === 0) {
       toast({
         title: "Error",
@@ -270,9 +270,20 @@ const Sales = () => {
       });
       return;
     }
-    const validItems = formData.items.filter(item =>
-      item.product_variant_id && item.quantity > 0 && item.harga_satuan > 0
-    );
+
+    const validItems = formData.items.filter(item => {
+      // Untuk edit mode, check juga product_name sebagai fallback
+      const hasValidProduct = item.product_variant_id || 
+        (editingSale && item.product_name && item.variant_display);
+      
+      return hasValidProduct && item.quantity > 0 && item.harga_satuan > 0;
+    });
+
+    // TAMBAHKAN DEBUG LOG
+    console.log('Form Data Items:', formData.items);
+    console.log('Valid Items:', validItems);
+    console.log('Editing Sale:', editingSale);
+
     if (validItems.length === 0) {
       toast({
         title: "Error",
@@ -281,10 +292,16 @@ const Sales = () => {
       });
       return;
     }
-    // *** VALIDASI STOK ***
+
+    // *** VALIDASI STOK - PERBAIKAN ***
     for (const item of validItems) {
+      // Skip validasi stok jika edit mode dan produk tidak berubah
+      if (editingSale && item.product_name && item.variant_display && !item.product_variant_id) {
+        continue; // Skip validasi untuk item yang sudah ada
+      }
+      
       const product = stockProducts?.find(p => p?.id === item.product_variant_id);
-      if (!product) {
+      if (!product && item.product_variant_id) {
         toast({
           title: "Error",
           description: "Produk tidak ditemukan",
@@ -292,26 +309,30 @@ const Sales = () => {
         });
         return;
       }
-      const availableStock = product.stok || 0;
-      // Jika edit, hitung stok yang akan dikembalikan
-      let adjustedStock = availableStock;
-      if (editingSale) {
-        const existingItem = editingSale.sale_items?.find((existing: any) =>
-          existing.product_variant_id === item.product_variant_id
-        );
-        if (existingItem) {
-          adjustedStock += existingItem.quantity; // Tambah stok yang akan dikembalikan
+      
+      if (product) {
+        const availableStock = product.stok || 0;
+        // Jika edit, hitung stok yang akan dikembalikan
+        let adjustedStock = availableStock;
+        if (editingSale) {
+          const existingItem = editingSale.sale_items?.find((existing: any) =>
+            existing.product_variant_id === item.product_variant_id
+          );
+          if (existingItem) {
+            adjustedStock += existingItem.quantity; // Tambah stok yang akan dikembalikan
+          }
+        }
+        if (item.quantity > adjustedStock) {
+          toast({
+            title: "Stok Tidak Mencukupi",
+            description: `${product?.products?.nama_produk} (${product?.warna}-${product?.size}) - Stok tersedia: ${adjustedStock}, diminta: ${item.quantity}`,
+            variant: "destructive",
+          });
+          return;
         }
       }
-      if (item.quantity > adjustedStock) {
-        toast({
-          title: "Stok Tidak Mencukupi",
-          description: `${product?.products?.nama_produk} (${product?.warna}-${product?.size}) - Stok tersedia: ${adjustedStock}, diminta: ${item.quantity}`,
-          variant: "destructive",
-        });
-        return;
-      }
     }
+
     const saleData = {
       tanggal: formData.tanggal,
       no_pesanan_platform: formData.no_pesanan_platform,
@@ -325,12 +346,14 @@ const Sales = () => {
       status: formData.status,
       notes: formData.notes || null,
     };
+
     let result;
     if (editingSale) {
       result = await updateSale(editingSale.id, saleData, validItems, editingSale.sale_items);
     } else {
       result = await createSale(saleData, validItems);
     }
+
     if (!result.error) {
       setDialogOpen(false);
       resetForm();
@@ -345,9 +368,13 @@ const Sales = () => {
       product_variant_id: item.product_variant_id,
       quantity: item.quantity,
       harga_satuan: item.harga_satuan,
-      product_name: item.product_variant?.product?.nama_produk || 'Produk tidak dikenal',
+      product_name: item.product_variant?.products?.nama_produk || 
+                    item.product_variant?.product?.nama_produk || 
+                    'Produk tidak dikenal',
       variant_display: `${item.product_variant?.warna || 'N/A'} - ${item.product_variant?.size || 'N/A'}`
     })) || [{ product_variant_id: '', quantity: 1, harga_satuan: 0 }];
+
+    console.log('Existing Items:', existingItems); // DEBUG
 
     setFormData({
       tanggal: sale.tanggal,
@@ -408,8 +435,8 @@ const Sales = () => {
       items: prev.items.map((item, i) => {
         if (i === index) {
           const updatedItem = { ...item, [field]: value };
-
-          if (field === 'product_variant_id' && value && !item.product_name) {
+          
+          if (field === 'product_variant_id' && value) {
             const product = stockProducts?.find(p => p?.id === value);
             if (product?.products) {
               updatedItem.harga_satuan = product.products.harga_jual_default || 0;
@@ -417,7 +444,7 @@ const Sales = () => {
               updatedItem.variant_display = `${product.warna || ''} - ${product.size || ''}`;
             }
           }
-
+          
           return updatedItem;
         }
         return item;
@@ -676,12 +703,22 @@ const Sales = () => {
                             onValueChange={(value) => updateItem(index, 'product_variant_id', value)}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder={item.product_name && item.variant_display ?
-                                `${item.product_name} - ${item.variant_display}` :
+                              <SelectValue placeholder={
+                                // Jika edit mode dan ada existing product info
+                                editingSale && item.product_name && item.variant_display ? 
+                                  `${item.product_name} - ${item.variant_display}` :
+                                // Jika ada product_variant_id, cari di stockProducts
+                                item.product_variant_id ? 
+                                  (() => {
+                                    const product = stockProducts?.find(p => p?.id === item.product_variant_id);
+                                    return product ? 
+                                      `${product.products?.nama_produk || 'Produk'} - ${product.warna || ''} ${product.size || ''}` : 
+                                      "Produk terpilih";
+                                  })() :
+                                // Default placeholder
                                 "Pilih produk"
                               } />
                             </SelectTrigger>
-                            {/* **[PERBAIKAN 3] - GANTI BAGIAN INI** */}
                             <SelectContent>
                               {stockProducts?.map((product) => {
                                 const availableStock = product?.stok || 0;
@@ -704,153 +741,153 @@ const Sales = () => {
                                     className={isOutOfStock && !editingSale ? "opacity-50 cursor-not-allowed" : ""}
                                   >
                                     {product?.products?.nama_produk || 'Produk tidak diketahui'} - {product?.warna || '-'} {product?.size || '-'}
-                                    <span className={`ml-2 ${adjustedStock <= 0 ? 'text-red-500' : adjustedStock <= 5 ? 'text-yellow-500' : 'text-green-500'}`}>
-                                      (Stok: {adjustedStock})
-                                    </span>
-                                    {isOutOfStock && !editingSale && <span className="text-red-500 ml-1">[HABIS]</span>}
-                                  </SelectItem>
-                                );
-                              }) || <SelectItem value="" disabled>Tidak ada produk tersedia</SelectItem>}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label>Qty</Label>
-                          <Input
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
-                            min="1"
-                          />
-                        </div>
-                        <div>
-                          <Label>Harga Satuan</Label>
-                          <Input
-                            type="number"
-                            value={item.harga_satuan}
-                            onChange={(e) => updateItem(index, 'harga_satuan', Number(e.target.value))}
-                            min="0"
-                          />
-                        </div>
-                        <div className="flex items-end">
-                          <div className="w-full">
-                            <Label>Subtotal</Label>
-                            <div className="text-sm font-medium p-2 bg-muted rounded">
-                              {formatCurrency(item.quantity * item.harga_satuan)}
-                            </div>
-                          </div>
-                          {formData.items.length > 1 && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => removeItem(index)}
-                              className="ml-2"
-                            >
-                              ×
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                                   <span className={`ml-2 ${adjustedStock <= 0 ? 'text-red-500' : adjustedStock <= 5 ? 'text-yellow-500' : 'text-green-500'}`}>
+                                     (Stok: {adjustedStock})
+                                   </span>
+                                   {isOutOfStock && !editingSale && <span className="text-red-500 ml-1">[HABIS]</span>}
+                                 </SelectItem>
+                               );
+                             }) || <SelectItem value="" disabled>Tidak ada produk tersedia</SelectItem>}
+                           </SelectContent>
+                         </Select>
+                       </div>
+                       <div>
+                         <Label>Qty</Label>
+                         <Input
+                           type="number"
+                           value={item.quantity}
+                           onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
+                           min="1"
+                         />
+                       </div>
+                       <div>
+                         <Label>Harga Satuan</Label>
+                         <Input
+                           type="number"
+                           value={item.harga_satuan}
+                           onChange={(e) => updateItem(index, 'harga_satuan', Number(e.target.value))}
+                           min="0"
+                         />
+                       </div>
+                       <div className="flex items-end">
+                         <div className="w-full">
+                           <Label>Subtotal</Label>
+                           <div className="text-sm font-medium p-2 bg-muted rounded">
+                             {formatCurrency(item.quantity * item.harga_satuan)}
+                           </div>
+                         </div>
+                         {formData.items.length > 1 && (
+                           <Button
+                             type="button"
+                             size="sm"
+                             variant="outline"
+                             onClick={() => removeItem(index)}
+                             className="ml-2"
+                           >
+                             ×
+                           </Button>
+                         )}
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="ongkir">Ongkos Kirim</Label>
-                    <Input
-                      id="ongkir"
-                      type="number"
-                      value={formData.ongkir}
-                      onChange={(e) => setFormData(prev => ({ ...prev, ongkir: Number(e.target.value) }))}
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="diskon">Diskon</Label>
-                    <Input
-                      id="diskon"
-                      type="number"
-                      value={formData.diskon}
-                      onChange={(e) => setFormData(prev => ({ ...prev, diskon: Number(e.target.value) }))}
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="status">Status</Label>
-                    <Select
-                      value={formData.status}
-                      onValueChange={(value: any) => setFormData(prev => ({ ...prev, status: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="processing">Diproses</SelectItem>
-                        <SelectItem value="shipped">Dikirim</SelectItem>
-                        <SelectItem value="delivered">Selesai</SelectItem>
-                        <SelectItem value="cancelled">Dibatal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                 <div>
+                   <Label htmlFor="ongkir">Ongkos Kirim</Label>
+                   <Input
+                     id="ongkir"
+                     type="number"
+                     value={formData.ongkir}
+                     onChange={(e) => setFormData(prev => ({ ...prev, ongkir: Number(e.target.value) }))}
+                     min="0"
+                   />
+                 </div>
+                 <div>
+                   <Label htmlFor="diskon">Diskon</Label>
+                   <Input
+                     id="diskon"
+                     type="number"
+                     value={formData.diskon}
+                     onChange={(e) => setFormData(prev => ({ ...prev, diskon: Number(e.target.value) }))}
+                     min="0"
+                   />
+                 </div>
+                 <div>
+                   <Label htmlFor="status">Status</Label>
+                   <Select
+                     value={formData.status}
+                     onValueChange={(value: any) => setFormData(prev => ({ ...prev, status: value }))}
+                   >
+                     <SelectTrigger>
+                       <SelectValue />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="pending">Pending</SelectItem>
+                       <SelectItem value="processing">Diproses</SelectItem>
+                       <SelectItem value="shipped">Dikirim</SelectItem>
+                       <SelectItem value="delivered">Selesai</SelectItem>
+                       <SelectItem value="cancelled">Dibatal</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
+               </div>
 
-                <div className="bg-muted p-4 rounded-lg">
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span>{formatCurrency(calculateSubtotal())}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Ongkos Kirim:</span>
-                      <span>{formatCurrency(formData.ongkir)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Diskon:</span>
-                      <span>-{formatCurrency(formData.diskon)}</span>
-                    </div>
-                    <div className="flex justify-between font-bold text-lg">
-                      <span>Total:</span>
-                      <span className="text-primary">{formatCurrency(calculateTotal())}</span>
-                    </div>
-                  </div>
-                </div>
+               <div className="bg-muted p-4 rounded-lg">
+                 <div className="space-y-2">
+                   <div className="flex justify-between">
+                     <span>Subtotal:</span>
+                     <span>{formatCurrency(calculateSubtotal())}</span>
+                   </div>
+                   <div className="flex justify-between">
+                     <span>Ongkos Kirim:</span>
+                     <span>{formatCurrency(formData.ongkir)}</span>
+                   </div>
+                   <div className="flex justify-between">
+                     <span>Diskon:</span>
+                     <span>-{formatCurrency(formData.diskon)}</span>
+                   </div>
+                   <div className="flex justify-between font-bold text-lg">
+                     <span>Total:</span>
+                     <span className="text-primary">{formatCurrency(calculateTotal())}</span>
+                   </div>
+                 </div>
+               </div>
 
-                <div className="flex gap-2 pt-4">
-                  <Button type="submit" disabled={loading} className="gradient-primary">
-                    {loading ? 'Menyimpan...' : editingSale ? 'Update Penjualan' : 'Simpan Penjualan'}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                    Batal
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
+               <div className="flex gap-2 pt-4">
+                 <Button type="submit" disabled={loading} className="gradient-primary">
+                   {loading ? 'Menyimpan...' : editingSale ? 'Update Penjualan' : 'Simpan Penjualan'}
+                 </Button>
+                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                   Batal
+                 </Button>
+               </div>
+             </form>
+           </DialogContent>
+         </Dialog>
+       )}
+     </div>
 
-      <Card className="glass-card border-0">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5" />
-            Daftar Penjualan
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            data={sales || []}
-            columns={columns}
-            loading={loading}
-            searchable={true}
-            searchPlaceholder="Cari penjualan..."
-          />
-        </CardContent>
-      </Card>
-    </div>
-  );
+     <Card className="glass-card border-0">
+       <CardHeader>
+         <CardTitle className="flex items-center gap-2">
+           <ShoppingCart className="h-5 w-5" />
+           Daftar Penjualan
+         </CardTitle>
+       </CardHeader>
+       <CardContent>
+         <DataTable
+           data={sales || []}
+           columns={columns}
+           loading={loading}
+           searchable={true}
+           searchPlaceholder="Cari penjualan..."
+         />
+       </CardContent>
+     </Card>
+   </div>
+ );
 };
 
 export default Sales;
