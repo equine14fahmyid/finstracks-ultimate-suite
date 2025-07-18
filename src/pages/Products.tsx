@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, InputCurrency } from '@/components/ui/input'; // Impor InputCurrency
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Package, Edit, Trash2, ShoppingCart } from 'lucide-react';
+import { Plus, Package, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProducts } from '@/hooks/useSupabase';
 import { DataTable } from '@/components/common/DataTable';
@@ -67,18 +67,16 @@ const Products = () => {
 
     const variants = formData.variants.filter(v => v.warna && v.size);
 
+    let result;
     if (editingProduct) {
-      const { error } = await updateProduct(editingProduct.id, productData);
-      if (!error) {
-        setDialogOpen(false);
-        resetForm();
-      }
+      result = await updateProduct(editingProduct.id, productData);
     } else {
-      const { error } = await createProduct(productData, variants);
-      if (!error) {
+      result = await createProduct(productData, variants);
+    }
+    
+    if (result && !result.error) {
         setDialogOpen(false);
         resetForm();
-      }
     }
   };
 
@@ -142,7 +140,7 @@ const Products = () => {
     {
       key: 'nama_produk',
       title: 'Nama Produk',
-      render: (value: any, product: any) => (
+      render: (_: any, product: any) => (
         <div>
           <div className="font-medium">{product?.nama_produk || '-'}</div>
           <div className="text-sm text-muted-foreground">{product?.satuan || 'pcs'}</div>
@@ -152,11 +150,11 @@ const Products = () => {
     {
       key: 'variants',
       title: 'Varian',
-      render: (value: any, product: any) => (
-        <div className="space-y-1">
+      render: (_: any, product: any) => (
+        <div className="flex flex-wrap gap-1">
           {product?.product_variants?.slice(0, 3).map((variant: any, index: number) => (
             <Badge key={index} variant="outline" className="text-xs">
-              {variant?.warna || '-'} - {variant?.size || '-'} ({variant?.stok || 0})
+              {variant?.warna || '-'} / {variant?.size || '-'} ({variant?.stok || 0})
             </Badge>
           )) || <span className="text-muted-foreground text-sm">Tidak ada varian</span>}
           {product?.product_variants?.length > 3 && (
@@ -170,17 +168,17 @@ const Products = () => {
     {
       key: 'harga_beli',
       title: 'Harga Beli',
-      render: (value: any, product: any) => formatCurrency(product?.harga_beli)
+      render: (_: any, product: any) => formatCurrency(product?.harga_beli)
     },
     {
       key: 'harga_jual_default',
       title: 'Harga Jual',
-      render: (value: any, product: any) => formatCurrency(product?.harga_jual_default)
+      render: (_: any, product: any) => formatCurrency(product?.harga_jual_default)
     },
     {
       key: 'total_stock',
       title: 'Total Stok',
-      render: (value: any, product: any) => {
+      render: (_: any, product: any) => {
         const totalStock = product?.product_variants?.reduce((sum: number, v: any) => sum + (v?.stok || 0), 0) || 0;
         return (
           <Badge variant={totalStock > 10 ? "default" : totalStock > 0 ? "secondary" : "destructive"}>
@@ -192,7 +190,7 @@ const Products = () => {
     {
       key: 'actions',
       title: 'Aksi',
-      render: (value: any, product: any) => (
+      render: (_: any, product: any) => (
         <div className="flex gap-2">
           {hasPermission('products.update') && (
             <Button 
@@ -206,7 +204,7 @@ const Products = () => {
           {hasPermission('products.delete') && (
             <Button 
               size="sm" 
-              variant="outline" 
+              variant="destructive"
               onClick={() => handleDelete(product?.id)}
             >
               <Trash2 className="h-4 w-4" />
@@ -219,7 +217,6 @@ const Products = () => {
 
   return (
     <div className="space-y-6 p-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold gradient-text">Manajemen Produk</h1>
@@ -274,23 +271,21 @@ const Products = () => {
                   </div>
                   <div>
                     <Label htmlFor="harga_beli">Harga Beli *</Label>
-                    <Input
+                    <InputCurrency
                       id="harga_beli"
-                      type="number"
                       value={formData.harga_beli}
-                      onChange={(e) => setFormData(prev => ({ ...prev, harga_beli: Number(e.target.value) }))}
-                      placeholder="50000"
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, harga_beli: value }))}
+                      placeholder="Rp 0"
                       required
                     />
                   </div>
                   <div>
                     <Label htmlFor="harga_jual_default">Harga Jual Default *</Label>
-                    <Input
+                    <InputCurrency
                       id="harga_jual_default"
-                      type="number"
                       value={formData.harga_jual_default}
-                      onChange={(e) => setFormData(prev => ({ ...prev, harga_jual_default: Number(e.target.value) }))}
-                      placeholder="75000"
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, harga_jual_default: value }))}
+                      placeholder="Rp 0"
                       required
                     />
                   </div>
@@ -374,7 +369,6 @@ const Products = () => {
         )}
       </div>
 
-      {/* Products Table */}
       <Card className="glass-card border-0">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
