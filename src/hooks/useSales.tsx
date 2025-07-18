@@ -102,7 +102,7 @@ export const useSales = () => {
         product_variant_id: item.product_variant_id,
         quantity: Number(item.quantity),
         harga_satuan: Number(item.harga_satuan),
-        subtotal: Number(item.quantity) * Number(item.harga_satuan)
+        subtotal: Number(item.quantity) * Number(item.harga_satuan) // Hitung subtotal per item
       }));
 
       const { error: itemsError } = await supabase
@@ -111,45 +111,42 @@ export const useSales = () => {
 
       if (itemsError) throw itemsError;
 
-      // HANYA KURANGI STOK JIKA STATUS SHIPPED/DELIVERED
-      if (saleData.status === 'shipped' || saleData.status === 'delivered') {
-        for (const item of items) {
-          const { data: currentStock, error: stockFetchError } = await supabase
-            .from('product_variants')
-            .select('stok')
-            .eq('id', item.product_variant_id)
-            .single();
+      for (const item of items) {
+        const { data: currentStock, error: stockFetchError } = await supabase
+          .from('product_variants')
+          .select('stok')
+          .eq('id', item.product_variant_id)
+          .single();
 
-          if (stockFetchError) {
-            console.error('Error fetching current stock:', stockFetchError);
-            continue;
-          }
+        if (stockFetchError) {
+          console.error('Error fetching current stock:', stockFetchError);
+          continue;
+        }
 
-          const newStock = (currentStock.stok || 0) - Number(item.quantity);
+        const newStock = (currentStock.stok || 0) - Number(item.quantity);
 
-          const { error: stockError } = await supabase
-            .from('product_variants')
-            .update({ stok: newStock })
-            .eq('id', item.product_variant_id);
+        const { error: stockError } = await supabase
+          .from('product_variants')
+          .update({ stok: newStock })
+          .eq('id', item.product_variant_id);
 
-          if (stockError) {
-            console.error('Stock update error:', stockError);
-          }
+        if (stockError) {
+          console.error('Stock update error:', stockError);
+        }
 
-          const { error: movementError } = await supabase
-            .from('stock_movements')
-            .insert([{
-              product_variant_id: item.product_variant_id,
-              movement_type: 'out',
-              quantity: Number(item.quantity),
-              reference_type: 'sale',
-              reference_id: saleResult.id,
-              notes: `Penjualan: ${saleData.no_pesanan_platform}`
-            }]);
+        const { error: movementError } = await supabase
+          .from('stock_movements')
+          .insert([{
+            product_variant_id: item.product_variant_id,
+            movement_type: 'out',
+            quantity: Number(item.quantity),
+            reference_type: 'sale',
+            reference_id: saleResult.id,
+            notes: `Penjualan: ${saleData.no_pesanan_platform}`
+          }]);
 
-          if (movementError) {
-            console.error('Movement error:', movementError);
-          }
+        if (movementError) {
+          console.error('Movement error:', movementError);
         }
       }
 
@@ -174,27 +171,36 @@ export const useSales = () => {
   };
 
   const updateSale = async (saleId: string, saleData: any, items: any[], existingItems?: any[]) => {
-    setLoading(true);
-    try {
-      const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.harga_satuan)), 0);
-      const total = subtotal + (Number(saleData.ongkir) || 0) - (Number(saleData.diskon) || 0);
+  setLoading(true);
+  try {
+    const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.harga_satuan)), 0);
+    const total = subtotal + (Number(saleData.ongkir) || 0) - (Number(saleData.diskon) || 0);
 
-      const completeData = {
-        ...saleData,
-        subtotal,
-        total
-      };
+    const completeData = {
+      ...saleData,
+      subtotal,
+      total
+    };
 
-      // Update sale data
-      const { error: saleError } = await supabase
+    // Update sale data
+    const { error: saleError } = await supabase
+      .from('sales')
+      .update(completeData)
+      .eq('id', saleId);
+
+    if (saleError) throw saleError;
+
+    // *** PERBAIKAN: Kembalikan stok HANYA jika status lama shipped/delivered ***
+    if (existingItems && existingItems.length > 0) {
+      // Cek status sale yang lama
+      const { data: oldSaleData, error: oldSaleError } = await supabase
         .from('sales')
-        .update(completeData)
-        .eq('id', saleId);
+        .select('status')
+        .eq('id', saleId)
+        .single();
 
-      if (saleError) throw saleError;
-
-      // LOGIC BARU: KEMBALIKAN STOK DARI ITEM LAMA DULU
-      if (existingItems && existingItems.length > 0) {
+      // Kembalikan stok hanya jika status lama adalah shipped/delivered
+      if (!oldSaleError && (oldSaleData.status === 'shipped' || oldSaleData.status === 'delivered')) {
         for (const existingItem of existingItems) {
           const { data: currentStock, error: stockFetchError } = await supabase
             .from('product_variants')
@@ -207,119 +213,117 @@ export const useSales = () => {
             continue;
           }
 
-          // Kembalikan stok dari transaksi lama jika statusnya shipped/delivered
-          if (saleData.status === 'shipped' || saleData.status === 'delivered') {
-            const restoredStock = (currentStock.stok || 0) + Number(existingItem.quantity);
-            
-            const { error: restoreError } = await supabase
-              .from('product_variants')
-              .update({ stok: restoredStock })
-              .eq('id', existingItem.product_variant_id);
+          // Kembalikan stok dari transaksi lama
+          const restoredStock = (currentStock.stok || 0) + Number(existingItem.quantity);
+          
+          const { error: restoreError } = await supabase
+            .from('product_variants')
+            .update({ stok: restoredStock })
+            .eq('id', existingItem.product_variant_id);
 
-            if (restoreError) {
-              console.error('Stock restore error:', restoreError);
-            }
+          if (restoreError) {
+            console.error('Stock restore error:', restoreError);
           }
         }
       }
-
-      // Hapus sale items lama
-      const { error: deleteError } = await supabase
-        .from('sale_items')
-        .delete()
-        .eq('sale_id', saleId);
-
-      if (deleteError) throw deleteError;
-
-      // Hapus stock movements lama
-      const { error: deleteMoveError } = await supabase
-        .from('stock_movements')
-        .delete()
-        .eq('reference_id', saleId)
-        .eq('reference_type', 'sale');
-
-      if (deleteMoveError) {
-        console.error('Delete movement error:', deleteMoveError);
-      }
-
-      // Insert sale items baru
-      const newSaleItems = items.map(item => ({
-        sale_id: saleId,
-        product_variant_id: item.product_variant_id,
-        quantity: Number(item.quantity),
-        harga_satuan: Number(item.harga_satuan),
-        subtotal: Number(item.quantity) * Number(item.harga_satuan)
-      }));
-
-      const { error: newItemsError } = await supabase
-        .from('sale_items')
-        .insert(newSaleItems);
-
-      if (newItemsError) throw newItemsError;
-
-      // Kurangi stok dengan data baru HANYA jika status shipped/delivered
-      if (saleData.status === 'shipped' || saleData.status === 'delivered') {
-        for (const item of items) {
-          const { data: currentStock, error: stockFetchError } = await supabase
-            .from('product_variants')
-            .select('stok')
-            .eq('id', item.product_variant_id)
-            .single();
-
-          if (stockFetchError) {
-            console.error('Error fetching current stock:', stockFetchError);
-            continue;
-          }
-
-          const newStock = (currentStock.stok || 0) - Number(item.quantity);
-
-          const { error: stockError } = await supabase
-            .from('product_variants')
-            .update({ stok: newStock })
-            .eq('id', item.product_variant_id);
-
-          if (stockError) {
-            console.error('Stock update error:', stockError);
-          }
-
-          // Insert stock movement
-          const { error: movementError } = await supabase
-            .from('stock_movements')
-            .insert([{
-              product_variant_id: item.product_variant_id,
-              movement_type: 'out',
-              quantity: Number(item.quantity),
-              reference_type: 'sale',
-              reference_id: saleId,
-              notes: `Update penjualan: ${saleData.no_pesanan_platform}`
-            }]);
-
-          if (movementError) {
-            console.error('Movement error:', movementError);
-          }
-        }
-      }
-
-      toast({
-        title: "Sukses",
-        description: "Penjualan berhasil diperbarui",
-      });
-
-      await fetchSales();
-      return { success: true };
-    } catch (error) {
-      console.error('Error updating sale:', error);
-      toast({
-        title: "Error", 
-        description: "Gagal memperbarui penjualan: " + (error as Error).message,
-        variant: "destructive",
-      });
-      return { error: true };
-    } finally {
-      setLoading(false);
     }
-  };
 
+    // Hapus sale items lama
+    const { error: deleteError } = await supabase
+      .from('sale_items')
+      .delete()
+      .eq('sale_id', saleId);
+
+    if (deleteError) throw deleteError;
+
+    // Hapus stock movements lama
+    const { error: deleteMoveError } = await supabase
+      .from('stock_movements')
+      .delete()
+      .eq('reference_id', saleId)
+      .eq('reference_type', 'sale');
+
+    if (deleteMoveError) {
+      console.error('Delete movement error:', deleteMoveError);
+    }
+
+    // Insert sale items baru
+    const newSaleItems = items.map(item => ({
+      sale_id: saleId,
+      product_variant_id: item.product_variant_id,
+      quantity: Number(item.quantity),
+      harga_satuan: Number(item.harga_satuan),
+      subtotal: Number(item.quantity) * Number(item.harga_satuan)
+    }));
+
+    const { error: newItemsError } = await supabase
+      .from('sale_items')
+      .insert(newSaleItems);
+
+    if (newItemsError) throw newItemsError;
+
+    // Kurangi stok dengan data baru HANYA jika status baru shipped/delivered
+    if (saleData.status === 'shipped' || saleData.status === 'delivered') {
+      for (const item of items) {
+        const { data: currentStock, error: stockFetchError } = await supabase
+          .from('product_variants')
+          .select('stok')
+          .eq('id', item.product_variant_id)
+          .single();
+
+        if (stockFetchError) {
+          console.error('Error fetching current stock:', stockFetchError);
+          continue;
+        }
+
+        const newStock = (currentStock.stok || 0) - Number(item.quantity);
+
+        const { error: stockError } = await supabase
+          .from('product_variants')
+          .update({ stok: newStock })
+          .eq('id', item.product_variant_id);
+
+        if (stockError) {
+          console.error('Stock update error:', stockError);
+        }
+
+        // Insert stock movement
+        const { error: movementError } = await supabase
+          .from('stock_movements')
+          .insert([{
+            product_variant_id: item.product_variant_id,
+            movement_type: 'out',
+            quantity: Number(item.quantity),
+            reference_type: 'sale',
+            reference_id: saleId,
+            notes: `Update penjualan: ${saleData.no_pesanan_platform}`
+          }]);
+
+        if (movementError) {
+          console.error('Movement error:', movementError);
+        }
+      }
+    }
+
+    toast({
+      title: "Sukses",
+      description: "Penjualan berhasil diperbarui",
+    });
+
+    await fetchSales();
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating sale:', error);
+    toast({
+      title: "Error", 
+      description: "Gagal memperbarui penjualan: " + (error as Error).message,
+      variant: "destructive",
+    });
+    return { error: true };
+  } finally {
+    setLoading(false);
+  }
+};
   const deleteSale = async (saleId: string) => {
     setLoading(true);
     try {
@@ -337,8 +341,7 @@ export const useSales = () => {
 
       if (fetchError) throw fetchError;
 
-      // Kembalikan stok jika status yang dihapus adalah shipped/delivered
-      if (saleData?.sale_items && (saleData.status === 'shipped' || saleData.status === 'delivered')) {
+      if (saleData?.sale_items) {
         for (const item of saleData.sale_items) {
           const { data: currentStock, error: stockFetchError } = await supabase
             .from('product_variants')
