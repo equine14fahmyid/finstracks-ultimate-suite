@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { InputCurrency } from '@/components/ui/input'; // Ganti import
+import { Input, InputCurrency } from '@/components/ui/input'; // PERBAIKAN DI SINI
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, DollarSign, Calendar, TrendingDown } from 'lucide-react';
@@ -12,10 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency, formatShortDate } from '@/utils/format';
-import { ExpenseFormData, Expense } from '@/types'; // Hapus Category dan Bank karena tidak dipakai langsung
+import { ExpenseFormData, Expense } from '@/types';
 
 const Expenses = () => {
-  const { expenses, loading, createExpense, updateExpense, deleteExpense } = useExpenses();
+  const { expenses, loading, fetchExpenses, createExpense, updateExpense, deleteExpense } = useExpenses();
   const { categories, fetchCategories } = useCategories();
   const { banks, fetchBanks } = useBanks();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -31,6 +31,7 @@ const Expenses = () => {
   const expenseCategories = categories.filter(cat => cat.tipe_kategori === 'expense');
 
   useEffect(() => {
+    // fetchExpenses() sudah dipanggil di dalam useExpenses hook, tidak perlu di sini lagi
     fetchCategories();
     fetchBanks();
   }, []);
