@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertTriangle, Package, TrendingDown, TrendingUp, Plus, Edit, Trash2, Bug } from 'lucide-react';
+import { AlertTriangle, Package, TrendingDown, TrendingUp, Plus, Edit, Trash2, Bug, RefreshCw } from 'lucide-react';
 import { useStock, useProducts } from '@/hooks/useSupabase';
 import { DataTable } from '@/components/common/DataTable';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -13,6 +13,7 @@ import { toast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/utils/format';
 import { useNavigate } from 'react-router-dom';
 import EmptyState from '@/components/common/EmptyState';
+
 const Inventory = () => {
   const navigate = useNavigate();
   const {
@@ -35,6 +36,7 @@ const Inventory = () => {
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [adjustmentData, setAdjustmentData] = useState({
     quantity: 0,
     notes: ''
@@ -46,11 +48,42 @@ const Inventory = () => {
     stok: 0,
     sku: ''
   });
+
   useEffect(() => {
     fetchStock();
     fetchStockMovements();
     fetchProducts();
   }, []);
+
+  // Auto refresh setiap 30 detik untuk real-time updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!dialogOpen && !variantDialogOpen) {
+        fetchStock();
+        fetchStockMovements();
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [dialogOpen, variantDialogOpen]);
+
+  // Manual refresh function
+  const handleManualRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        fetchStock(),
+        fetchStockMovements(),
+        fetchProducts()
+      ]);
+      toast({
+        title: "Data Diperbarui",
+        description: "Data inventory telah diperbarui",
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Helper function to get product name safely
   const getProductName = (item: any) => {
@@ -66,6 +99,7 @@ const Inventory = () => {
   const getProductUnit = (item: any) => {
     return item?.products?.satuan || item?.product?.satuan || item?.satuan || 'pcs';
   };
+
   const resetVariantForm = () => {
     setVariantFormData({
       product_id: '',
@@ -77,6 +111,7 @@ const Inventory = () => {
     setIsEditMode(false);
     setSelectedVariant(null);
   };
+
   const handleStockAdjustment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedVariant || adjustmentData.quantity < 0) {
@@ -87,6 +122,17 @@ const Inventory = () => {
       });
       return;
     }
+
+    // Validasi: stok baru tidak boleh negatif
+    if (adjustmentData.quantity < 0) {
+      toast({
+        title: "Error",
+        description: "Stok tidak boleh negatif",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       await adjustStock(selectedVariant.id, adjustmentData.quantity, adjustmentData.notes || 'Penyesuaian stok manual');
       setDialogOpen(false);
@@ -99,6 +145,10 @@ const Inventory = () => {
         title: "Sukses",
         description: "Stok berhasil disesuaikan"
       });
+      
+      // Refresh data setelah adjustment
+      await fetchStock();
+      await fetchStockMovements();
     } catch (error) {
       console.error('Stock adjustment error:', error);
       toast({
@@ -108,6 +158,7 @@ const Inventory = () => {
       });
     }
   };
+
   const handleVariantSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!variantFormData.product_id || !variantFormData.warna || !variantFormData.size) {
@@ -118,6 +169,17 @@ const Inventory = () => {
       });
       return;
     }
+
+    // Validasi: stok awal tidak boleh negatif
+    if (variantFormData.stok < 0) {
+      toast({
+        title: "Error",
+        description: "Stok awal tidak boleh negatif",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       let result;
       if (isEditMode && selectedVariant) {
@@ -141,6 +203,7 @@ const Inventory = () => {
       });
     }
   };
+
   const handleEditVariant = (variant: any) => {
     if (!variant) {
       toast({
@@ -161,6 +224,7 @@ const Inventory = () => {
     setIsEditMode(true);
     setVariantDialogOpen(true);
   };
+
   const handleDeleteVariant = async (id: string) => {
     if (!id) {
       toast({
@@ -182,6 +246,14 @@ const Inventory = () => {
     }
   };
 
+  // Check stock status with color coding
+  const getStockStatus = (stok: number) => {
+    if (stok <= 0) return { status: 'habis', color: 'text-red-600', bgColor: 'bg-red-100' };
+    if (stok <= 5) return { status: 'rendah', color: 'text-yellow-600', bgColor: 'bg-yellow-100' };
+    if (stok <= 10) return { status: 'sedang', color: 'text-blue-600', bgColor: 'bg-blue-100' };
+    return { status: 'aman', color: 'text-green-600', bgColor: 'bg-green-100' };
+  };
+
   // PERBAIKAN: Simplified columns tanpa masalah TypeScript
   const stockColumns = [{
     key: 'product',
@@ -189,12 +261,17 @@ const Inventory = () => {
     render: (value: any, item: any) => {
       if (!item) return <div>Data tidak tersedia</div>;
       const productName = getProductName(item);
+      const stockStatus = getStockStatus(item.stok || 0);
+      
       return <div>
             <div className="font-medium">{productName}</div>
             <div className="text-sm text-muted-foreground">
               {item.warna || 'N/A'} - {item.size || 'N/A'}
             </div>
             {item.sku && <div className="text-xs text-muted-foreground">SKU: {item.sku}</div>}
+            <Badge variant="outline" className={`text-xs mt-1 ${stockStatus.color} ${stockStatus.bgColor}`}>
+              Status: {stockStatus.status.toUpperCase()}
+            </Badge>
           </div>;
     }
   }, {
@@ -204,14 +281,16 @@ const Inventory = () => {
       if (!item) return <div>0</div>;
       const stok = item.stok ?? 0;
       const unit = getProductUnit(item);
+      const stockStatus = getStockStatus(stok);
+      
       return <div className="flex items-center gap-2">
-            <span className={`font-medium ${stok <= 5 ? 'text-red-600' : stok <= 10 ? 'text-yellow-600' : 'text-green-600'}`}>
+            <span className={`font-medium text-lg ${stockStatus.color}`}>
               {stok.toLocaleString('id-ID')}
             </span>
             <span className="text-sm text-muted-foreground">{unit}</span>
             {stok <= 5 && <Badge variant="destructive" className="text-xs">
                 <AlertTriangle className="h-3 w-3 mr-1" />
-                Stok Rendah
+                {stok <= 0 ? 'HABIS' : 'RENDAH'}
               </Badge>}
           </div>;
     }
@@ -223,6 +302,7 @@ const Inventory = () => {
       const stok = item.stok || 0;
       const hargaBeli = getProductPrice(item);
       const totalValue = stok * hargaBeli;
+      
       return <div>
             <div className="font-medium">
               {formatCurrency(totalValue)}
@@ -230,6 +310,33 @@ const Inventory = () => {
             <div className="text-sm text-muted-foreground">
               @ {formatCurrency(hargaBeli)}
             </div>
+          </div>;
+    }
+  }, {
+    key: 'last_movement',
+    title: 'Pergerakan Terakhir',
+    render: (value: any, item: any) => {
+      if (!item) return <div>-</div>;
+      
+      // Find last movement for this variant
+      const lastMovement = movements?.find(movement => 
+        movement?.product_variant_id === item.id
+      );
+      
+      if (!lastMovement) {
+        return <div className="text-sm text-muted-foreground">Belum ada pergerakan</div>;
+      }
+      
+      const date = new Date(lastMovement.created_at).toLocaleDateString('id-ID');
+      const isIncoming = lastMovement.movement_type === 'in';
+      
+      return <div className="text-sm">
+            <div className={`flex items-center gap-1 ${isIncoming ? 'text-green-600' : 'text-red-600'}`}>
+              {isIncoming ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+              <span>{isIncoming ? '+' : '-'}{lastMovement.quantity}</span>
+            </div>
+            <div className="text-muted-foreground text-xs">{date}</div>
+            <div className="text-muted-foreground text-xs">{lastMovement.reference_type || 'Manual'}</div>
           </div>;
     }
   }, {
@@ -245,18 +352,19 @@ const Inventory = () => {
             notes: ''
           });
           setDialogOpen(true);
-        }}>
+        }} title="Sesuaikan Stok">
               <Package className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEditVariant(item)}>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEditVariant(item)} title="Edit Varian">
               <Edit className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-600 hover:text-red-700" onClick={() => handleDeleteVariant(item.id)}>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-600 hover:text-red-700" onClick={() => handleDeleteVariant(item.id)} title="Hapus Varian">
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>;
     }
   }];
+
   const movementColumns = [{
     key: 'created_at',
     title: 'Tanggal',
@@ -304,9 +412,21 @@ const Inventory = () => {
     title: 'Referensi',
     render: (value: any, movement: any) => {
       if (!movement) return <div className="text-sm">N/A</div>;
+      
+      const getReferenceName = (refType: string) => {
+        const types: Record<string, string> = {
+          'sale': 'Penjualan',
+          'purchase': 'Pembelian',
+          'sale_status_change': 'Perubahan Status',
+          'adjustment': 'Penyesuaian',
+          'manual': 'Manual'
+        };
+        return types[refType] || refType;
+      };
+      
       return <div className="text-sm">
-            <div className="capitalize">{movement.reference_type || 'Manual'}</div>
-            {movement.notes && <div className="text-muted-foreground">{movement.notes}</div>}
+            <div className="capitalize font-medium">{getReferenceName(movement.reference_type || 'manual')}</div>
+            {movement.notes && <div className="text-muted-foreground text-xs">{movement.notes}</div>}
           </div>;
     }
   }];
@@ -317,10 +437,14 @@ const Inventory = () => {
     const harga = getProductPrice(item);
     return total + stok * harga;
   }, 0) || 0;
+  
   const lowStockItems = stock?.filter(item => (item?.stok || 0) <= 5) || [];
+  const outOfStockItems = stock?.filter(item => (item?.stok || 0) <= 0) || [];
   const totalStock = stock?.reduce((total, item) => total + (item?.stok || 0), 0) || 0;
   const filteredMovements = movements?.filter(movement => movement != null) || [];
-  if (loading) return <div className="p-6">Loading stock data...</div>;
+
+  if (loading && !stock?.length) return <div className="p-6">Loading stock data...</div>;
+
   if (!stock?.length) {
     return <div className="container mx-auto p-6 space-y-6">
         <div className="flex justify-between items-center">
@@ -330,13 +454,20 @@ const Inventory = () => {
         <EmptyState icon="📦" title="Belum Ada Data Stok" description="Mulai dengan menambahkan produk dan varian untuk mengelola stok Anda. Buka menu Master Data > Produk untuk menambahkan produk baru." actionLabel="+ Tambah Produk" onAction={() => navigate('/master-data/products')} />
       </div>;
   }
+
   return <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Manajemen Stok</h1>
-        <Button variant="outline" size="sm" onClick={() => setShowDebug(!showDebug)}>
-          <Bug className="h-4 w-4 mr-2" />
-          {showDebug ? 'Hide' : 'Show'} Debug
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleManualRefresh} disabled={refreshing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Memperbarui...' : 'Perbarui'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowDebug(!showDebug)}>
+            <Bug className="h-4 w-4 mr-2" />
+            {showDebug ? 'Hide' : 'Show'} Debug
+          </Button>
+        </div>
       </div>
 
       {/* Debug Panel */}
@@ -348,6 +479,8 @@ const Inventory = () => {
             <div className="space-y-2">
               <div><strong>Stock Items:</strong> {stock?.length || 0}</div>
               <div><strong>Products:</strong> {products?.length || 0}</div>
+              <div><strong>Stock Movements:</strong> {movements?.length || 0}</div>
+              <div><strong>Last Refresh:</strong> {new Date().toLocaleTimeString('id-ID')}</div>
               {stock?.length > 0 && <div>
                   <strong>First Stock Item Structure:</strong>
                   <pre className="bg-yellow-100 p-2 rounded text-xs overflow-x-auto">
@@ -395,12 +528,16 @@ const Inventory = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Stok Rendah</CardTitle>
+            <CardTitle className="text-sm font-medium">Alert Stok</CardTitle>
             <AlertTriangle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{lowStockItems.length}</div>
-            <p className="text-xs text-muted-foreground">Perlu restock</p>
+            <div className="space-y-1">
+              <div className="text-lg font-bold text-red-600">{outOfStockItems.length}</div>
+              <p className="text-xs text-red-600">Stok habis</p>
+              <div className="text-lg font-bold text-yellow-600">{lowStockItems.length - outOfStockItems.length}</div>
+              <p className="text-xs text-yellow-600">Stok rendah</p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -415,7 +552,10 @@ const Inventory = () => {
             if (!open) resetVariantForm();
           }}>
               <DialogTrigger asChild>
-                
+                <Button variant="outline" size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Tambah Varian
+                </Button>
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <form onSubmit={handleVariantSubmit}>
@@ -538,10 +678,22 @@ const Inventory = () => {
               
               <div>
                 <Label htmlFor="quantity">Stok Baru *</Label>
-                <Input id="quantity" type="number" value={adjustmentData.quantity} onChange={e => setAdjustmentData(prev => ({
-              ...prev,
-              quantity: parseInt(e.target.value) || 0
-            }))} min="0" required />
+                <Input id="quantity" type="number" value={adjustmentData.quantity} onChange={e => {
+                const value = parseInt(e.target.value) || 0;
+                if (value >= 0) {
+                  setAdjustmentData(prev => ({
+                    ...prev,
+                    quantity: value
+                  }));
+                }
+              }} min="0" required />
+                <div className="text-xs text-muted-foreground mt-1">
+                  {adjustmentData.quantity > (selectedVariant?.stok || 0) 
+                    ? `Akan menambah ${adjustmentData.quantity - (selectedVariant?.stok || 0)} unit` 
+                    : adjustmentData.quantity < (selectedVariant?.stok || 0)
+                    ? `Akan mengurangi ${(selectedVariant?.stok || 0) - adjustmentData.quantity} unit`
+                    : 'Tidak ada perubahan'}
+                </div>
               </div>
               
               <div>
@@ -565,4 +717,5 @@ const Inventory = () => {
       </Dialog>
     </div>;
 };
+
 export default Inventory;
