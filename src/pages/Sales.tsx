@@ -124,21 +124,6 @@ const Sales = () => {
 
   const handleStatusUpdate = async (saleId: string, newStatus: string, currentSale: any) => {
     try {
-      // *** SKIP STOCK UPDATE JIKA SEDANG EDIT ***
-      if (editingSale && editingSale.id === saleId) {
-        // Hanya update status, skip stock logic
-        const result = await updateSaleStatus(saleId, newStatus as SaleStatus);
-        if (result.success) {
-          toast({
-            title: "Sukses", 
-            description: `Status pesanan berhasil diubah ke ${getStatusLabel(newStatus)}`,
-          });
-          await handleSaldoUpdate(currentSale, newStatus);
-          await fetchSales();
-        }
-        return;
-      }
-
       // Ambil data sale items untuk kalkulasi stok
       const { data: saleItems, error: itemsError } = await supabase
         .from('sale_items')
@@ -272,14 +257,12 @@ const Sales = () => {
     }
 
     const validItems = formData.items.filter(item => {
-      // Untuk edit mode, check juga product_name sebagai fallback
       const hasValidProduct = item.product_variant_id || 
         (editingSale && item.product_name && item.variant_display);
       
       return hasValidProduct && item.quantity > 0 && item.harga_satuan > 0;
     });
 
-    // TAMBAHKAN DEBUG LOG
     console.log('Form Data Items:', formData.items);
     console.log('Valid Items:', validItems);
     console.log('Editing Sale:', editingSale);
@@ -293,43 +276,22 @@ const Sales = () => {
       return;
     }
 
-    // *** VALIDASI STOK - PERBAIKAN ***
+    // Validasi stok - hanya untuk item dengan product_variant_id
     for (const item of validItems) {
-      // Skip validasi stok jika edit mode dan produk tidak berubah
-      if (editingSale && item.product_name && item.variant_display && !item.product_variant_id) {
-        continue; // Skip validasi untuk item yang sudah ada
-      }
-      
-      const product = stockProducts?.find(p => p?.id === item.product_variant_id);
-      if (!product && item.product_variant_id) {
-        toast({
-          title: "Error",
-          description: "Produk tidak ditemukan",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      if (product) {
-        const availableStock = product.stok || 0;
-        // Jika edit, hitung stok yang akan dikembalikan
-        let adjustedStock = availableStock;
-        if (editingSale) {
-          const existingItem = editingSale.sale_items?.find((existing: any) =>
-            existing.product_variant_id === item.product_variant_id
-          );
-          if (existingItem) {
-            adjustedStock += existingItem.quantity; // Tambah stok yang akan dikembalikan
-          }
-        }
-        if (item.quantity > adjustedStock) {
+      if (item.product_variant_id) {
+        const product = stockProducts?.find(p => p?.id === item.product_variant_id);
+        if (!product) {
           toast({
-            title: "Stok Tidak Mencukupi",
-            description: `${product?.products?.nama_produk} (${product?.warna}-${product?.size}) - Stok tersedia: ${adjustedStock}, diminta: ${item.quantity}`,
+            title: "Error",
+            description: "Produk tidak ditemukan",
             variant: "destructive",
           });
           return;
         }
+        
+        const availableStock = product.stok || 0;
+        // Note: No stock validation here since stock is only cut when status changes to shipped/delivered
+        console.log(`Product ${product?.products?.nama_produk}: Available stock ${availableStock}, Requested ${item.quantity}`);
       }
     }
 
@@ -349,7 +311,7 @@ const Sales = () => {
 
     let result;
     if (editingSale) {
-      result = await updateSale(editingSale.id, saleData, validItems, editingSale.sale_items);
+      result = await updateSale(editingSale.id, saleData, validItems);
     } else {
       result = await createSale(saleData, validItems);
     }
@@ -374,7 +336,7 @@ const Sales = () => {
       variant_display: `${item.product_variant?.warna || 'N/A'} - ${item.product_variant?.size || 'N/A'}`
     })) || [{ product_variant_id: '', quantity: 1, harga_satuan: 0 }];
 
-    console.log('Existing Items:', existingItems); // DEBUG
+    console.log('Existing Items:', existingItems);
 
     setFormData({
       tanggal: sale.tanggal,
@@ -704,10 +666,8 @@ const Sales = () => {
                           >
                             <SelectTrigger>
                               <SelectValue placeholder={
-                                // Jika edit mode dan ada existing product info
                                 editingSale && item.product_name && item.variant_display ? 
                                   `${item.product_name} - ${item.variant_display}` :
-                                // Jika ada product_variant_id, cari di stockProducts
                                 item.product_variant_id ? 
                                   (() => {
                                     const product = stockProducts?.find(p => p?.id === item.product_variant_id);
@@ -715,36 +675,21 @@ const Sales = () => {
                                       `${product.products?.nama_produk || 'Produk'} - ${product.warna || ''} ${product.size || ''}` : 
                                       "Produk terpilih";
                                   })() :
-                                // Default placeholder
                                 "Pilih produk"
                               } />
                             </SelectTrigger>
                             <SelectContent>
                               {stockProducts?.map((product) => {
                                 const availableStock = product?.stok || 0;
-                                const isOutOfStock = availableStock <= 0;
-                                // Jika edit, hitung stok yang tersedia + yang akan dikembalikan
-                                let adjustedStock = availableStock;
-                                if (editingSale && item.product_variant_id === product.id) {
-                                  const existingItem = editingSale.sale_items?.find((existing: any) =>
-                                    existing.product_variant_id === product.id
-                                  );
-                                  if (existingItem) {
-                                    adjustedStock += existingItem.quantity;
-                                  }
-                                }
                                 return (
                                   <SelectItem
                                     key={product.id}
                                     value={product.id}
-                                    disabled={isOutOfStock && !editingSale}
-                                    className={isOutOfStock && !editingSale ? "opacity-50 cursor-not-allowed" : ""}
                                   >
                                     {product?.products?.nama_produk || 'Produk tidak diketahui'} - {product?.warna || '-'} {product?.size || '-'}
-                                   <span className={`ml-2 ${adjustedStock <= 0 ? 'text-red-500' : adjustedStock <= 5 ? 'text-yellow-500' : 'text-green-500'}`}>
-                                     (Stok: {adjustedStock})
+                                   <span className={`ml-2 ${availableStock <= 0 ? 'text-red-500' : availableStock <= 5 ? 'text-yellow-500' : 'text-green-500'}`}>
+                                     (Stok: {availableStock})
                                    </span>
-                                   {isOutOfStock && !editingSale && <span className="text-red-500 ml-1">[HABIS]</span>}
                                  </SelectItem>
                                );
                              }) || <SelectItem value="" disabled>Tidak ada produk tersedia</SelectItem>}

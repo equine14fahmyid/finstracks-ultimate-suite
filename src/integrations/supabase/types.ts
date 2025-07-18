@@ -1134,6 +1134,10 @@ export type Database = {
         Args: { p_store_id: string; p_bank_id: string; p_amount: number }
         Returns: Json
       }
+      get_dashboard_analytics: {
+        Args: { start_date: string; end_date: string }
+        Returns: Json
+      }
       get_inventory_value_on_date: {
         Args: { p_report_date: string }
         Returns: number

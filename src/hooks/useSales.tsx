@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -108,9 +109,6 @@ export const useSales = () => {
 
       if (itemsError) throw itemsError;
 
-      // Stock management akan dihandle oleh handleStatusUpdate di Sales.tsx
-      // Tidak ada pemotongan stok otomatis saat create sale
-
       toast({
         title: "Sukses",
         description: "Penjualan berhasil ditambahkan",
@@ -131,7 +129,7 @@ export const useSales = () => {
     }
   };
 
-  const updateSale = async (saleId: string, saleData: any, items: any[], existingItems?: any[]) => {
+  const updateSale = async (saleId: string, saleData: any, items: any[]) => {
     setLoading(true);
     try {
       const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.harga_satuan)), 0);
@@ -151,7 +149,7 @@ export const useSales = () => {
 
       if (saleError) throw saleError;
 
-      // Hapus sale items lama
+      // Delete existing sale items
       const { error: deleteError } = await supabase
         .from('sale_items')
         .delete()
@@ -159,18 +157,7 @@ export const useSales = () => {
 
       if (deleteError) throw deleteError;
 
-      // Hapus stock movements lama
-      const { error: deleteMoveError } = await supabase
-        .from('stock_movements')
-        .delete()
-        .eq('reference_id', saleId)
-        .eq('reference_type', 'sale');
-
-      if (deleteMoveError) {
-        console.error('Delete movement error:', deleteMoveError);
-      }
-
-      // Insert sale items baru
+      // Insert new sale items
       const newSaleItems = items.map(item => ({
         sale_id: saleId,
         product_variant_id: item.product_variant_id,
@@ -184,9 +171,6 @@ export const useSales = () => {
         .insert(newSaleItems);
 
       if (newItemsError) throw newItemsError;
-
-      // Stock management akan dihandle oleh handleStatusUpdate di Sales.tsx
-      // Tidak ada pemotongan stok otomatis saat update sale
 
       toast({
         title: "Sukses",
@@ -225,7 +209,7 @@ export const useSales = () => {
 
       if (fetchError) throw fetchError;
 
-      // Kembalikan stok jika status yang dihapus adalah shipped/delivered
+      // Restore stock if sale status was shipped/delivered
       if (saleData?.sale_items && (saleData.status === 'shipped' || saleData.status === 'delivered')) {
         for (const item of saleData.sale_items) {
           const { data: currentStock, error: stockFetchError } = await supabase
