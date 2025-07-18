@@ -26,12 +26,10 @@ interface SettlementFormData {
 
 const Settlements = () => {
   const { hasPermission } = useAuth();
-  // PERBAIKAN: Ambil fungsi yang ada dari hook
   const { createSettlement, deleteSettlement } = useSettlements();
   const { stores, fetchStores } = useStores();
   const { banks, fetchBanks } = useBanks();
 
-  // PERBAIKAN: Kelola state secara lokal di dalam komponen ini
   const [settlements, setSettlements] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   
@@ -46,7 +44,6 @@ const Settlements = () => {
     keterangan: ''
   });
 
-  // PERBAIKAN: Tambahkan fungsi fetchSettlements yang hilang di sini
   const fetchSettlements = async () => {
     setLoading(true);
     try {
@@ -68,7 +65,6 @@ const Settlements = () => {
     }
   };
 
-  // PERBAIKAN: Tambahkan fungsi updateSettlement yang hilang di sini
   const updateSettlement = async (id: string, settlementData: SettlementFormData) => {
     setLoading(true);
     try {
@@ -88,7 +84,7 @@ const Settlements = () => {
       return { success: true, data };
     } catch (error: any) {
         toast({ title: "Error", description: `Gagal memperbarui: ${error.message}`, variant: "destructive" });
-        return { error: true };
+        return { success: false, error: true };
     } finally {
         setLoading(false);
     }
@@ -113,14 +109,19 @@ const Settlements = () => {
       return;
     }
 
-    const result = editingSettlement
-      ? await updateSettlement(editingSettlement.id, formData)
-      : await createSettlement(formData);
-
-    if (result && !result.error) {
+    if (editingSettlement) {
+      const result = await updateSettlement(editingSettlement.id, formData);
+      if (result.success) {
+        setDialogOpen(false);
+        resetForm();
+      }
+    } else {
+      // createSettlement dari hook tidak mengembalikan status, tapi menampilkan toast sendiri.
+      // Kita panggil, lalu langsung tutup dialog & refresh data.
+      await createSettlement(formData);
       setDialogOpen(false);
       resetForm();
-      await fetchSettlements(); // Panggil fetch lokal
+      await fetchSettlements();
     }
   };
 
@@ -138,10 +139,8 @@ const Settlements = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const result = await deleteSettlement(id);
-    if(result && !result.error) {
-      await fetchSettlements(); // Panggil fetch lokal
-    }
+    await deleteSettlement(id);
+    await fetchSettlements(); // Refresh data setelah hapus
   };
 
   const resetForm = () => {
