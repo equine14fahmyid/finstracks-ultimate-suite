@@ -108,47 +108,8 @@ export const useSales = () => {
 
       if (itemsError) throw itemsError;
 
-      // HANYA KURANGI STOK JIKA STATUS SHIPPED/DELIVERED
-      if (saleData.status === 'shipped' || saleData.status === 'delivered') {
-        for (const item of items) {
-          const { data: currentStock, error: stockFetchError } = await supabase
-            .from('product_variants')
-            .select('stok')
-            .eq('id', item.product_variant_id)
-            .single();
-
-          if (stockFetchError) {
-            console.error('Error fetching current stock:', stockFetchError);
-            continue;
-          }
-
-          const newStock = (currentStock.stok || 0) - Number(item.quantity);
-
-          const { error: stockError } = await supabase
-            .from('product_variants')
-            .update({ stok: newStock })
-            .eq('id', item.product_variant_id);
-
-          if (stockError) {
-            console.error('Stock update error:', stockError);
-          }
-
-          const { error: movementError } = await supabase
-            .from('stock_movements')
-            .insert([{
-              product_variant_id: item.product_variant_id,
-              movement_type: 'out',
-              quantity: Number(item.quantity),
-              reference_type: 'sale',
-              reference_id: saleResult.id,
-              notes: `Penjualan: ${saleData.no_pesanan_platform}`
-            }]);
-
-          if (movementError) {
-            console.error('Movement error:', movementError);
-          }
-        }
-      }
+      // Stock management akan dihandle oleh handleStatusUpdate di Sales.tsx
+      // Tidak ada pemotongan stok otomatis saat create sale
 
       toast({
         title: "Sukses",
@@ -176,20 +137,6 @@ export const useSales = () => {
       const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.harga_satuan)), 0);
       const total = subtotal + (Number(saleData.ongkir) || 0) - (Number(saleData.diskon) || 0);
 
-      // *** CEK STATUS LAMA SEBELUM UPDATE ***
-      const { data: oldSaleData, error: oldSaleError } = await supabase
-        .from('sales')
-        .select('status')
-        .eq('id', saleId)
-        .single();
-
-      if (oldSaleError) throw oldSaleError;
-
-      const oldStatus = oldSaleData.status;
-      const newStatus = saleData.status;
-
-      console.log(`Edit Sale: Old Status: ${oldStatus}, New Status: ${newStatus}`);
-
       const completeData = {
         ...saleData,
         subtotal,
@@ -203,37 +150,6 @@ export const useSales = () => {
         .eq('id', saleId);
 
       if (saleError) throw saleError;
-
-      // *** KEMBALIKAN STOK HANYA JIKA STATUS LAMA SHIPPED/DELIVERED ***
-      if (existingItems && existingItems.length > 0 && (oldStatus === 'shipped' || oldStatus === 'delivered')) {
-        console.log('Restoring stock from old status...');
-        for (const existingItem of existingItems) {
-          if (!existingItem.product_variant_id) continue;
-          
-          const { data: currentStock, error: stockFetchError } = await supabase
-            .from('product_variants')
-            .select('stok')
-            .eq('id', existingItem.product_variant_id)
-            .single();
-
-          if (stockFetchError) {
-            console.error('Error fetching current stock:', stockFetchError);
-            continue;
-          }
-
-          const restoredStock = (currentStock.stok || 0) + Number(existingItem.quantity);
-          console.log(`Restoring: ${currentStock.stok} + ${existingItem.quantity} = ${restoredStock}`);
-          
-          const { error: restoreError } = await supabase
-            .from('product_variants')
-            .update({ stok: restoredStock })
-            .eq('id', existingItem.product_variant_id);
-
-          if (restoreError) {
-            console.error('Stock restore error:', restoreError);
-          }
-        }
-      }
 
       // Hapus sale items lama
       const { error: deleteError } = await supabase
@@ -269,51 +185,8 @@ export const useSales = () => {
 
       if (newItemsError) throw newItemsError;
 
-      // *** KURANGI STOK HANYA JIKA STATUS BARU SHIPPED/DELIVERED ***
-      if (newStatus === 'shipped' || newStatus === 'delivered') {
-        console.log('Deducting stock for new status...');
-        for (const item of items) {
-          if (!item.product_variant_id) continue;
-          
-          const { data: currentStock, error: stockFetchError } = await supabase
-            .from('product_variants')
-            .select('stok')
-            .eq('id', item.product_variant_id)
-            .single();
-
-          if (stockFetchError) {
-            console.error('Error fetching current stock:', stockFetchError);
-            continue;
-          }
-
-          const newStock = (currentStock.stok || 0) - Number(item.quantity);
-          console.log(`Deducting: ${currentStock.stok} - ${item.quantity} = ${newStock}`);
-
-          const { error: stockError } = await supabase
-            .from('product_variants')
-            .update({ stok: newStock })
-            .eq('id', item.product_variant_id);
-
-          if (stockError) {
-            console.error('Stock update error:', stockError);
-          }
-
-          const { error: movementError } = await supabase
-            .from('stock_movements')
-            .insert([{
-              product_variant_id: item.product_variant_id,
-              movement_type: 'out',
-              quantity: Number(item.quantity),
-              reference_type: 'sale',
-              reference_id: saleId,
-              notes: `Update penjualan: ${saleData.no_pesanan_platform}`
-            }]);
-
-          if (movementError) {
-            console.error('Movement error:', movementError);
-          }
-        }
-      }
+      // Stock management akan dihandle oleh handleStatusUpdate di Sales.tsx
+      // Tidak ada pemotongan stok otomatis saat update sale
 
       toast({
         title: "Sukses",
