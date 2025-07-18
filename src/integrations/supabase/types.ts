@@ -1203,7 +1203,7 @@ export type Database = {
           sale_id: string
           sale_data: Json
           sale_items: Json[]
-          existing_items: Json[]
+          stock_changes: Json
         }
         Returns: undefined
       }
