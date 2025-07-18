@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { InputCurrency } from '@/components/ui/input'; // Ganti import
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, DollarSign, Calendar, TrendingDown } from 'lucide-react';
@@ -12,10 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency, formatShortDate } from '@/utils/format';
-import { ExpenseFormData, Expense, Category, Bank } from '@/types';
+import { ExpenseFormData, Expense } from '@/types'; // Hapus Category dan Bank karena tidak dipakai langsung
 
 const Expenses = () => {
-  const { expenses, loading, fetchExpenses, createExpense, updateExpense, deleteExpense } = useExpenses();
+  const { expenses, loading, createExpense, updateExpense, deleteExpense } = useExpenses();
   const { categories, fetchCategories } = useCategories();
   const { banks, fetchBanks } = useBanks();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -28,11 +28,9 @@ const Expenses = () => {
     keterangan: ''
   });
 
-  // Filter categories for expenses only
   const expenseCategories = categories.filter(cat => cat.tipe_kategori === 'expense');
 
   useEffect(() => {
-    fetchExpenses();
     fetchCategories();
     fetchBanks();
   }, []);
@@ -49,7 +47,6 @@ const Expenses = () => {
       return;
     }
 
-    // Clean formData - replace "cash" with null for bank_id
     const cleanedFormData = {
       ...formData,
       bank_id: formData.bank_id === "cash" ? null : formData.bank_id
@@ -82,7 +79,7 @@ const Expenses = () => {
       tanggal: expense.tanggal,
       category_id: expense.category_id || '',
       jumlah: expense.jumlah,
-      bank_id: expense.bank_id || '',
+      bank_id: expense.bank_id || 'cash',
       keterangan: expense.keterangan || ''
     });
     setDialogOpen(true);
@@ -94,71 +91,55 @@ const Expenses = () => {
     }
   };
 
-  // Fixed columns dengan parameter yang benar
   const columns = [
     {
       key: 'tanggal',
       title: 'Tanggal',
-      render: (value: any, expense: any) => {
-        console.log('Rendering tanggal:', { value, expense }); // Debug log
-        return formatShortDate(expense?.tanggal);
-      }
+      render: (_: any, expense: Expense) => formatShortDate(expense.tanggal)
     },
     {
       key: 'category',
       title: 'Kategori',
-      render: (value: any, expense: any) => {
-        console.log('Rendering category:', { value, expense }); // Debug log
-        return (
-          <span className="font-medium">
-            {expense?.category?.nama_kategori || 'Tidak dikategorikan'}
-          </span>
-        );
-      }
+      render: (_: any, expense: Expense) => (
+        <span className="font-medium">
+          {expense.category?.nama_kategori || 'Tidak dikategorikan'}
+        </span>
+      )
     },
     {
       key: 'jumlah',
       title: 'Jumlah',
-      render: (value: any, expense: any) => {
-        console.log('Rendering jumlah:', { value, expense }); // Debug log
-        return (
-          <span className="font-medium text-red-600">
-            -{formatCurrency(expense?.jumlah || 0)}
-          </span>
-        );
-      }
+      render: (_: any, expense: Expense) => (
+        <span className="font-medium text-red-600">
+          -{formatCurrency(expense.jumlah || 0)}
+        </span>
+      )
     },
     {
       key: 'bank',
       title: 'Dari Bank',
-      render: (value: any, expense: any) => {
-        console.log('Rendering bank:', { value, expense }); // Debug log
-        return (
-          <span>{expense?.bank?.nama_bank || 'Kas'}</span>
-        );
-      }
+      render: (_: any, expense: Expense) => (
+        <span>{expense.bank?.nama_bank || 'Kas'}</span>
+      )
     },
     {
       key: 'keterangan',
       title: 'Keterangan',
-      render: (value: any, expense: any) => {
-        console.log('Rendering keterangan:', { value, expense }); // Debug log
-        return (
-          <span className="text-sm text-muted-foreground">
-            {expense?.keterangan || '-'}
-          </span>
-        );
-      }
+      render: (_: any, expense: Expense) => (
+        <span className="text-sm text-muted-foreground">
+          {expense.keterangan || '-'}
+        </span>
+      )
     },
     {
       key: 'actions',
       title: 'Aksi',
-      render: (value: any, expense: any) => (
+      render: (_: any, expense: Expense) => (
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => handleEdit(expense)}>
             Edit
           </Button>
-          <Button size="sm" variant="destructive" onClick={() => handleDelete(expense?.id)}>
+          <Button size="sm" variant="destructive" onClick={() => handleDelete(expense.id)}>
             Hapus
           </Button>
         </div>
@@ -225,17 +206,11 @@ const Expenses = () => {
 
               <div>
                 <Label htmlFor="jumlah">Jumlah *</Label>
-                <Input
+                <InputCurrency
                   id="jumlah"
-                  type="number"
-                  value={formData.jumlah || ''}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    jumlah: parseFloat(e.target.value) || 0 
-                  }))}
-                  placeholder="0"
-                  min="0"
-                  step="0.01"
+                  value={formData.jumlah}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, jumlah: value }))}
+                  placeholder="Rp 0"
                   required
                 />
               </div>
@@ -275,8 +250,8 @@ const Expenses = () => {
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Batal
                 </Button>
-                <Button type="submit">
-                  {editingExpense ? 'Update' : 'Simpan'}
+                <Button type="submit" disabled={loading}>
+                  {loading ? 'Menyimpan...' : (editingExpense ? 'Update' : 'Simpan')}
                 </Button>
               </div>
             </form>
