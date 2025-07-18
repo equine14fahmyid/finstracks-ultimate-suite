@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -25,6 +24,7 @@ export const useSales = () => {
             id,
             quantity,
             harga_satuan,
+            product_variant_id,
             product_variant:product_variants(
               id,
               warna,
@@ -108,6 +108,8 @@ export const useSales = () => {
         .insert(saleItems);
 
       if (itemsError) throw itemsError;
+      
+      // TIDAK ADA PENGURANGAN STOK DI SINI
 
       toast({
         title: "Sukses",
@@ -148,6 +150,8 @@ export const useSales = () => {
         .eq('id', saleId);
 
       if (saleError) throw saleError;
+      
+      // TIDAK ADA PENGURANGAN/PENGEMBALIAN STOK DI SINI
 
       // Delete existing sale items
       const { error: deleteError } = await supabase
@@ -209,7 +213,7 @@ export const useSales = () => {
 
       if (fetchError) throw fetchError;
 
-      // Restore stock if sale status was shipped/delivered
+      // Kembalikan stok jika status yang dihapus adalah shipped/delivered
       if (saleData?.sale_items && (saleData.status === 'shipped' || saleData.status === 'delivered')) {
         for (const item of saleData.sale_items) {
           const { data: currentStock, error: stockFetchError } = await supabase
