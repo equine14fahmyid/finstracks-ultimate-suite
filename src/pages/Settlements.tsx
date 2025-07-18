@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input, InputCurrency } from '@/components/ui/input'; // Impor InputCurrency
+import { Input, InputCurrency } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Edit, Trash2, Banknote } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useSettlements, useStores, useBanks } from '@/hooks/useSupabase';
+import { useStores, useBanks } from '@/hooks/useSupabase';
+import { useSettlements } from '@/hooks/useSettlements'; // PERBAIKAN DI SINI
 import { DataTable } from '@/components/common/DataTable';
 import { formatCurrency, formatShortDate } from '@/utils/format';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
