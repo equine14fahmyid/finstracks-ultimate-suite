@@ -232,20 +232,18 @@ const Incomes = () => {
               </div>
 
               <div>
-                <Label htmlFor="jumlah">Jumlah *</Label>
-                <Input
-                  id="jumlah"
-                  type="number"
-                  value={formData.jumlah || ''}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    jumlah: parseFloat(e.target.value) || 0 
-                  }))}
-                  placeholder="0"
-                  min="0"
-                  step="0.01"
-                  required
-                />
+  <Label htmlFor="jumlah">Jumlah *</Label>
+  <InputCurrency
+    id="jumlah"
+    value={formData.jumlah}
+    onValueChange={(value) => setFormData(prev => ({
+      ...prev,
+      jumlah: value
+    }))}
+    placeholder="Rp 0"
+    required
+  />
+</div>
               </div>
 
               <div>
