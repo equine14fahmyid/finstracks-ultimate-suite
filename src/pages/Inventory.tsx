@@ -13,7 +13,6 @@ import { toast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/utils/format';
 import { useNavigate } from 'react-router-dom';
 import EmptyState from '@/components/common/EmptyState';
-
 const Inventory = () => {
   const navigate = useNavigate();
   const {
@@ -48,7 +47,6 @@ const Inventory = () => {
     stok: 0,
     sku: ''
   });
-
   useEffect(() => {
     fetchStock();
     fetchStockMovements();
@@ -71,14 +69,10 @@ const Inventory = () => {
   const handleManualRefresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        fetchStock(),
-        fetchStockMovements(),
-        fetchProducts()
-      ]);
+      await Promise.all([fetchStock(), fetchStockMovements(), fetchProducts()]);
       toast({
         title: "Data Diperbarui",
-        description: "Data inventory telah diperbarui",
+        description: "Data inventory telah diperbarui"
       });
     } finally {
       setRefreshing(false);
@@ -99,7 +93,6 @@ const Inventory = () => {
   const getProductUnit = (item: any) => {
     return item?.products?.satuan || item?.product?.satuan || item?.satuan || 'pcs';
   };
-
   const resetVariantForm = () => {
     setVariantFormData({
       product_id: '',
@@ -111,7 +104,6 @@ const Inventory = () => {
     setIsEditMode(false);
     setSelectedVariant(null);
   };
-
   const handleStockAdjustment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedVariant || adjustmentData.quantity < 0) {
@@ -132,7 +124,6 @@ const Inventory = () => {
       });
       return;
     }
-
     try {
       await adjustStock(selectedVariant.id, adjustmentData.quantity, adjustmentData.notes || 'Penyesuaian stok manual');
       setDialogOpen(false);
@@ -145,7 +136,7 @@ const Inventory = () => {
         title: "Sukses",
         description: "Stok berhasil disesuaikan"
       });
-      
+
       // Refresh data setelah adjustment
       await fetchStock();
       await fetchStockMovements();
@@ -158,7 +149,6 @@ const Inventory = () => {
       });
     }
   };
-
   const handleVariantSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!variantFormData.product_id || !variantFormData.warna || !variantFormData.size) {
@@ -179,7 +169,6 @@ const Inventory = () => {
       });
       return;
     }
-
     try {
       let result;
       if (isEditMode && selectedVariant) {
@@ -203,7 +192,6 @@ const Inventory = () => {
       });
     }
   };
-
   const handleEditVariant = (variant: any) => {
     if (!variant) {
       toast({
@@ -224,7 +212,6 @@ const Inventory = () => {
     setIsEditMode(true);
     setVariantDialogOpen(true);
   };
-
   const handleDeleteVariant = async (id: string) => {
     if (!id) {
       toast({
@@ -248,10 +235,26 @@ const Inventory = () => {
 
   // Check stock status with color coding
   const getStockStatus = (stok: number) => {
-    if (stok <= 0) return { status: 'habis', color: 'text-red-600', bgColor: 'bg-red-100' };
-    if (stok <= 5) return { status: 'rendah', color: 'text-yellow-600', bgColor: 'bg-yellow-100' };
-    if (stok <= 10) return { status: 'sedang', color: 'text-blue-600', bgColor: 'bg-blue-100' };
-    return { status: 'aman', color: 'text-green-600', bgColor: 'bg-green-100' };
+    if (stok <= 0) return {
+      status: 'habis',
+      color: 'text-red-600',
+      bgColor: 'bg-red-100'
+    };
+    if (stok <= 5) return {
+      status: 'rendah',
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-100'
+    };
+    if (stok <= 10) return {
+      status: 'sedang',
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100'
+    };
+    return {
+      status: 'aman',
+      color: 'text-green-600',
+      bgColor: 'bg-green-100'
+    };
   };
 
   // PERBAIKAN: Simplified columns tanpa masalah TypeScript
@@ -262,7 +265,6 @@ const Inventory = () => {
       if (!item) return <div>Data tidak tersedia</div>;
       const productName = getProductName(item);
       const stockStatus = getStockStatus(item.stok || 0);
-      
       return <div>
             <div className="font-medium">{productName}</div>
             <div className="text-sm text-muted-foreground">
@@ -282,7 +284,6 @@ const Inventory = () => {
       const stok = item.stok ?? 0;
       const unit = getProductUnit(item);
       const stockStatus = getStockStatus(stok);
-      
       return <div className="flex items-center gap-2">
             <span className={`font-medium text-lg ${stockStatus.color}`}>
               {stok.toLocaleString('id-ID')}
@@ -302,7 +303,6 @@ const Inventory = () => {
       const stok = item.stok || 0;
       const hargaBeli = getProductPrice(item);
       const totalValue = stok * hargaBeli;
-      
       return <div>
             <div className="font-medium">
               {formatCurrency(totalValue)}
@@ -317,19 +317,14 @@ const Inventory = () => {
     title: 'Pergerakan Terakhir',
     render: (value: any, item: any) => {
       if (!item) return <div>-</div>;
-      
+
       // Find last movement for this variant
-      const lastMovement = movements?.find(movement => 
-        movement?.product_variant_id === item.id
-      );
-      
+      const lastMovement = movements?.find(movement => movement?.product_variant_id === item.id);
       if (!lastMovement) {
         return <div className="text-sm text-muted-foreground">Belum ada pergerakan</div>;
       }
-      
       const date = new Date(lastMovement.created_at).toLocaleDateString('id-ID');
       const isIncoming = lastMovement.movement_type === 'in';
-      
       return <div className="text-sm">
             <div className={`flex items-center gap-1 ${isIncoming ? 'text-green-600' : 'text-red-600'}`}>
               {isIncoming ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -364,7 +359,6 @@ const Inventory = () => {
           </div>;
     }
   }];
-
   const movementColumns = [{
     key: 'created_at',
     title: 'Tanggal',
@@ -412,7 +406,6 @@ const Inventory = () => {
     title: 'Referensi',
     render: (value: any, movement: any) => {
       if (!movement) return <div className="text-sm">N/A</div>;
-      
       const getReferenceName = (refType: string) => {
         const types: Record<string, string> = {
           'sale': 'Penjualan',
@@ -423,7 +416,6 @@ const Inventory = () => {
         };
         return types[refType] || refType;
       };
-      
       return <div className="text-sm">
             <div className="capitalize font-medium">{getReferenceName(movement.reference_type || 'manual')}</div>
             {movement.notes && <div className="text-muted-foreground text-xs">{movement.notes}</div>}
@@ -437,14 +429,11 @@ const Inventory = () => {
     const harga = getProductPrice(item);
     return total + stok * harga;
   }, 0) || 0;
-  
   const lowStockItems = stock?.filter(item => (item?.stok || 0) <= 5) || [];
   const outOfStockItems = stock?.filter(item => (item?.stok || 0) <= 0) || [];
   const totalStock = stock?.reduce((total, item) => total + (item?.stok || 0), 0) || 0;
   const filteredMovements = movements?.filter(movement => movement != null) || [];
-
   if (loading && !stock?.length) return <div className="p-6">Loading stock data...</div>;
-
   if (!stock?.length) {
     return <div className="container mx-auto p-6 space-y-6">
         <div className="flex justify-between items-center">
@@ -454,7 +443,6 @@ const Inventory = () => {
         <EmptyState icon="📦" title="Belum Ada Data Stok" description="Mulai dengan menambahkan produk dan varian untuk mengelola stok Anda. Buka menu Master Data > Produk untuk menambahkan produk baru." actionLabel="+ Tambah Produk" onAction={() => navigate('/master-data/products')} />
       </div>;
   }
-
   return <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Manajemen Stok</h1>
@@ -552,7 +540,7 @@ const Inventory = () => {
             if (!open) resetVariantForm();
           }}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="bg-amber-500 hover:bg-amber-400">
                   <Plus className="h-4 w-4 mr-2" />
                   Tambah Varian
                 </Button>
@@ -679,20 +667,16 @@ const Inventory = () => {
               <div>
                 <Label htmlFor="quantity">Stok Baru *</Label>
                 <Input id="quantity" type="number" value={adjustmentData.quantity} onChange={e => {
-                const value = parseInt(e.target.value) || 0;
-                if (value >= 0) {
-                  setAdjustmentData(prev => ({
-                    ...prev,
-                    quantity: value
-                  }));
-                }
-              }} min="0" required />
+              const value = parseInt(e.target.value) || 0;
+              if (value >= 0) {
+                setAdjustmentData(prev => ({
+                  ...prev,
+                  quantity: value
+                }));
+              }
+            }} min="0" required />
                 <div className="text-xs text-muted-foreground mt-1">
-                  {adjustmentData.quantity > (selectedVariant?.stok || 0) 
-                    ? `Akan menambah ${adjustmentData.quantity - (selectedVariant?.stok || 0)} unit` 
-                    : adjustmentData.quantity < (selectedVariant?.stok || 0)
-                    ? `Akan mengurangi ${(selectedVariant?.stok || 0) - adjustmentData.quantity} unit`
-                    : 'Tidak ada perubahan'}
+                  {adjustmentData.quantity > (selectedVariant?.stok || 0) ? `Akan menambah ${adjustmentData.quantity - (selectedVariant?.stok || 0)} unit` : adjustmentData.quantity < (selectedVariant?.stok || 0) ? `Akan mengurangi ${(selectedVariant?.stok || 0) - adjustmentData.quantity} unit` : 'Tidak ada perubahan'}
                 </div>
               </div>
               
@@ -717,5 +701,4 @@ const Inventory = () => {
       </Dialog>
     </div>;
 };
-
 export default Inventory;
