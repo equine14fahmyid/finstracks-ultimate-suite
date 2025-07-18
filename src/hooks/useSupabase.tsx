@@ -1162,8 +1162,8 @@ export const usePurchases = () => {
   const [loading, setLoading] = useState(false);
 
   const fetchPurchases = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('purchases')
         .select(`
@@ -1179,7 +1179,10 @@ export const usePurchases = () => {
               id,
               warna,
               size,
-              products:products(nama_produk)
+              products(
+                id,
+                nama_produk
+              )
             )
           )
         `)
@@ -1187,7 +1190,8 @@ export const usePurchases = () => {
 
       if (error) throw error;
       setPurchases(data || []);
-    } catch (error: any) {
+    } catch (error) {
+      console.error('Error fetching purchases:', error);
       toast({
         title: "Error",
         description: "Gagal memuat data pembelian",
@@ -1199,106 +1203,346 @@ export const usePurchases = () => {
   };
 
   const createPurchase = async (purchaseData: any, items: any[]) => {
+    setLoading(true);
     try {
-      // Calculate totals
-      const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.harga_beli_satuan), 0);
-      const total = subtotal; // For now, purchases don't have additional fees
+      const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.harga_beli_satuan)), 0);
+      const total = subtotal;
 
-      const { data: purchase, error } = await supabase
+      const completeData = {
+        ...purchaseData,
+        subtotal,
+        total
+      };
+
+      // Insert purchase
+      const { data: purchaseResult, error: purchaseError } = await supabase
         .from('purchases')
-        .insert([{
-          ...purchaseData,
-          subtotal,
-          total
-        }])
+        .insert([completeData])
         .select()
         .single();
 
-      if (error) throw error;
+      if (purchaseError) throw purchaseError;
 
-      // Create purchase items
-      const itemsData = items.map(item => ({
-        purchase_id: purchase.id,
+      // Insert purchase items
+      const purchaseItems = items.map(item => ({
+        purchase_id: purchaseResult.id,
         product_variant_id: item.product_variant_id,
-        quantity: item.quantity,
-        harga_beli_satuan: item.harga_beli_satuan,
-        subtotal: item.quantity * item.harga_beli_satuan
+        quantity: Number(item.quantity),
+        harga_beli_satuan: Number(item.harga_beli_satuan),
+        subtotal: Number(item.quantity) * Number(item.harga_beli_satuan)
       }));
 
       const { error: itemsError } = await supabase
         .from('purchase_items')
-        .insert(itemsData);
+        .insert(purchaseItems);
 
       if (itemsError) throw itemsError;
 
-      await fetchPurchases();
+      // *** TAMBAH STOK OTOMATIS ***
+      for (const item of items) {
+        const { data: currentStock, error: stockFetchError } = await supabase
+          .from('product_variants')
+          .select('stok')
+          .eq('id', item.product_variant_id)
+          .single();
+
+        if (stockFetchError) {
+          console.error('Error fetching current stock:', stockFetchError);
+          continue;
+        }
+
+        const newStock = (currentStock.stok || 0) + Number(item.quantity);
+
+        const { error: stockError } = await supabase
+          .from('product_variants')
+          .update({ stok: newStock })
+          .eq('id', item.product_variant_id);
+
+        if (stockError) {
+          console.error('Stock update error:', stockError);
+        }
+
+        // Insert stock movement
+        const { error: movementError } = await supabase
+          .from('stock_movements')
+          .insert([{
+            product_variant_id: item.product_variant_id,
+            movement_type: 'in',
+            quantity: Number(item.quantity),
+            reference_type: 'purchase',
+            reference_id: purchaseResult.id,
+            notes: `Pembelian: ${purchaseData.no_invoice_supplier || 'Tanpa invoice'}`
+          }]);
+
+        if (movementError) {
+          console.error('Movement error:', movementError);
+        }
+      }
+
+      // *** UPDATE SALDO BANK JIKA PAYMENT STATUS = PAID ***
+      if (purchaseData.payment_status === 'paid' && purchaseData.bank_id) {
+        const { data: currentBank, error: bankFetchError } = await supabase
+          .from('banks')
+          .select('saldo_akhir')
+          .eq('id', purchaseData.bank_id)
+          .single();
+
+        if (!bankFetchError && currentBank) {
+          const newSaldo = (currentBank.saldo_akhir || 0) - total;
+          
+          const { error: bankUpdateError } = await supabase
+            .from('banks')
+            .update({ saldo_akhir: newSaldo })
+            .eq('id', purchaseData.bank_id);
+
+          if (bankUpdateError) {
+            console.error('Bank saldo update error:', bankUpdateError);
+          }
+        }
+      }
+
       toast({
-        title: "Berhasil",
-        description: "Pembelian berhasil ditambahkan",
+        title: "Sukses",
+        description: "Pembelian berhasil ditambahkan dan stok telah diperbarui",
       });
-      return { error: null };
-    } catch (error: any) {
+
+      await fetchPurchases();
+      return { success: true, data: purchaseResult };
+    } catch (error) {
+      console.error('Error creating purchase:', error);
       toast({
         title: "Error",
-        description: "Gagal menambahkan pembelian",
+        description: "Gagal menambahkan pembelian: " + (error as Error).message,
         variant: "destructive",
       });
-      return { error };
+      return { error: true };
+    } finally {
+      setLoading(false);
     }
   };
 
-  const updatePurchase = async (id: string, purchaseData: any) => {
+  const updatePurchase = async (purchaseId: string, purchaseData: any, items: any[], existingItems?: any[]) => {
+    setLoading(true);
     try {
-      const { error } = await supabase
+      const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.harga_beli_satuan)), 0);
+      const total = subtotal;
+
+      const completeData = {
+        ...purchaseData,
+        subtotal,
+        total
+      };
+
+      // Update purchase
+      const { error: purchaseError } = await supabase
         .from('purchases')
-        .update(purchaseData)
-        .eq('id', id);
+        .update(completeData)
+        .eq('id', purchaseId);
 
-      if (error) throw error;
+      if (purchaseError) throw purchaseError;
+
+      // *** KEMBALIKAN STOK DARI ITEMS LAMA ***
+      if (existingItems && existingItems.length > 0) {
+        for (const existingItem of existingItems) {
+          const { data: currentStock, error: stockFetchError } = await supabase
+            .from('product_variants')
+            .select('stok')
+            .eq('id', existingItem.product_variant_id)
+            .single();
+
+          if (stockFetchError) {
+            console.error('Error fetching current stock:', stockFetchError);
+            continue;
+          }
+
+          const restoredStock = (currentStock.stok || 0) - Number(existingItem.quantity);
+          
+          const { error: restoreError } = await supabase
+            .from('product_variants')
+            .update({ stok: Math.max(0, restoredStock) })
+            .eq('id', existingItem.product_variant_id);
+
+          if (restoreError) {
+            console.error('Stock restore error:', restoreError);
+          }
+        }
+      }
+
+      // Delete old items and movements
+      const { error: deleteError } = await supabase
+        .from('purchase_items')
+        .delete()
+        .eq('purchase_id', purchaseId);
+
+      if (deleteError) throw deleteError;
+
+      const { error: deleteMoveError } = await supabase
+        .from('stock_movements')
+        .delete()
+        .eq('reference_id', purchaseId)
+        .eq('reference_type', 'purchase');
+
+      if (deleteMoveError) {
+        console.error('Delete movement error:', deleteMoveError);
+      }
+
+      // Insert new items
+      const newPurchaseItems = items.map(item => ({
+        purchase_id: purchaseId,
+        product_variant_id: item.product_variant_id,
+        quantity: Number(item.quantity),
+        harga_beli_satuan: Number(item.harga_beli_satuan),
+        subtotal: Number(item.quantity) * Number(item.harga_beli_satuan)
+      }));
+
+      const { error: newItemsError } = await supabase
+        .from('purchase_items')
+        .insert(newPurchaseItems);
+
+      if (newItemsError) throw newItemsError;
+
+      // *** TAMBAH STOK DENGAN DATA BARU ***
+      for (const item of items) {
+        const { data: currentStock, error: stockFetchError } = await supabase
+          .from('product_variants')
+          .select('stok')
+          .eq('id', item.product_variant_id)
+          .single();
+
+        if (stockFetchError) {
+          console.error('Error fetching current stock:', stockFetchError);
+          continue;
+        }
+
+        const newStock = (currentStock.stok || 0) + Number(item.quantity);
+
+        const { error: stockError } = await supabase
+          .from('product_variants')
+          .update({ stok: newStock })
+          .eq('id', item.product_variant_id);
+
+        if (stockError) {
+          console.error('Stock update error:', stockError);
+        }
+
+        // Insert stock movement
+        const { error: movementError } = await supabase
+          .from('stock_movements')
+          .insert([{
+            product_variant_id: item.product_variant_id,
+            movement_type: 'in',
+            quantity: Number(item.quantity),
+            reference_type: 'purchase',
+            reference_id: purchaseId,
+            notes: `Update pembelian: ${purchaseData.no_invoice_supplier || 'Tanpa invoice'}`
+          }]);
+
+        if (movementError) {
+          console.error('Movement error:', movementError);
+        }
+      }
+
+      toast({
+        title: "Sukses",
+        description: "Pembelian berhasil diperbarui dan stok telah disesuaikan",
+      });
 
       await fetchPurchases();
-      toast({
-        title: "Berhasil",
-        description: "Pembelian berhasil diupdate",
-      });
-      return { error: null };
-    } catch (error: any) {
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating purchase:', error);
       toast({
         title: "Error",
-        description: "Gagal mengupdate pembelian",
+        description: "Gagal memperbarui pembelian: " + (error as Error).message,
         variant: "destructive",
       });
-      return { error };
+      return { error: true };
+    } finally {
+      setLoading(false);
     }
   };
 
-  const deletePurchase = async (id: string) => {
+  const deletePurchase = async (purchaseId: string) => {
+    setLoading(true);
     try {
-      // Delete purchase items first
+      // Get purchase data with items
+      const { data: purchaseData, error: fetchError } = await supabase
+        .from('purchases')
+        .select(`
+          *,
+          purchase_items(
+            product_variant_id,
+            quantity
+          )
+        `)
+        .eq('id', purchaseId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // *** KEMBALIKAN STOK SEBELUM DELETE ***
+      if (purchaseData?.purchase_items) {
+        for (const item of purchaseData.purchase_items) {
+          const { data: currentStock, error: stockFetchError } = await supabase
+            .from('product_variants')
+            .select('stok')
+            .eq('id', item.product_variant_id)
+            .single();
+
+          if (stockFetchError) {
+            console.error('Error fetching current stock:', stockFetchError);
+            continue;
+          }
+
+          const newStock = Math.max(0, (currentStock.stok || 0) - Number(item.quantity));
+          
+          const { error: stockError } = await supabase
+            .from('product_variants')
+            .update({ stok: newStock })
+            .eq('id', item.product_variant_id);
+
+          if (stockError) {
+            console.error('Stock revert error:', stockError);
+          }
+        }
+      }
+
+      // Delete movements, items, and purchase
+      await supabase
+        .from('stock_movements')
+        .delete()
+        .eq('reference_id', purchaseId)
+        .eq('reference_type', 'purchase');
+
       await supabase
         .from('purchase_items')
         .delete()
-        .eq('purchase_id', id);
+        .eq('purchase_id', purchaseId);
 
-      // Delete purchase
       const { error } = await supabase
         .from('purchases')
         .delete()
-        .eq('id', id);
+        .eq('id', purchaseId);
 
       if (error) throw error;
 
-      await fetchPurchases();
       toast({
-        title: "Berhasil",
-        description: "Pembelian berhasil dihapus",
+        title: "Sukses",
+        description: "Pembelian berhasil dihapus dan stok telah disesuaikan",
       });
-    } catch (error: any) {
+
+      await fetchPurchases();
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting purchase:', error);
       toast({
         title: "Error",
-        description: "Gagal menghapus pembelian",
+        description: "Gagal menghapus pembelian: " + (error as Error).message,
         variant: "destructive",
       });
+      return { error: true };
+    } finally {
+      setLoading(false);
     }
   };
 
