@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input, InputCurrency } from '@/components/ui/input'; // Impor InputCurrency
+import { Input, InputCurrency } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Edit, Trash2, Landmark } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useAssets } from '@/hooks/useSupabase';
 import { DataTable } from '@/components/common/DataTable';
 import { formatCurrency, formatShortDate } from '@/utils/format';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AssetFormData {
   nama_aset: string;
@@ -22,7 +22,8 @@ interface AssetFormData {
 
 const Assets = () => {
   const { hasPermission } = useAuth();
-  const { assets, loading, fetchAssets, createAsset, updateAsset, deleteAsset } = useAssets();
+  const [assets, setAssets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<any>(null);
   const [formData, setFormData] = useState<AssetFormData>({
@@ -31,6 +32,56 @@ const Assets = () => {
     harga_perolehan: 0,
     deskripsi: ''
   });
+
+  const fetchAssets = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('assets').select('*').order('tanggal_perolehan', { ascending: false });
+      if (error) throw error;
+      setAssets(data || []);
+    } catch (error) {
+      toast({ title: "Error", description: "Gagal memuat data aset.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createAsset = async (assetData: AssetFormData) => {
+    try {
+      const { data, error } = await supabase.from('assets').insert([assetData]).select().single();
+      if (error) throw error;
+      toast({ title: "Sukses", description: "Aset berhasil ditambahkan." });
+      await fetchAssets();
+      return { success: true, data };
+    } catch (error: any) {
+      toast({ title: "Error", description: `Gagal menambahkan aset: ${error.message}`, variant: "destructive" });
+      return { error: true };
+    }
+  };
+
+  const updateAsset = async (id: string, assetData: AssetFormData) => {
+    try {
+      const { data, error } = await supabase.from('assets').update(assetData).eq('id', id).select().single();
+      if (error) throw error;
+      toast({ title: "Sukses", description: "Aset berhasil diperbarui." });
+      await fetchAssets();
+      return { success: true, data };
+    } catch (error: any) {
+      toast({ title: "Error", description: `Gagal memperbarui aset: ${error.message}`, variant: "destructive" });
+      return { error: true };
+    }
+  };
+
+  const deleteAsset = async (id: string) => {
+    try {
+      const { error } = await supabase.from('assets').delete().eq('id', id);
+      if (error) throw error;
+      toast({ title: "Sukses", description: "Aset berhasil dihapus." });
+      await fetchAssets();
+    } catch (error: any) {
+      toast({ title: "Error", description: `Gagal menghapus aset: ${error.message}`, variant: "destructive" });
+    }
+  };
 
   useEffect(() => {
     fetchAssets();
