@@ -251,6 +251,10 @@ const Sales = () => {
     const validItems = formData.items.filter(item =>
       item.product_variant_id && item.quantity > 0 && item.harga_satuan > 0
     );
+    console.log('Form Data Items:', formData.items);
+console.log('Valid Items:', validItems);
+console.log('Editing Sale:', editingSale);
+
     if (validItems.length === 0) {
       toast({
         title: "Error",
