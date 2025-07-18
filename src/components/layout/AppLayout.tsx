@@ -1,7 +1,9 @@
+
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { ThemeProvider } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
+import { useIsMobile } from '@/hooks/use-mobile';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import { Loader2 } from 'lucide-react';
@@ -12,6 +14,7 @@ interface AppLayoutProps {
 
 const AppLayout = ({ children }: AppLayoutProps) => {
   const { user, loading } = useAuth();
+  const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
@@ -42,11 +45,15 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         
         <div className="flex">
           {/* Sidebar */}
-          <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
+          <Sidebar 
+            isOpen={sidebarOpen} 
+            onClose={closeSidebar}
+            isMobile={isMobile}
+          />
           
           {/* Main Content */}
-          <main className="flex-1 min-h-[calc(100vh-4rem)] bg-gradient-to-br from-background via-background to-primary/5">
-            <div className="container mx-auto max-w-7xl">
+          <main className="flex-1 min-h-[calc(100vh-3rem)] md:min-h-[calc(100vh-4rem)] bg-gradient-to-br from-background via-background to-primary/5">
+            <div className="container mx-auto max-w-7xl w-full">
               {children}
             </div>
           </main>

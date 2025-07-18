@@ -65,7 +65,7 @@ const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 md:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((card, index) => (
         <Card 
           key={card.title} 
@@ -76,21 +76,21 @@ const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
           )}
           style={{ animationDelay: `${index * 100}ms` }}
         >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 md:pb-2">
+            <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">
               {card.title}
             </CardTitle>
-            <div className={cn("p-2 rounded-lg", card.bgColor)}>
-              <card.icon className={cn("h-4 w-4", card.textColor)} />
+            <div className={cn("p-1.5 md:p-2 rounded-lg", card.bgColor)}>
+              <card.icon className={cn("h-4 w-4 md:h-4 md:w-4", card.textColor)} />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pb-3 md:pb-4">
             <div className="space-y-1">
-              <div className={cn("text-2xl font-bold", card.textColor)}>
+              <div className={cn("text-xl md:text-2xl font-bold", card.textColor)}>
                 {loading ? (
-                  <div className="h-8 bg-muted animate-pulse rounded w-24"></div>
+                  <div className="h-6 md:h-8 bg-muted animate-pulse rounded w-20 md:w-24"></div>
                 ) : (
-                  formatCurrency(card.value)
+                  <span className="text-lg md:text-2xl">{formatCurrency(card.value)}</span>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -99,7 +99,7 @@ const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
             </div>
             
             {/* Gradient Bar */}
-            <div className="mt-3 h-1 w-full bg-muted rounded-full overflow-hidden">
+            <div className="mt-2 md:mt-3 h-1 w-full bg-muted rounded-full overflow-hidden">
               <div 
                 className={cn(
                   "h-full rounded-full bg-gradient-to-r transition-all duration-1000",

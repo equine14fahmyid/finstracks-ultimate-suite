@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,52 +51,59 @@ const DateFilter = ({ value, onChange, className }: DateFilterProps) => {
   const isDateSelected = value.from && value.to;
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn("flex flex-col md:flex-row md:items-center gap-2", className)}>
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
             className={cn(
-              "justify-start text-left font-normal glass-card border-0 hover-lift",
+              "justify-start text-left font-normal glass-card border-0 hover-lift w-full md:w-auto h-10 md:h-auto",
               !value.from && "text-muted-foreground",
               isDateSelected && "bg-primary/10 text-primary border-primary/20"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {formatDisplayText()}
+            <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+            <span className="truncate">{formatDisplayText()}</span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0 glass-card border-0" align="start">
-          <div className="flex">
+        <PopoverContent 
+          className="w-auto p-0 glass-card border-0" 
+          align="start"
+          side="bottom"
+          sideOffset={4}
+        >
+          <div className="flex flex-col md:flex-row">
             {/* Presets */}
-            <div className="border-r border-border p-3">
+            <div className="border-b md:border-b-0 md:border-r border-border p-3 order-2 md:order-1">
               <div className="space-y-1">
                 <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Preset Cepat
                 </Label>
-                {Object.values(presets).map((preset) => (
-                  <Button
-                    key={preset.label}
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start text-sm hover:bg-primary/10"
-                    onClick={() => handlePresetClick(preset)}
-                  >
-                    {preset.label}
-                  </Button>
-                ))}
+                <div className="grid grid-cols-2 md:grid-cols-1 gap-1">
+                  {Object.values(presets).map((preset) => (
+                    <Button
+                      key={preset.label}
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-sm hover:bg-primary/10 h-8 md:h-auto"
+                      onClick={() => handlePresetClick(preset)}
+                    >
+                      <span className="truncate">{preset.label}</span>
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
 
             {/* Calendar */}
-            <div className="p-3">
+            <div className="p-3 order-1 md:order-2">
               <Calendar
                 initialFocus
                 mode="range"
                 defaultMonth={value?.from}
                 selected={value}
                 onSelect={(range) => onChange(range ? { from: range.from, to: range.to } : { from: undefined, to: undefined })}
-                numberOfMonths={2}
+                numberOfMonths={1}
                 locale={id}
                 className="rounded-md"
               />
@@ -103,7 +111,7 @@ const DateFilter = ({ value, onChange, className }: DateFilterProps) => {
               {/* Manual Input */}
               <div className="mt-4 space-y-2">
                 <Label className="text-xs font-medium">Input Manual</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <div>
                     <Label htmlFor="from-date" className="text-xs">Dari</Label>
                     <Input
@@ -114,7 +122,7 @@ const DateFilter = ({ value, onChange, className }: DateFilterProps) => {
                         ...value,
                         from: e.target.value ? new Date(e.target.value) : undefined
                       })}
-                      className="text-xs"
+                      className="text-xs h-8"
                     />
                   </div>
                   <div>
@@ -127,7 +135,7 @@ const DateFilter = ({ value, onChange, className }: DateFilterProps) => {
                         ...value,
                         to: e.target.value ? new Date(e.target.value) : undefined
                       })}
-                      className="text-xs"
+                      className="text-xs h-8"
                     />
                   </div>
                 </div>
@@ -139,7 +147,7 @@ const DateFilter = ({ value, onChange, className }: DateFilterProps) => {
 
       {/* Active Filter Badge */}
       {isDateSelected && (
-        <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
+        <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 w-fit">
           <Filter className="w-3 h-3 mr-1" />
           Filter Aktif
           <Button

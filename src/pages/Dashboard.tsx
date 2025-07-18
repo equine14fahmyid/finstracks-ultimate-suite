@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -152,8 +153,8 @@ const Dashboard = () => {
   if (!hasPermission('dashboard.view')) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="glass-card border-0 p-8 text-center">
-          <Eye className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+        <Card className="glass-card border-0 p-6 md:p-8 text-center">
+          <Eye className="h-10 w-10 md:h-12 md:w-12 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-lg font-semibold mb-2">Akses Terbatas</h3>
           <p className="text-muted-foreground">
             Anda tidak memiliki izin untuk melihat dashboard ini.
@@ -164,17 +165,17 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6 p-6" id="dashboard-content">
+    <div className="space-y-4 md:space-y-6 p-3 md:p-6" id="dashboard-content">
       {/* Bagian Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col space-y-3 md:space-y-0 md:flex-row md:items-center md:justify-between md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold gradient-text">Dashboard</h1>
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold gradient-text">Dashboard</h1>
+          <div className="flex flex-col md:flex-row md:items-center gap-2 mt-1">
+            <p className="text-muted-foreground text-sm md:text-base">
               Selamat datang, {profile?.full_name}! Berikut ringkasan bisnis Anda.
             </p>
             {lastUpdate && (
-              <Badge variant="outline" className="text-xs flex items-center gap-1">
+              <Badge variant="outline" className="text-xs flex items-center gap-1 w-fit">
                 <Clock className="h-3 w-3" />
                 Update: {lastUpdate.toLocaleTimeString('id-ID')}
               </Badge>
@@ -182,26 +183,26 @@ const Dashboard = () => {
           </div>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3">
           <Button
             variant="outline"
             size="sm"
             onClick={handleRefresh}
             disabled={refreshing}
-            className="glass-button"
+            className="glass-button h-10 md:h-auto"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
           
           {hasPermission('reports.export') && (
-            <>
+            <div className="flex gap-2 md:gap-3">
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={handleExportCSV}
                 disabled={exporting}
-                className="glass-button"
+                className="glass-button flex-1 md:flex-none h-10 md:h-auto"
               >
                 <Download className="h-4 w-4 mr-2" />
                 CSV
@@ -210,20 +211,20 @@ const Dashboard = () => {
                 size="sm" 
                 onClick={handleExportPDF}
                 disabled={exporting}
-                className="gradient-primary"
+                className="gradient-primary flex-1 md:flex-none h-10 md:h-auto"
               >
                 <Download className="h-4 w-4 mr-2" />
                 {exporting ? 'Mengekspor...' : 'PDF'}
               </Button>
-            </>
+            </div>
           )}
         </div>
       </div>
 
       {/* Filter Tanggal */}
       <Card className="glass-card border-0">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
+        <CardHeader className="pb-3 md:pb-6">
+          <CardTitle className="text-base md:text-lg flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
             Filter Periode
             <span className="text-sm font-normal text-muted-foreground">
               ({formatDate(dateRange.from || new Date())} - {formatDate(dateRange.to || new Date())})
@@ -234,7 +235,7 @@ const Dashboard = () => {
           <DateFilter
             value={dateRange}
             onChange={setDateRange}
-            className="max-w-md"
+            className="w-full md:max-w-md"
           />
         </CardContent>
       </Card>
@@ -243,7 +244,7 @@ const Dashboard = () => {
       <SummaryCards data={dashboardData} loading={loading} />
 
       {/* Bagian Grafik */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
         {/* Grafik Tren Penjualan */}
         <div className="lg:col-span-2">
           <SalesChart data={salesData} loading={loading} />
@@ -273,21 +274,21 @@ const Dashboard = () => {
 
       {/* Aksi Cepat */}
       <Card className="glass-card border-0">
-        <CardHeader>
-          <CardTitle className="text-lg">Aksi Cepat</CardTitle>
+        <CardHeader className="pb-3 md:pb-6">
+          <CardTitle className="text-base md:text-lg">Aksi Cepat</CardTitle>
           <p className="text-sm text-muted-foreground">Akses cepat ke fitur yang sering digunakan</p>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {hasPermission('sales.create') && (
               <Button 
                 variant="outline" 
-                className="glass-button justify-start h-auto p-4 flex-col items-start gap-2"
+                className="glass-button justify-start h-auto p-3 md:p-4 flex-col items-start gap-2 min-h-[80px] md:min-h-[90px]"
                 onClick={() => navigate('/sales')}
               >
                 <Plus className="h-5 w-5 text-success" />
                 <div className="text-left">
-                  <div className="font-medium">Tambah Penjualan</div>
+                  <div className="font-medium text-sm md:text-base">Tambah Penjualan</div>
                   <div className="text-xs text-muted-foreground">Input transaksi penjualan</div>
                 </div>
               </Button>
@@ -295,12 +296,12 @@ const Dashboard = () => {
             {hasPermission('purchases.create') && (
               <Button 
                 variant="outline" 
-                className="glass-button justify-start h-auto p-4 flex-col items-start gap-2"
+                className="glass-button justify-start h-auto p-3 md:p-4 flex-col items-start gap-2 min-h-[80px] md:min-h-[90px]"
                 onClick={() => navigate('/purchases')}
               >
                 <ShoppingCart className="h-5 w-5 text-primary" />
                 <div className="text-left">
-                  <div className="font-medium">Tambah Pembelian</div>
+                  <div className="font-medium text-sm md:text-base">Tambah Pembelian</div>
                   <div className="text-xs text-muted-foreground">Input pembelian barang</div>
                 </div>
               </Button>
@@ -308,12 +309,12 @@ const Dashboard = () => {
             {hasPermission('finance.create') && (
               <Button 
                 variant="outline" 
-                className="glass-button justify-start h-auto p-4 flex-col items-start gap-2"
+                className="glass-button justify-start h-auto p-3 md:p-4 flex-col items-start gap-2 min-h-[80px] md:min-h-[90px]"
                 onClick={() => navigate('/expenses')}
               >
                 <CreditCard className="h-5 w-5 text-warning" />
                 <div className="text-left">
-                  <div className="font-medium">Catat Pengeluaran</div>
+                  <div className="font-medium text-sm md:text-base">Catat Pengeluaran</div>
                   <div className="text-xs text-muted-foreground">Input biaya operasional</div>
                 </div>
               </Button>
@@ -321,12 +322,12 @@ const Dashboard = () => {
             {hasPermission('reports.read') && (
               <Button 
                 variant="outline" 
-                className="glass-button justify-start h-auto p-4 flex-col items-start gap-2"
+                className="glass-button justify-start h-auto p-3 md:p-4 flex-col items-start gap-2 min-h-[80px] md:min-h-[90px]"
                 onClick={() => navigate('/reports/analytics')}
               >
                 <FileText className="h-5 w-5 text-secondary" />
                 <div className="text-left">
-                  <div className="font-medium">Lihat Laporan</div>
+                  <div className="font-medium text-sm md:text-base">Lihat Laporan</div>
                   <div className="text-xs text-muted-foreground">Analisis & laporan</div>
                 </div>
               </Button>
