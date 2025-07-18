@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Plus, Edit, Trash2, Banknote } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useStores, useBanks } from '@/hooks/useSupabase';
-import { useSettlements } from '@/hooks/useSettlements'; // PERBAIKAN DI SINI
+import { useSettlements } from '@/hooks/useSettlements';
 import { DataTable } from '@/components/common/DataTable';
 import { formatCurrency, formatShortDate } from '@/utils/format';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -14,13 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
+// PERBAIKAN: Menyelaraskan nama properti dengan hook
 interface SettlementFormData {
-  tanggal_pencairan: string;
+  tanggal: string;
   store_id: string;
   bank_id: string;
   jumlah_dicairkan: number;
   biaya_admin: number;
-  notes: string;
+  keterangan: string;
 }
 
 const Settlements = () => {
@@ -31,12 +32,12 @@ const Settlements = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSettlement, setEditingSettlement] = useState<any>(null);
   const [formData, setFormData] = useState<SettlementFormData>({
-    tanggal_pencairan: new Date().toISOString().split('T')[0],
+    tanggal: new Date().toISOString().split('T')[0],
     store_id: '',
     bank_id: '',
     jumlah_dicairkan: 0,
     biaya_admin: 0,
-    notes: ''
+    keterangan: ''
   });
 
   useEffect(() => {
@@ -70,12 +71,12 @@ const Settlements = () => {
   const handleEdit = (settlement: any) => {
     setEditingSettlement(settlement);
     setFormData({
-      tanggal_pencairan: settlement.tanggal_pencairan,
+      tanggal: settlement.tanggal,
       store_id: settlement.store_id,
       bank_id: settlement.bank_id,
       jumlah_dicairkan: settlement.jumlah_dicairkan,
       biaya_admin: settlement.biaya_admin || 0,
-      notes: settlement.notes || ''
+      keterangan: settlement.keterangan || ''
     });
     setDialogOpen(true);
   };
@@ -87,20 +88,20 @@ const Settlements = () => {
   const resetForm = () => {
     setEditingSettlement(null);
     setFormData({
-      tanggal_pencairan: new Date().toISOString().split('T')[0],
+      tanggal: new Date().toISOString().split('T')[0],
       store_id: '',
       bank_id: '',
       jumlah_dicairkan: 0,
       biaya_admin: 0,
-      notes: ''
+      keterangan: ''
     });
   };
 
   const columns = [
     {
-      key: 'tanggal_pencairan',
+      key: 'tanggal',
       title: 'Tanggal',
-      render: (_: any, settlement: any) => formatShortDate(settlement?.tanggal_pencairan)
+      render: (_: any, settlement: any) => formatShortDate(settlement?.tanggal)
     },
     {
       key: 'store',
@@ -135,9 +136,9 @@ const Settlements = () => {
       )
     },
     {
-      key: 'notes',
+      key: 'keterangan',
       title: 'Catatan',
-      render: (_: any, settlement: any) => <span className="text-sm text-muted-foreground">{settlement?.notes || '-'}</span>
+      render: (_: any, settlement: any) => <span className="text-sm text-muted-foreground">{settlement?.keterangan || '-'}</span>
     },
     {
       key: 'actions',
@@ -201,12 +202,12 @@ const Settlements = () => {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="tanggal_pencairan">Tanggal *</Label>
+                    <Label htmlFor="tanggal">Tanggal *</Label>
                     <Input
-                      id="tanggal_pencairan"
+                      id="tanggal"
                       type="date"
-                      value={formData.tanggal_pencairan}
-                      onChange={(e) => setFormData(prev => ({ ...prev, tanggal_pencairan: e.target.value }))}
+                      value={formData.tanggal}
+                      onChange={(e) => setFormData(prev => ({ ...prev, tanggal: e.target.value }))}
                       required
                     />
                   </div>
