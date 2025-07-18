@@ -6,14 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, ShoppingBag, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useStock, useSuppliers, useBanks } from '@/hooks/useSupabase';
+import { usePurchases, useStock, useSuppliers, useBanks } from '@/hooks/useSupabase';
 import { DataTable } from '@/components/common/DataTable';
 import { formatCurrency, formatShortDate } from '@/utils/format';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { usePurchases } from '@/hooks/usePurchases';
 
 interface PurchaseFormData {
   tanggal: string;
@@ -120,7 +119,7 @@ const Purchases = () => {
 
     let result;
     if (editingPurchase) {
-      result = await updatePurchase(editingPurchase.id, purchaseData, validItems, editingPurchase.purchase_items);
+      result = await updatePurchase(editingPurchase.id, purchaseData);
     } else {
       result = await createPurchase(purchaseData, validItems);
     }
@@ -128,8 +127,6 @@ const Purchases = () => {
     if (!result.error) {
       setDialogOpen(false);
       resetForm();
-      // Refresh stock data setelah purchase
-      await fetchStock();
     }
   };
 
@@ -157,11 +154,7 @@ const Purchases = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const result = await deletePurchase(id);
-    if (result.success) {
-      // Refresh stock data setelah delete
-      await fetchStock();
-    }
+    await deletePurchase(id);
   };
 
   const resetForm = () => {
@@ -312,7 +305,7 @@ const Purchases = () => {
               <AlertDialogHeader>
                 <AlertDialogTitle>Hapus Pembelian</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Apakah Anda yakin ingin menghapus pembelian ini? Tindakan ini tidak dapat dibatalkan dan akan mengurangi stok produk.
+                  Apakah Anda yakin ingin menghapus pembelian ini? Tindakan ini tidak dapat dibatalkan.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -579,9 +572,6 @@ const Purchases = () => {
                     <div className="flex justify-between font-bold text-lg">
                       <span>Total:</span>
                       <span className="text-primary">{formatCurrency(calculateSubtotal())}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      * Stok produk akan otomatis bertambah setelah pembelian disimpan
                     </div>
                   </div>
                 </div>
