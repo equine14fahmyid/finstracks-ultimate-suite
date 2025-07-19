@@ -52,6 +52,7 @@ const Incomes = () => {
 
   const incomeCategories = categories.filter(cat => cat.tipe_kategori === 'income');
 
+  // Gunakan useCallback agar fungsi tidak dibuat ulang di setiap render
   const memoizedFetchIncomes = useCallback(fetchIncomes, []);
 
   useEffect(() => {
@@ -64,6 +65,7 @@ const Incomes = () => {
     fetchCategories();
     fetchBanks();
     
+    // Listener untuk event realtime dari hook
     const handleRefetch = () => {
         const startDate = dateRange.from?.toISOString().split('T')[0];
         const endDate = dateRange.to?.toISOString().split('T')[0];
@@ -75,6 +77,7 @@ const Incomes = () => {
     };
 
   }, [fetchCategories, fetchBanks, dateRange, fetchIncomes]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +110,7 @@ const Incomes = () => {
       tanggal: income.tanggal,
       category_id: income.category_id || '',
       jumlah: income.jumlah,
-      bank_id: income.bank_id || 'cash',
+      bank_id: income.bank_id || 'cash', // Default ke 'cash' jika null
       keterangan: income.keterangan || ''
     });
     setDialogOpen(true);
@@ -116,7 +119,7 @@ const Incomes = () => {
   const handleDelete = async (id: string) => {
     await deleteIncome(id);
   };
-
+  
   const handleExportPDF = () => {
     toast({ title: "Mengekspor PDF...", description: "Harap tunggu sebentar." });
     const preparedData = incomes.map(income => ({
@@ -246,6 +249,7 @@ const Incomes = () => {
       <Card>
         <CardHeader>
           <CardTitle>Daftar Pemasukan ({formatCurrency(totalIncomes)})</CardTitle>
+          <p className="text-sm text-muted-foreground">Menampilkan data untuk periode yang dipilih.</p>
         </CardHeader>
         <CardContent>
           <DataTable
