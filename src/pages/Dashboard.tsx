@@ -83,22 +83,26 @@ const Dashboard = () => {
     });
   };
 
-  // Fungsionalitas ekspor
-  const handleExportPDF = async () => {
+ // Cari fungsi ini di dalam file src/pages/Dashboard.tsx
+
+const handleExportPDF = async () => {
     try {
       setExporting(true);
+
+      // --- PERBAIKAN DI SINI ---
+      // Kita hapus properti 'includeHeader' dan 'includeFooter'
       await exportToPDF('dashboard-content', {
         filename: `dashboard-${startDate}-${endDate}.pdf`,
         title: `Dashboard EQUINE Fashion - ${formatDate(dateRange.from || new Date())} s/d ${formatDate(dateRange.to || new Date())}`,
         orientation: 'landscape',
-        includeHeader: true,
-        includeFooter: true,
         companyInfo: {
           name: 'EQUINE Fashion',
           address: 'Indonesia',
           email: 'info@equinefashion.com',
         },
       });
+      // --- BATAS PERBAIKAN ---
+
       toast({
         title: "Berhasil",
         description: "Dashboard berhasil diekspor ke PDF",
@@ -112,7 +116,7 @@ const Dashboard = () => {
     } finally {
       setExporting(false);
     }
-  };
+};
 
   const handleExportCSV = () => {
     try {
