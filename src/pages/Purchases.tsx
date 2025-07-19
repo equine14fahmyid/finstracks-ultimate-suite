@@ -65,9 +65,7 @@ const Purchases = () => {
   });
 
   useEffect(() => {
-    const startDate = dateRange.from?.toISOString().split('T')[0];
-    const endDate = dateRange.to?.toISOString().split('T')[0];
-    fetchPurchases(startDate, endDate);
+    fetchPurchases();
   }, [dateRange]);
 
   useEffect(() => {

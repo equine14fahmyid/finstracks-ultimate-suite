@@ -186,7 +186,10 @@ export interface PurchaseItem {
   purchase?: Purchase;
 }
 
-export interface Expense extends BaseEntity {
+export interface Expense {
+  id: string;
+  created_at: string;
+  updated_at: string;
   tanggal: string;
   category_id: string;
   jumlah: number;
@@ -194,8 +197,8 @@ export interface Expense extends BaseEntity {
   keterangan?: string;
   created_by?: string;
   // Relations
-  category?: Category;
-  bank?: Bank;
+  category?: { nama_kategori: string };
+  bank?: { nama_bank: string; nama_pemilik: string };
 }
 
 export interface Income extends BaseEntity {
