@@ -1,3 +1,5 @@
+// src/hooks/useSales.tsx (Kode Lengkap Baru)
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -24,7 +26,6 @@ export const useSales = () => {
             id,
             quantity,
             harga_satuan,
-            product_variant_id,
             product_variant:product_variants(
               id,
               warna,
@@ -108,8 +109,43 @@ export const useSales = () => {
         .insert(saleItems);
 
       if (itemsError) throw itemsError;
-      
-      // TIDAK ADA PENGURANGAN STOK DI SINI
+
+      if (saleData.status === 'shipped' || saleData.status === 'delivered') {
+        for (const item of items) {
+          const { data: currentStock, error: stockFetchError } = await supabase
+            .from('product_variants')
+            .select('stok')
+            .eq('id', item.product_variant_id)
+            .single();
+
+          if (stockFetchError) {
+            console.error('Error fetching current stock:', stockFetchError);
+            continue;
+          }
+
+          const newStock = (currentStock.stok || 0) - Number(item.quantity);
+
+          const { error: stockError } = await supabase
+            .from('product_variants')
+            .update({ stok: newStock })
+            .eq('id', item.product_variant_id);
+
+          if (stockError) console.error('Stock update error:', stockError);
+
+          const { error: movementError } = await supabase
+            .from('stock_movements')
+            .insert([{
+              product_variant_id: item.product_variant_id,
+              movement_type: 'out',
+              quantity: Number(item.quantity),
+              reference_type: 'sale',
+              reference_id: saleResult.id,
+              notes: `Penjualan: ${saleData.no_pesanan_platform}`
+            }]);
+
+          if (movementError) console.error('Movement error:', movementError);
+        }
+      }
 
       toast({
         title: "Sukses",
@@ -117,7 +153,7 @@ export const useSales = () => {
       });
 
       await fetchSales();
-      return { success: true, data: saleResult };
+      return { success: true, data: saleResult, error: null };
     } catch (error) {
       console.error('Error creating sale:', error);
       toast({
@@ -131,37 +167,60 @@ export const useSales = () => {
     }
   };
 
-  const updateSale = async (saleId: string, saleData: any, items: any[]) => {
+  // V V V PERBAIKANNYA ADA DI BARIS INI V V V
+  const updateSale = async (saleId: string, saleData: any, items: any[], existingItems?: any[]) => {
     setLoading(true);
     try {
       const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.harga_satuan)), 0);
       const total = subtotal + (Number(saleData.ongkir) || 0) - (Number(saleData.diskon) || 0);
 
-      const completeData = {
-        ...saleData,
-        subtotal,
-        total
-      };
-
-      // Update sale data
-      const { error: saleError } = await supabase
+      const { data: oldSaleData, error: oldSaleError } = await supabase
         .from('sales')
-        .update(completeData)
-        .eq('id', saleId);
+        .select('status')
+        .eq('id', saleId)
+        .single();
 
-      if (saleError) throw saleError;
+      if (oldSaleError) throw oldSaleError;
+
+      const oldStatus = oldSaleData.status;
+      const newStatus = saleData.status;
       
-      // TIDAK ADA PENGURANGAN/PENGEMBALIAN STOK DI SINI
+      console.log('Update Sale - Old Status:', oldStatus, 'New Status:', newStatus);
 
-      // Delete existing sale items
-      const { error: deleteError } = await supabase
-        .from('sale_items')
-        .delete()
-        .eq('sale_id', saleId);
+      const completeData = { ...saleData, subtotal, total };
 
+      const { error: saleError } = await supabase.from('sales').update(completeData).eq('id', saleId);
+      if (saleError) throw saleError;
+
+      if (existingItems && existingItems.length > 0 && (oldStatus === 'shipped' || oldStatus === 'delivered')) {
+        console.log('Restoring stock from old items...');
+        for (const existingItem of existingItems) {
+          const { data: currentStock, error: stockFetchError } = await supabase
+            .from('product_variants')
+            .select('stok')
+            .eq('id', existingItem.product_variant_id)
+            .single();
+
+          if (stockFetchError) { console.error('Error fetching current stock:', stockFetchError); continue; }
+
+          const restoredStock = (currentStock.stok || 0) + Number(existingItem.quantity);
+          console.log(`Restoring stock for ${existingItem.product_variant_id}: ${currentStock.stok} + ${existingItem.quantity} = ${restoredStock}`);
+          
+          const { error: restoreError } = await supabase
+            .from('product_variants')
+            .update({ stok: restoredStock })
+            .eq('id', existingItem.product_variant_id);
+
+          if (restoreError) console.error('Stock restore error:', restoreError);
+        }
+      }
+
+      const { error: deleteError } = await supabase.from('sale_items').delete().eq('sale_id', saleId);
       if (deleteError) throw deleteError;
 
-      // Insert new sale items
+      const { error: deleteMoveError } = await supabase.from('stock_movements').delete().eq('reference_id', saleId).eq('reference_type', 'sale');
+      if (deleteMoveError) console.error('Delete movement error:', deleteMoveError);
+
       const newSaleItems = items.map(item => ({
         sale_id: saleId,
         product_variant_id: item.product_variant_id,
@@ -170,19 +229,41 @@ export const useSales = () => {
         subtotal: Number(item.quantity) * Number(item.harga_satuan)
       }));
 
-      const { error: newItemsError } = await supabase
-        .from('sale_items')
-        .insert(newSaleItems);
-
+      const { error: newItemsError } = await supabase.from('sale_items').insert(newSaleItems);
       if (newItemsError) throw newItemsError;
 
-      toast({
-        title: "Sukses",
-        description: "Penjualan berhasil diperbarui",
-      });
+      if (newStatus === 'shipped' || newStatus === 'delivered') {
+        console.log('Deducting stock for new items...');
+        for (const item of items) {
+          const { data: currentStock, error: stockFetchError } = await supabase
+            .from('product_variants')
+            .select('stok')
+            .eq('id', item.product_variant_id)
+            .single();
 
+          if (stockFetchError) { console.error('Error fetching current stock:', stockFetchError); continue; }
+
+          const newStock = (currentStock.stok || 0) - Number(item.quantity);
+          console.log(`Deducting stock for ${item.product_variant_id}: ${currentStock.stok} - ${item.quantity} = ${newStock}`);
+
+          const { error: stockError } = await supabase.from('product_variants').update({ stok: newStock }).eq('id', item.product_variant_id);
+          if (stockError) console.error('Stock update error:', stockError);
+
+          const { error: movementError } = await supabase.from('stock_movements').insert([{
+            product_variant_id: item.product_variant_id,
+            movement_type: 'out',
+            quantity: Number(item.quantity),
+            reference_type: 'sale',
+            reference_id: saleId,
+            notes: `Update penjualan: ${saleData.no_pesanan_platform}`
+          }]);
+          if (movementError) console.error('Movement error:', movementError);
+        }
+      }
+
+      toast({ title: "Sukses", description: "Penjualan berhasil diperbarui" });
       await fetchSales();
-      return { success: true };
+      return { success: true, error: null };
     } catch (error) {
       console.error('Error updating sale:', error);
       toast({
@@ -201,19 +282,12 @@ export const useSales = () => {
     try {
       const { data: saleData, error: fetchError } = await supabase
         .from('sales')
-        .select(`
-          *,
-          sale_items(
-            product_variant_id,
-            quantity
-          )
-        `)
+        .select(`*, sale_items(product_variant_id, quantity)`)
         .eq('id', saleId)
         .single();
 
       if (fetchError) throw fetchError;
 
-      // Kembalikan stok jika status yang dihapus adalah shipped/delivered
       if (saleData?.sale_items && (saleData.status === 'shipped' || saleData.status === 'delivered')) {
         for (const item of saleData.sale_items) {
           const { data: currentStock, error: stockFetchError } = await supabase
@@ -222,10 +296,7 @@ export const useSales = () => {
             .eq('id', item.product_variant_id)
             .single();
 
-          if (stockFetchError) {
-            console.error('Error fetching current stock:', stockFetchError);
-            continue;
-          }
+          if (stockFetchError) { console.error('Error fetching current stock:', stockFetchError); continue; }
 
           const newStock = (currentStock.stok || 0) + Number(item.quantity);
           
@@ -234,37 +305,18 @@ export const useSales = () => {
             .update({ stok: newStock })
             .eq('id', item.product_variant_id);
 
-          if (stockError) {
-            console.error('Stock revert error:', stockError);
-          }
+          if (stockError) console.error('Stock revert error:', stockError);
         }
       }
 
-      await supabase
-        .from('stock_movements')
-        .delete()
-        .eq('reference_id', saleId)
-        .eq('reference_type', 'sale');
-
-      await supabase
-        .from('sale_items')
-        .delete()
-        .eq('sale_id', saleId);
-
-      const { error } = await supabase
-        .from('sales')
-        .delete()
-        .eq('id', saleId);
-
+      await supabase.from('stock_movements').delete().eq('reference_id', saleId).eq('reference_type', 'sale');
+      await supabase.from('sale_items').delete().eq('sale_id', saleId);
+      const { error } = await supabase.from('sales').delete().eq('id', saleId);
       if (error) throw error;
 
-      toast({
-        title: "Sukses",
-        description: "Penjualan berhasil dihapus",
-      });
-
+      toast({ title: "Sukses", description: "Penjualan berhasil dihapus" });
       await fetchSales();
-      return { success: true };
+      return { success: true, error: null };
     } catch (error) {
       console.error('Error deleting sale:', error);
       toast({
