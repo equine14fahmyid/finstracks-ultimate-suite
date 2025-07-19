@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input } from '@/components/ui/input'; // Kembali menggunakan Input standar
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, DollarSign, Calendar, TrendingUp, Download, Edit, Trash2 } from 'lucide-react';
@@ -52,7 +52,6 @@ const Incomes = () => {
 
   const incomeCategories = categories.filter(cat => cat.tipe_kategori === 'income');
 
-  // Gunakan useCallback agar fungsi tidak dibuat ulang di setiap render
   const memoizedFetchIncomes = useCallback(fetchIncomes, []);
 
   useEffect(() => {
@@ -65,7 +64,6 @@ const Incomes = () => {
     fetchCategories();
     fetchBanks();
     
-    // Listener untuk event realtime dari hook
     const handleRefetch = () => {
         const startDate = dateRange.from?.toISOString().split('T')[0];
         const endDate = dateRange.to?.toISOString().split('T')[0];
@@ -110,7 +108,7 @@ const Incomes = () => {
       tanggal: income.tanggal,
       category_id: income.category_id || '',
       jumlah: income.jumlah,
-      bank_id: income.bank_id || 'cash', // Default ke 'cash' jika null
+      bank_id: income.bank_id || 'cash',
       keterangan: income.keterangan || ''
     });
     setDialogOpen(true);
@@ -216,6 +214,7 @@ const Incomes = () => {
               </div>
               <div>
                 <Label htmlFor="jumlah">Jumlah *</Label>
+                {/* [PERBAIKAN] Menggunakan Input standar type="number" */}
                 <Input id="jumlah" type="number" value={formData.jumlah || ''} onChange={(e) => setFormData(prev => ({ ...prev, jumlah: parseFloat(e.target.value) || 0 }))} placeholder="0" min="0" required />
               </div>
               <div>
