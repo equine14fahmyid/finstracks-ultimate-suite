@@ -1,4 +1,4 @@
-// src/pages/Sales.tsx (Kode Lengkap Baru)
+// src/pages/Sales.tsx (Kode Lengkap dengan Fitur Filter Tanggal)
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,19 +7,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, ShoppingCart, Edit, Trash2, Download } from 'lucide-react'; // Import Download icon
+import { Plus, ShoppingCart, Edit, Trash2, Download } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSales, useStock, useExpeditions, useStores } from '@/hooks/useSupabase';
 import type { SaleStatus } from '@/hooks/useSales';
 import { DataTable } from '@/components/common/DataTable';
-import { formatCurrency, formatShortDate } from '@/utils/format';
+import { formatCurrency, formatShortDate, formatDate } from '@/utils/format';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { exportDataTableAsPDF } from '@/utils/pdfExport'; // <-- [BARU] Import PDF Exporter
-import { exportToCSV } from '@/utils/csvExport'; // <-- [BARU] Import CSV Exporter
+import { exportDataTableAsPDF } from '@/utils/pdfExport';
+import { exportToCSV } from '@/utils/csvExport';
+import DateFilter from '@/components/dashboard/DateFilter'; // Import komponen filter tanggal
+
+// Interface untuk rentang tanggal
+interface DateRange {
+  from: Date | undefined;
+  to: Date | undefined;
+}
 
 interface SaleFormData {
   tanggal: string;
@@ -49,6 +56,13 @@ const Sales = () => {
   const { stock: stockProducts, fetchStock } = useStock();
   const { expeditions, fetchExpeditions } = useExpeditions();
   const { stores, fetchStores } = useStores();
+  
+  // State untuk filter tanggal
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // Default: Awal bulan ini
+    to: new Date() // Default: Hari ini
+  });
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<any>(null);
   const [formData, setFormData] = useState<SaleFormData>({
@@ -66,8 +80,14 @@ const Sales = () => {
     items: [{ product_variant_id: '', quantity: 1, harga_satuan: 0 }]
   });
 
+  // useEffect untuk fetch data berdasarkan filter tanggal
   useEffect(() => {
-    fetchSales();
+    const startDate = dateRange.from?.toISOString().split('T')[0];
+    const endDate = dateRange.to?.toISOString().split('T')[0];
+    fetchSales(startDate, endDate);
+  }, [dateRange]);
+
+  useEffect(() => {
     fetchStock();
     fetchExpeditions();
     fetchStores();
@@ -85,7 +105,7 @@ const Sales = () => {
     return labels[status] || status;
   };
 
-  // [BARU] Fungsi untuk menangani ekspor PDF
+  // Fungsi untuk menangani ekspor PDF
   const handleExportPDF = () => {
       toast({ title: "Mengekspor PDF...", description: "Harap tunggu sebentar." });
       
@@ -108,7 +128,7 @@ const Sales = () => {
           { title: 'Total', dataKey: 'total' },
           { title: 'Status', dataKey: 'status' },
         ],
-        title: 'Laporan Penjualan',
+        title: `Laporan Penjualan (${formatDate(dateRange.from)} - ${formatDate(dateRange.to)})`,
         filename: `Laporan-Penjualan-${new Date().toISOString().split('T')[0]}.pdf`,
         companyInfo: {
           name: 'FINTracks Ultimate Suite',
@@ -117,7 +137,7 @@ const Sales = () => {
       });
   };
 
-  // [BARU] Fungsi untuk menangani ekspor CSV
+  // Fungsi untuk menangani ekspor CSV
   const handleExportCSV = () => {
       toast({ title: "Mengekspor CSV...", description: "Harap tunggu sebentar." });
 
@@ -142,9 +162,6 @@ const Sales = () => {
       });
   };
 
-
-  // ... (semua fungsi lain seperti handleStatusUpdate, handleSubmit, handleEdit, dll tetap sama) ...
-  // ... (kode fungsi-fungsi tersebut tidak saya tampilkan ulang agar ringkas) ...
   const handleSaldoUpdate = async (currentSale: any, newStatus: string) => {
     try {
       let saldoChange = 0;
@@ -199,28 +216,35 @@ const Sales = () => {
           )
         `)
         .eq('sale_id', saleId);
+      
       if (itemsError) {
         throw new Error('Gagal mengambil data item penjualan');
       }
+      
       const oldStatus = currentSale.status;
+      
       for (const item of saleItems || []) {
         const { data: currentStock, error: stockFetchError } = await supabase
           .from('product_variants')
           .select('stok')
           .eq('id', item.product_variant_id)
           .single();
+        
         if (stockFetchError) {
           console.error('Error fetching stock:', stockFetchError);
           continue;
         }
+        
         let stockChange = 0;
         let movementType: 'in' | 'out' | null = null;
         let notes = '';
+        
         if (oldStatus !== 'shipped' && oldStatus !== 'delivered' &&
           (newStatus === 'shipped' || newStatus === 'delivered')) {
           stockChange = -item.quantity;
           movementType = 'out';
           notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
+          
           if ((currentStock.stok || 0) < item.quantity) {
             throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
           }
@@ -236,20 +260,25 @@ const Sales = () => {
           stockChange = -item.quantity;
           movementType = 'out';
           notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
+          
           if ((currentStock.stok || 0) < item.quantity) {
             throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
           }
         }
+        
         if (stockChange !== 0 && movementType) {
           const newStockLevel = (currentStock.stok || 0) + stockChange;
+          
           const { error: stockUpdateError } = await supabase
             .from('product_variants')
             .update({ stok: newStockLevel })
             .eq('id', item.product_variant_id);
+          
           if (stockUpdateError) {
             console.error('Error updating stock:', stockUpdateError);
             continue;
           }
+          
           const { error: movementError } = await supabase
             .from('stock_movements')
             .insert([{
@@ -260,12 +289,15 @@ const Sales = () => {
               reference_id: saleId,
               notes: notes
             }]);
+          
           if (movementError) {
             console.error('Error inserting movement:', movementError);
           }
         }
       }
+      
       const result = await updateSaleStatus(saleId, newStatus as SaleStatus);
+      
       if (result.success) {
         toast({
           title: "Sukses",
@@ -289,6 +321,7 @@ const Sales = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!formData.no_pesanan_platform || !formData.customer_name || !formData.store_id || formData.items.length === 0) {
       toast({
         title: "Error",
@@ -297,9 +330,11 @@ const Sales = () => {
       });
       return;
     }
+    
     const validItems = formData.items.filter(item =>
       item.product_variant_id && item.quantity > 0 && item.harga_satuan > 0
     );
+    
     if (validItems.length === 0) {
       toast({
         title: "Error",
@@ -308,6 +343,7 @@ const Sales = () => {
       });
       return;
     }
+    
     for (const item of validItems) {
       const product = stockProducts?.find(p => p?.id === item.product_variant_id);
       if (!product) {
@@ -318,8 +354,10 @@ const Sales = () => {
         });
         return;
       }
+      
       const availableStock = product.stok || 0;
       let adjustedStock = availableStock;
+      
       if (editingSale) {
         const existingItem = editingSale.sale_items?.find((existing: any) =>
           existing.product_variant_id === item.product_variant_id
@@ -328,6 +366,7 @@ const Sales = () => {
           adjustedStock += existingItem.quantity;
         }
       }
+      
       if (item.quantity > adjustedStock) {
         toast({
           title: "Stok Tidak Mencukupi",
@@ -337,6 +376,7 @@ const Sales = () => {
         return;
       }
     }
+    
     const saleData = {
       tanggal: formData.tanggal,
       no_pesanan_platform: formData.no_pesanan_platform,
@@ -350,12 +390,14 @@ const Sales = () => {
       status: formData.status,
       notes: formData.notes || null,
     };
+    
     let result;
     if (editingSale) {
       result = await updateSale(editingSale.id, saleData, validItems, editingSale.sale_items);
     } else {
       result = await createSale(saleData, validItems);
     }
+    
     if (!result.error) {
       setDialogOpen(false);
       resetForm();
@@ -613,8 +655,7 @@ const Sales = () => {
                 <DialogTitle>{editingSale ? 'Edit Penjualan' : 'Tambah Penjualan Baru'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-6">
-                 {/* ... (Isi form tidak berubah, jadi saya sembunyikan agar ringkas) ... */}
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="tanggal">Tanggal *</Label>
                     <Input
@@ -821,6 +862,27 @@ const Sales = () => {
                   </div>
                 </div>
 
+                <div>
+                  <Label htmlFor="no_resi">No. Resi</Label>
+                  <Input
+                    id="no_resi"
+                    value={formData.no_resi}
+                    onChange={(e) => setFormData(prev => ({ ...prev, no_resi: e.target.value }))}
+                    placeholder="JNE123456789"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="notes">Catatan</Label>
+                  <Textarea
+                    id="notes"
+                    value={formData.notes}
+                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="Catatan tambahan untuk pesanan ini..."
+                    rows={3}
+                  />
+                </div>
+
                 <div className="bg-muted p-4 rounded-lg">
                   <div className="space-y-2">
                     <div className="flex justify-between">
@@ -856,6 +918,25 @@ const Sales = () => {
         )}
       </div>
 
+      {/* Filter Tanggal - Fitur Baru */}
+      <Card className="glass-card border-0">
+        <CardHeader className="pb-3 md:pb-6">
+          <CardTitle className="text-base md:text-lg flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+            📅 Filter Periode Penjualan
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DateFilter
+            value={dateRange}
+            onChange={setDateRange}
+            className="w-full md:max-w-md"
+          />
+          <div className="mt-3 text-sm text-muted-foreground">
+            Menampilkan data dari {formatDate(dateRange.from)} sampai {formatDate(dateRange.to)}
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="glass-card border-0">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -864,7 +945,6 @@ const Sales = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* [BARU] Modifikasi DataTable dengan props 'actions' */}
           <DataTable
             data={sales || []}
             columns={columns}
