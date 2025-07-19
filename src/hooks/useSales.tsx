@@ -10,34 +10,27 @@ export const useSales = () => {
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchSales = async () => {
+  const fetchSales = async (startDate?: string, endDate?: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('sales')
         .select(`
           *,
-          store:stores(
-            id,
-            nama_toko,
-            platform:platforms(nama_platform)
-          ),
-          sale_items(
-            id,
-            quantity,
-            harga_satuan,
-            product_variant:product_variants(
-              id,
-              warna,
-              size,
-              product:products(
-                id,
-                nama_produk
-              )
-            )
-          )
+          store:stores(id, nama_toko, platform:platforms(nama_platform)),
+          sale_items(id, quantity, harga_satuan, product_variant:product_variants(id, warna, size, product:products(id, nama_produk)))
         `)
         .order('created_at', { ascending: false });
+
+      // Menambahkan filter tanggal jika ada
+      if (startDate) {
+        query = query.gte('tanggal', startDate);
+      }
+      if (endDate) {
+        query = query.lte('tanggal', endDate);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setSales(data || []);
@@ -52,6 +45,7 @@ export const useSales = () => {
       setLoading(false);
     }
   };
+
 
   const updateSaleStatus = async (saleId: string, newStatus: SaleStatus) => {
     try {
