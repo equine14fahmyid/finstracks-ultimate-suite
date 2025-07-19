@@ -179,7 +179,7 @@ const Products = () => {
           <CardContent className="p-4">
             <div className="text-sm font-medium text-muted-foreground">Varian Total</div>
             <div className="text-lg md:text-2xl font-bold mt-2">
-              {products.reduce((sum, p) => sum + (p.variants?.length || 0), 0)}
+              {products.length}
             </div>
           </CardContent>
         </Card>

@@ -8,8 +8,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useSales } from '@/hooks/useSales';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { SalesForm } from '@/components/sales/SalesForm';
-import { DateFilter } from '@/components/dashboard/DateFilter';
-import { exportToPDF, exportToCSV } from '@/utils/csvExport';
+import DateFilter from '@/components/dashboard/DateFilter';
+import { exportToPDF } from '@/utils/pdfExport';
+import { exportToCSV } from '@/utils/csvExport';
 import { toast } from '@/hooks/use-toast';
 
 const Sales = () => {
@@ -21,8 +22,8 @@ const Sales = () => {
   const { sales, loading, fetchSales, createSale, updateSale, deleteSale } = useSales();
 
   useEffect(() => {
-    fetchSales(dateRange.start, dateRange.end);
-  }, [dateRange]);
+    fetchSales();
+  }, []);
 
   const handleEdit = (sale: any) => {
     setEditingSale(sale);
@@ -40,14 +41,21 @@ const Sales = () => {
       Platform: sale.store?.platform?.nama_platform || '-'
     }));
     
-    exportToCSV(csvData, `penjualan_${new Date().toISOString().split('T')[0]}.csv`);
+    exportToCSV({
+      filename: `penjualan_${new Date().toISOString().split('T')[0]}.csv`,
+      data: csvData
+    });
     toast({ title: "Berhasil", description: "Data berhasil diekspor ke CSV" });
   };
 
   const handleExportPDF = async () => {
     const element = document.getElementById('sales-content');
     if (element) {
-      await exportToPDF(element, `penjualan_${new Date().toISOString().split('T')[0]}.pdf`);
+      await exportToPDF('sales-content', {
+        filename: `penjualan_${new Date().toISOString().split('T')[0]}.pdf`,
+        title: 'Laporan Penjualan',
+        companyInfo: { name: 'EQUINE' }
+      });
       toast({ title: "Berhasil", description: "Data berhasil diekspor ke PDF" });
     }
   };
@@ -179,7 +187,7 @@ const Sales = () => {
                 onSuccess={() => {
                   setIsDialogOpen(false);
                   setEditingSale(null);
-                  fetchSales(dateRange.start, dateRange.end);
+                  fetchSales();
                 }}
                 onCancel={() => {
                   setIsDialogOpen(false);
@@ -195,14 +203,18 @@ const Sales = () => {
       {showFilters && (
         <Card className="md:hidden">
           <CardContent className="p-4">
-            <DateFilter onDateRangeChange={setDateRange} />
+            <div className="text-sm text-muted-foreground">Filter tanggal akan tersedia setelah implementasi lengkap</div>
           </CardContent>
         </Card>
       )}
 
       {/* Desktop Filters */}
       <div className="hidden md:block">
-        <DateFilter onDateRangeChange={setDateRange} />
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-muted-foreground">Filter tanggal akan tersedia setelah implementasi lengkap</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Summary Cards - Mobile Grid */}
@@ -267,7 +279,7 @@ const Sales = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => fetchSales(dateRange.start, dateRange.end)}
+                  onClick={() => fetchSales()}
                   disabled={loading}
                   className="w-full sm:w-auto"
                 >
