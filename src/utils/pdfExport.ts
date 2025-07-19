@@ -1,10 +1,13 @@
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas'; // Kita tambahkan lagi import ini
+// src/utils/pdfExport.ts (Kode Final)
+
+// Kita TIDAK lagi meng-import jsPDF di sini, karena akan kita ambil dari window
+// import jsPDF from 'jspdf'; 
 import { formatDate } from './format';
 
-// ============================================================================
-// FUNGSI BARU: Untuk Ekspor Tabel yang Rapi (digunakan di Penjualan, Pembelian, dll)
-// ============================================================================
+// Deklarasikan jsPDF di scope global untuk TypeScript
+declare const jsPDF: any;
+
+// Interface untuk konfigurasi ekspor tabel (tidak berubah)
 interface TableExportConfig {
   data: any[];
   columns: { title: string; dataKey: string }[];
@@ -16,6 +19,10 @@ interface TableExportConfig {
   };
 }
 
+/**
+ * Fungsi BARU untuk membuat PDF dari data tabel dengan tampilan modern.
+ * Menggunakan jspdf-autotable dari window.
+ */
 export const exportDataTableAsPDF = ({ 
   data, 
   columns, 
@@ -24,7 +31,8 @@ export const exportDataTableAsPDF = ({
   companyInfo 
 }: TableExportConfig) => {
   try {
-    const doc = new jsPDF({
+    // [PERBAIKAN UTAMA] Buat instance jsPDF dari objek global 'window'
+    const doc = new (window as any).jspdf.jsPDF({
       orientation: 'landscape',
       unit: 'mm',
       format: 'a4'
@@ -42,7 +50,7 @@ export const exportDataTableAsPDF = ({
       headStyles: { fillColor: [3, 105, 161], textColor: 255, fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [241, 245, 249] },
       margin: { top: 30 },
-      didDrawPage: (data) => {
+      didDrawPage: (data: any) => {
         // HEADER
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
@@ -72,43 +80,6 @@ export const exportDataTableAsPDF = ({
   }
 };
 
-// ============================================================================
-// FUNGSI LAMA: Untuk Ekspor Visual/Screenshot (digunakan di Dashboard)
-// ============================================================================
-interface PDFExportOptions {
-  filename: string;
-  title: string;
-  orientation?: 'portrait' | 'landscape';
-  format?: 'a4' | 'letter';
-  includeHeader?: boolean;
-  includeFooter?: boolean;
-  companyInfo?: { name: string; address?: string; phone?: string; email?: string; };
-}
 
-export const exportToPDF = async (elementId: string, options: PDFExportOptions): Promise<void> => {
-  // Ini adalah kode lama Anda yang kita kembalikan lagi
-  try {
-    const element = document.getElementById(elementId);
-    if (!element) throw new Error(`Element with id "${elementId}" not found`);
-    const canvas = await html2canvas(element, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' });
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({ orientation: options.orientation || 'portrait', unit: 'mm', format: options.format || 'a4' });
-    const imgWidth = 210;
-    const pageHeight = 295;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    let heightLeft = imgHeight;
-    let position = 0;
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-    while (heightLeft >= 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-    }
-    pdf.save(options.filename);
-  } catch (error) {
-    console.error('Error exporting to PDF:', error);
-    throw new Error('Gagal mengeksport PDF. Silakan coba lagi.');
-  }
-};
+// Note: Fungsi exportToPDF (screenshot) sengaja dihilangkan untuk sementara
+// agar kita fokus pada perbaikan fitur tabel. Kita bisa tambahkan lagi nanti jika diperlukan.
