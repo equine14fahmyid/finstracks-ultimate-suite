@@ -1,13 +1,14 @@
-// src/utils/pdfExport.ts (Kode Final)
+// src/utils/pdfExport.ts (KODE FINAL & LENGKAP)
 
-// Kita TIDAK lagi meng-import jsPDF di sini, karena akan kita ambil dari window
-// import jsPDF from 'jspdf'; 
+import html2canvas from 'html2canvas';
 import { formatDate } from './format';
 
-// Deklarasikan jsPDF di scope global untuk TypeScript
+// Deklarasikan jsPDF di scope global untuk TypeScript agar tidak error
 declare const jsPDF: any;
 
-// Interface untuk konfigurasi ekspor tabel (tidak berubah)
+// ============================================================================
+// FUNGSI UNTUK EKSPOR TABEL (Penjualan, Pembelian, dll.)
+// ============================================================================
 interface TableExportConfig {
   data: any[];
   columns: { title: string; dataKey: string }[];
@@ -19,10 +20,6 @@ interface TableExportConfig {
   };
 }
 
-/**
- * Fungsi BARU untuk membuat PDF dari data tabel dengan tampilan modern.
- * Menggunakan jspdf-autotable dari window.
- */
 export const exportDataTableAsPDF = ({ 
   data, 
   columns, 
@@ -31,7 +28,6 @@ export const exportDataTableAsPDF = ({
   companyInfo 
 }: TableExportConfig) => {
   try {
-    // [PERBAIKAN UTAMA] Buat instance jsPDF dari objek global 'window'
     const doc = new (window as any).jspdf.jsPDF({
       orientation: 'landscape',
       unit: 'mm',
@@ -64,7 +60,6 @@ export const exportDataTableAsPDF = ({
         if (companyInfo.address) {
           doc.text(companyInfo.address, doc.internal.pageSize.getWidth() - data.settings.margin.right, 22, { align: 'right' });
         }
-
         // FOOTER
         const pageCount = (doc as any).internal.getNumberOfPages();
         doc.setFontSize(8);
@@ -74,12 +69,54 @@ export const exportDataTableAsPDF = ({
     });
 
     doc.save(filename);
-
   } catch (error) {
     console.error("Gagal membuat PDF tabel:", error);
   }
 };
 
+// ============================================================================
+// FUNGSI UNTUK EKSPOR VISUAL / SCREENSHOT (Dashboard, Analitik, dll.)
+// ============================================================================
+interface PDFExportOptions {
+  filename: string;
+  title: string;
+  orientation?: 'portrait' | 'landscape';
+  format?: 'a4' | 'letter';
+  companyInfo?: { name: string; address?: string; phone?: string; email?: string; };
+}
 
-// Note: Fungsi exportToPDF (screenshot) sengaja dihilangkan untuk sementara
-// agar kita fokus pada perbaikan fitur tabel. Kita bisa tambahkan lagi nanti jika diperlukan.
+export const exportToPDF = async (elementId: string, options: PDFExportOptions): Promise<void> => {
+  try {
+    const element = document.getElementById(elementId);
+    if (!element) throw new Error(`Element with id "${elementId}" not found`);
+    
+    const canvas = await html2canvas(element, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' });
+    const imgData = canvas.toDataURL('image/png');
+    
+    const doc = new (window as any).jspdf.jsPDF({
+      orientation: options.orientation || 'portrait',
+      unit: 'mm',
+      format: options.format || 'a4'
+    });
+
+    const imgWidth = doc.internal.pageSize.getWidth();
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+    heightLeft -= doc.internal.pageSize.getHeight();
+
+    while (heightLeft >= 0) {
+      position = heightLeft - imgHeight;
+      doc.addPage();
+      doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= doc.internal.pageSize.getHeight();
+    }
+    
+    doc.save(options.filename);
+  } catch (error) {
+    console.error('Error exporting element to PDF:', error);
+    throw new Error('Gagal mengekspor PDF. Silakan coba lagi.');
+  }
+};
