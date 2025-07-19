@@ -3,17 +3,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, InputCurrency } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Edit, Trash2, Banknote } from 'lucide-react';
+import { Plus, Edit, Trash2, Banknote, Download } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useStores, useBanks } from '@/hooks/useSupabase';
 import { useSettlements } from '@/hooks/useSettlements';
 import { DataTable } from '@/components/common/DataTable';
-import { formatCurrency, formatShortDate } from '@/utils/format';
+import { formatCurrency, formatShortDate, formatDate } from '@/utils/format';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { exportDataTableAsPDF } from '@/utils/pdfExport';
+import { exportToCSV } from '@/utils/csvExport';
+import DateFilter from '@/components/dashboard/DateFilter';
 import { supabase } from '@/integrations/supabase/client';
+
+// Interface untuk rentang tanggal
+interface DateRange {
+  from: Date | undefined;
+  to: Date | undefined;
+}
 
 interface SettlementFormData {
   tanggal: string;
@@ -33,6 +42,12 @@ const Settlements = () => {
   const [settlements, setSettlements] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   
+  // State untuk filter tanggal
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    to: new Date()
+  });
+  
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSettlement, setEditingSettlement] = useState<any>(null);
   const [formData, setFormData] = useState<SettlementFormData>({
@@ -47,7 +62,10 @@ const Settlements = () => {
   const fetchSettlements = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const startDate = dateRange.from?.toISOString().split('T')[0];
+      const endDate = dateRange.to?.toISOString().split('T')[0];
+      
+      let query = supabase
         .from('settlements')
         .select(`
           *,
@@ -55,6 +73,12 @@ const Settlements = () => {
           bank:banks(nama_bank, nama_pemilik)
         `)
         .order('tanggal', { ascending: false });
+
+      if (startDate && endDate) {
+        query = query.gte('tanggal', startDate).lte('tanggal', endDate);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       setSettlements(data || []);
     } catch (error) {
@@ -64,6 +88,11 @@ const Settlements = () => {
       setLoading(false);
     }
   };
+
+  // useEffect untuk fetch data berdasarkan filter tanggal
+  useEffect(() => {
+    fetchSettlements();
+  }, [dateRange]);
 
   const updateSettlement = async (id: string, settlementData: SettlementFormData) => {
     setLoading(true);
@@ -90,12 +119,66 @@ const Settlements = () => {
     }
   };
 
-
   useEffect(() => {
-    fetchSettlements();
     fetchStores();
     fetchBanks();
   }, []);
+
+  // Fungsi export PDF
+  const handleExportPDF = () => {
+    toast({ title: "Mengekspor PDF...", description: "Harap tunggu sebentar." });
+    
+    const preparedData = settlements.map(settlement => ({
+      tanggal: formatShortDate(settlement?.tanggal),
+      toko: settlement?.store?.nama_toko || '-',
+      platform: settlement?.store?.platform?.nama_platform || '-',
+      bank: settlement?.bank?.nama_bank || '-',
+      jumlah: formatCurrency(settlement?.jumlah_dicairkan),
+      biaya_admin: formatCurrency(settlement?.biaya_admin || 0),
+      keterangan: settlement?.keterangan || '-',
+    }));
+
+    exportDataTableAsPDF({
+      data: preparedData,
+      columns: [
+        { title: 'Tanggal', dataKey: 'tanggal' },
+        { title: 'Toko', dataKey: 'toko' },
+        { title: 'Platform', dataKey: 'platform' },
+        { title: 'Bank', dataKey: 'bank' },
+        { title: 'Jumlah', dataKey: 'jumlah' },
+        { title: 'Biaya Admin', dataKey: 'biaya_admin' },
+        { title: 'Keterangan', dataKey: 'keterangan' },
+      ],
+      title: `Laporan Pencairan Dana (${formatDate(dateRange.from)} - ${formatDate(dateRange.to)})`,
+      filename: `Laporan-Pencairan-${new Date().toISOString().split('T')[0]}.pdf`,
+      companyInfo: {
+        name: 'FINTracks Ultimate Suite',
+        address: 'Tasikmalaya, Indonesia'
+      }
+    });
+  };
+
+  // Fungsi export CSV
+  const handleExportCSV = () => {
+    toast({ title: "Mengekspor CSV...", description: "Harap tunggu sebentar." });
+
+    const preparedData = settlements.map(settlement => ({
+      Tanggal: formatShortDate(settlement?.tanggal),
+      'Nama Toko': settlement?.store?.nama_toko || '-',
+      Platform: settlement?.store?.platform?.nama_platform || '-',
+      'Bank Tujuan': settlement?.bank?.nama_bank || '-',
+      'Nama Pemilik': settlement?.bank?.nama_pemilik || '-',
+      'Jumlah Dicairkan': settlement?.jumlah_dicairkan || 0,
+      'Biaya Admin': settlement?.biaya_admin || 0,
+      'Jumlah Diterima': (settlement?.jumlah_dicairkan || 0) - (settlement?.biaya_admin || 0),
+      Keterangan: settlement?.keterangan || '-'
+    }));
+    
+    exportToCSV({
+      data: preparedData,
+      filename: `Laporan-Pencairan-${new Date().toISOString().split('T')[0]}.csv`,
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,8 +199,6 @@ const Settlements = () => {
         resetForm();
       }
     } else {
-      // createSettlement dari hook tidak mengembalikan status, tapi menampilkan toast sendiri.
-      // Kita panggil, lalu langsung tutup dialog & refresh data.
       await createSettlement(formData);
       setDialogOpen(false);
       resetForm();
@@ -140,7 +221,7 @@ const Settlements = () => {
 
   const handleDelete = async (id: string) => {
     await deleteSettlement(id);
-    await fetchSettlements(); // Refresh data setelah hapus
+    await fetchSettlements();
   };
 
   const resetForm = () => {
@@ -349,6 +430,25 @@ const Settlements = () => {
         )}
       </div>
 
+      {/* Filter Tanggal */}
+      <Card className="glass-card border-0">
+        <CardHeader className="pb-3 md:pb-6">
+          <CardTitle className="text-base md:text-lg flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+            📅 Filter Periode Pencairan
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DateFilter
+            value={dateRange}
+            onChange={setDateRange}
+            className="w-full md:max-w-md"
+          />
+          <div className="mt-3 text-sm text-muted-foreground">
+            Menampilkan data dari {formatDate(dateRange.from)} sampai {formatDate(dateRange.to)}
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="glass-card border-0">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -363,6 +463,18 @@ const Settlements = () => {
             loading={loading}
             searchable={true}
             searchPlaceholder="Cari pencairan..."
+            actions={
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportPDF}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export PDF
+                </Button>
+              </div>
+            }
           />
         </CardContent>
       </Card>

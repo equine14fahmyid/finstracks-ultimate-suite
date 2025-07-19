@@ -1,272 +1,137 @@
-import { useState, useEffect, useRef } from 'react';
+
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { ExpenseFormData, Expense } from '@/types';
 
 export const useExpenses = () => {
-  const [expenses, setExpenses] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
-  const channelRef = useRef<RealtimeChannel | null>(null);
 
-  const fetchExpenses = async () => {
+  const fetchExpenses = useCallback(async (startDate?: string, endDate?: string) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      console.log('🔄 Fetching expenses...');
-      
-      const { data, error } = await supabase
+      let query = supabase
         .from('expenses')
         .select(`
-          id,
-          tanggal,
-          jumlah,
-          keterangan,
-          bank_id,
-          category_id,
-          created_at,
-          updated_at,
-          category:categories(
-            id,
-            nama_kategori,
-            tipe_kategori
-          ),
-          bank:banks(
-            id,
-            nama_bank,
-            nama_pemilik,
-            no_rekening
-          )
+          *,
+          category:categories(nama_kategori),
+          bank:banks(nama_bank, nama_pemilik)
         `)
         .order('tanggal', { ascending: false });
 
-      if (error) {
-        console.error('❌ Fetch expenses error:', error);
-        throw error;
+      if (startDate && endDate) {
+        query = query.gte('tanggal', startDate).lte('tanggal', endDate);
       }
 
-      console.log('✅ Expenses data fetched:', data);
-      console.log(`📊 Total expenses: ${data?.length || 0}`);
+      const { data, error } = await query;
       
-      // Log first item for debugging
-      if (data && data.length > 0) {
-        console.log('🔍 First expense item:', JSON.stringify(data[0], null, 2));
+      if (error) {
+        console.error('Error fetching expenses:', error);
+        toast({
+          title: "Error",
+          description: "Gagal memuat data pengeluaran",
+          variant: "destructive",
+        });
+        return;
       }
-      
-      // Process data to handle null banks properly
-      const processedData = (data || []).map(expense => ({
-        ...expense,
-        bank: expense.bank || null // Explicitly handle null bank
-      }));
-      
-      setExpenses(processedData);
-    } catch (error: any) {
-      console.error('❌ Fetch expenses error:', error);
+
+      setExpenses(data || []);
+    } catch (error) {
+      console.error('Unexpected error:', error);
       toast({
         title: "Error",
-        description: `Gagal memuat data pengeluaran: ${error.message}`,
+        description: "Terjadi kesalahan tidak terduga",
         variant: "destructive",
       });
-      setExpenses([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const createExpense = async (expenseData: any) => {
+  const createExpense = async (expenseData: ExpenseFormData) => {
     try {
-      setLoading(true);
-      console.log('➕ Creating expense:', expenseData);
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      const dataWithUser = {
-        ...expenseData,
-        created_by: user?.id
-      };
-
       const { data, error } = await supabase
         .from('expenses')
-        .insert(dataWithUser)
-        .select(`
-          id,
-          tanggal,
-          jumlah,
-          keterangan,
-          bank_id,
-          category_id,
-          created_at,
-          category:categories(
-            id,
-            nama_kategori,
-            tipe_kategori
-          ),
-          bank:banks(
-            id,
-            nama_bank,
-            nama_pemilik
-          )
-        `)
+        .insert([expenseData])
+        .select()
         .single();
 
-      if (error) {
-        console.error('❌ Create expense error:', error);
-        throw error;
-      }
-
-      console.log('✅ Expense created:', data);
+      if (error) throw error;
 
       toast({
         title: "Sukses",
-        description: "Pengeluaran berhasil dibuat dan saldo bank terupdate otomatis",
+        description: "Pengeluaran berhasil ditambahkan",
       });
 
-      return { data, error: null };
+      await fetchExpenses();
+      return { success: true, data };
     } catch (error: any) {
-      console.error('❌ Create expense error:', error);
+      console.error('Error creating expense:', error);
       toast({
         title: "Error",
-        description: `Gagal membuat pengeluaran: ${error.message}`,
+        description: error.message || "Gagal menambahkan pengeluaran",
         variant: "destructive",
       });
-      return { data: null, error };
-    } finally {
-      setLoading(false);
+      return { error: true };
     }
   };
 
-  const updateExpense = async (id: string, expenseData: any) => {
+  const updateExpense = async (id: string, expenseData: ExpenseFormData) => {
     try {
-      setLoading(true);
-      console.log('📝 Updating expense:', id, expenseData);
-      
       const { data, error } = await supabase
         .from('expenses')
         .update(expenseData)
         .eq('id', id)
-        .select(`
-          id,
-          tanggal,
-          jumlah,
-          keterangan,
-          bank_id,
-          category_id,
-          category:categories(
-            id,
-            nama_kategori,
-            tipe_kategori
-          ),
-          bank:banks(
-            id,
-            nama_bank,
-            nama_pemilik
-          )
-        `)
+        .select()
         .single();
 
-      if (error) {
-        console.error('❌ Update expense error:', error);
-        throw error;
-      }
-
-      console.log('✅ Expense updated:', data);
+      if (error) throw error;
 
       toast({
         title: "Sukses",
-        description: "Pengeluaran berhasil diperbarui dan saldo bank terupdate otomatis",
+        description: "Pengeluaran berhasil diperbarui",
       });
 
-      return { data, error: null };
+      await fetchExpenses();
+      return { success: true, data };
     } catch (error: any) {
-      console.error('❌ Update expense error:', error);
+      console.error('Error updating expense:', error);
       toast({
         title: "Error",
-        description: `Gagal memperbarui pengeluaran: ${error.message}`,
+        description: error.message || "Gagal memperbarui pengeluaran",
         variant: "destructive",
       });
-      return { data: null, error };
-    } finally {
-      setLoading(false);
+      return { error: true };
     }
   };
 
   const deleteExpense = async (id: string) => {
     try {
-      setLoading(true);
-      console.log('🗑️ Deleting expense:', id);
-      
       const { error } = await supabase
         .from('expenses')
         .delete()
         .eq('id', id);
 
-      if (error) {
-        console.error('❌ Delete expense error:', error);
-        throw error;
-      }
-
-      console.log('✅ Expense deleted');
+      if (error) throw error;
 
       toast({
         title: "Sukses",
-        description: "Pengeluaran berhasil dihapus dan saldo bank terupdate otomatis",
+        description: "Pengeluaran berhasil dihapus",
       });
 
+      await fetchExpenses();
+      return { success: true };
     } catch (error: any) {
-      console.error('❌ Delete expense error:', error);
+      console.error('Error deleting expense:', error);
       toast({
         title: "Error",
-        description: `Gagal menghapus pengeluaran: ${error.message}`,
+        description: error.message || "Gagal menghapus pengeluaran",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
+      return { error: true };
     }
   };
-
-  // Setup real-time subscription
-  useEffect(() => {
-    console.log('🔌 Setting up expenses real-time subscription...');
-    
-    // Initial fetch
-    fetchExpenses();
-
-    // Cleanup previous channel
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-    }
-
-    // Create new real-time channel
-    const channel = supabase
-      .channel('expenses-realtime-detailed')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'expenses'
-        },
-        (payload) => {
-          console.log('📡 Expense realtime update:', payload);
-          
-          // Add delay to ensure database consistency
-          setTimeout(() => {
-            console.log('🔄 Refreshing expenses after real-time event...');
-            fetchExpenses();
-          }, 500);
-        }
-      )
-      .subscribe((status) => {
-        console.log('📡 Expenses subscription status:', status);
-      });
-
-    channelRef.current = channel;
-
-    // Cleanup
-    return () => {
-      console.log('🧹 Cleaning up expenses subscription...');
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
-    };
-  }, []);
 
   return {
     expenses,

@@ -1,267 +1,160 @@
-import { useState, useEffect, useRef } from 'react';
+
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { RealtimeChannel } from '@supabase/supabase-js';
+
+export interface IncomeFormData {
+  tanggal: string;
+  category_id: string;
+  jumlah: number;
+  bank_id: string | null;
+  keterangan: string;
+}
+
+export interface Income {
+  id: string;
+  tanggal: string;
+  jumlah: number;
+  keterangan?: string;
+  category?: {
+    nama_kategori: string;
+  };
+  bank?: {
+    nama_bank: string;
+    nama_pemilik: string;
+  };
+  category_id?: string;
+  bank_id?: string;
+}
 
 export const useIncomes = () => {
-  const [incomes, setIncomes] = useState<any[]>([]);
+  const [incomes, setIncomes] = useState<Income[]>([]);
   const [loading, setLoading] = useState(false);
-  const channelRef = useRef<RealtimeChannel | null>(null);
 
-  const fetchIncomes = async () => {
+  const fetchIncomes = useCallback(async (startDate?: string, endDate?: string) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      console.log('🔄 Fetching incomes...');
-      
-      const { data, error } = await supabase
+      let query = supabase
         .from('incomes')
         .select(`
-          id,
-          tanggal,
-          jumlah,
-          keterangan,
-          bank_id,
-          category_id,
-          created_at,
-          updated_at,
-          category:categories(
-            id,
-            nama_kategori,
-            tipe_kategori
-          ),
-          bank:banks(
-            id,
-            nama_bank,
-            nama_pemilik,
-            no_rekening
-          )
+          *,
+          category:categories(nama_kategori),
+          bank:banks(nama_bank, nama_pemilik)
         `)
         .order('tanggal', { ascending: false });
 
-      if (error) {
-        console.error('❌ Fetch incomes error:', error);
-        throw error;
+      if (startDate && endDate) {
+        query = query.gte('tanggal', startDate).lte('tanggal', endDate);
       }
 
-      console.log('✅ Incomes data fetched:', data);
-      console.log(`📊 Total incomes: ${data?.length || 0}`);
+      const { data, error } = await query;
       
-      // Log first item for debugging
-      if (data && data.length > 0) {
-        console.log('🔍 First income item:', JSON.stringify(data[0], null, 2));
+      if (error) {
+        console.error('Error fetching incomes:', error);
+        toast({
+          title: "Error",
+          description: "Gagal memuat data pemasukan",
+          variant: "destructive",
+        });
+        return;
       }
-      
+
       setIncomes(data || []);
-    } catch (error: any) {
-      console.error('❌ Fetch incomes error:', error);
+    } catch (error) {
+      console.error('Unexpected error:', error);
       toast({
         title: "Error",
-        description: `Gagal memuat data pemasukan: ${error.message}`,
+        description: "Terjadi kesalahan tidak terduga",
         variant: "destructive",
       });
-      setIncomes([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const createIncome = async (incomeData: any) => {
+  const createIncome = async (incomeData: IncomeFormData) => {
     try {
-      setLoading(true);
-      console.log('➕ Creating income:', incomeData);
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      const dataWithUser = {
-        ...incomeData,
-        created_by: user?.id
-      };
-
       const { data, error } = await supabase
         .from('incomes')
-        .insert(dataWithUser)
-        .select(`
-          id,
-          tanggal,
-          jumlah,
-          keterangan,
-          bank_id,
-          category_id,
-          created_at,
-          category:categories(
-            id,
-            nama_kategori,
-            tipe_kategori
-          ),
-          bank:banks(
-            id,
-            nama_bank,
-            nama_pemilik
-          )
-        `)
+        .insert([incomeData])
+        .select()
         .single();
 
-      if (error) {
-        console.error('❌ Create income error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('✅ Income created:', data);
-      
       toast({
         title: "Sukses",
-        description: "Pemasukan berhasil dibuat dan saldo bank terupdate otomatis",
+        description: "Pemasukan berhasil ditambahkan",
       });
 
-      // Don't call fetchIncomes here, let real-time handle it
-      return { data, error: null };
+      await fetchIncomes();
+      return { success: true, data };
     } catch (error: any) {
-      console.error('❌ Create income error:', error);
+      console.error('Error creating income:', error);
       toast({
         title: "Error",
-        description: `Gagal membuat pemasukan: ${error.message}`,
+        description: error.message || "Gagal menambahkan pemasukan",
         variant: "destructive",
       });
-      return { data: null, error };
-    } finally {
-      setLoading(false);
+      return { error: true };
     }
   };
 
-  const updateIncome = async (id: string, incomeData: any) => {
+  const updateIncome = async (id: string, incomeData: IncomeFormData) => {
     try {
-      setLoading(true);
-      console.log('📝 Updating income:', id, incomeData);
-      
       const { data, error } = await supabase
         .from('incomes')
         .update(incomeData)
         .eq('id', id)
-        .select(`
-          id,
-          tanggal,
-          jumlah,
-          keterangan,
-          bank_id,
-          category_id,
-          category:categories(
-            id,
-            nama_kategori,
-            tipe_kategori
-          ),
-          bank:banks(
-            id,
-            nama_bank,
-            nama_pemilik
-          )
-        `)
+        .select()
         .single();
 
-      if (error) {
-        console.error('❌ Update income error:', error);
-        throw error;
-      }
-
-      console.log('✅ Income updated:', data);
+      if (error) throw error;
 
       toast({
         title: "Sukses",
-        description: "Pemasukan berhasil diperbarui dan saldo bank terupdate otomatis",
+        description: "Pemasukan berhasil diperbarui",
       });
 
-      return { data, error: null };
+      await fetchIncomes();
+      return { success: true, data };
     } catch (error: any) {
-      console.error('❌ Update income error:', error);
+      console.error('Error updating income:', error);
       toast({
         title: "Error",
-        description: `Gagal memperbarui pemasukan: ${error.message}`,
+        description: error.message || "Gagal memperbarui pemasukan",
         variant: "destructive",
       });
-      return { data: null, error };
-    } finally {
-      setLoading(false);
+      return { error: true };
     }
   };
 
   const deleteIncome = async (id: string) => {
     try {
-      setLoading(true);
-      console.log('🗑️ Deleting income:', id);
-      
       const { error } = await supabase
         .from('incomes')
         .delete()
         .eq('id', id);
 
-      if (error) {
-        console.error('❌ Delete income error:', error);
-        throw error;
-      }
-
-      console.log('✅ Income deleted');
+      if (error) throw error;
 
       toast({
         title: "Sukses",
-        description: "Pemasukan berhasil dihapus dan saldo bank terupdate otomatis",
+        description: "Pemasukan berhasil dihapus",
       });
 
+      await fetchIncomes();
+      return { success: true };
     } catch (error: any) {
-      console.error('❌ Delete income error:', error);
+      console.error('Error deleting income:', error);
       toast({
         title: "Error",
-        description: `Gagal menghapus pemasukan: ${error.message}`,
+        description: error.message || "Gagal menghapus pemasukan",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
+      return { error: true };
     }
   };
-
-  // Setup real-time subscription
-  useEffect(() => {
-    console.log('🔌 Setting up incomes real-time subscription...');
-    
-    // Initial fetch
-    fetchIncomes();
-
-    // Cleanup previous channel
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-    }
-
-    // Create new real-time channel
-    const channel = supabase
-      .channel('incomes-realtime-detailed')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'incomes'
-        },
-        (payload) => {
-          console.log('📡 Income realtime update:', payload);
-          
-          // Add delay to ensure database consistency
-          setTimeout(() => {
-            console.log('🔄 Refreshing incomes after real-time event...');
-            fetchIncomes();
-          }, 500);
-        }
-      )
-      .subscribe((status) => {
-        console.log('📡 Incomes subscription status:', status);
-      });
-
-    channelRef.current = channel;
-
-    // Cleanup
-    return () => {
-      console.log('🧹 Cleaning up incomes subscription...');
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
-    };
-  }, []);
 
   return {
     incomes,

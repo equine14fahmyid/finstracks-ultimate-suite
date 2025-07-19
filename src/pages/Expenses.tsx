@@ -1,23 +1,39 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input, InputCurrency } from '@/components/ui/input'; // PERBAIKAN DI SINI
+import { Input, InputCurrency } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, DollarSign, Calendar, TrendingDown } from 'lucide-react';
+import { Plus, DollarSign, Calendar, TrendingDown, Download } from 'lucide-react';
 import { useCategories, useBanks } from '@/hooks/useSupabase';
 import { useExpenses } from '@/hooks/useExpenses';
 import { DataTable } from '@/components/common/DataTable';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { formatCurrency, formatShortDate } from '@/utils/format';
+import { formatCurrency, formatShortDate, formatDate } from '@/utils/format';
+import { exportDataTableAsPDF } from '@/utils/pdfExport';
+import { exportToCSV } from '@/utils/csvExport';
+import DateFilter from '@/components/dashboard/DateFilter';
 import { ExpenseFormData, Expense } from '@/types';
+
+// Interface untuk rentang tanggal
+interface DateRange {
+  from: Date | undefined;
+  to: Date | undefined;
+}
 
 const Expenses = () => {
   const { expenses, loading, fetchExpenses, createExpense, updateExpense, deleteExpense } = useExpenses();
   const { categories, fetchCategories } = useCategories();
   const { banks, fetchBanks } = useBanks();
+  
+  // State untuk filter tanggal
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    to: new Date()
+  });
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [formData, setFormData] = useState<ExpenseFormData>({
@@ -30,11 +46,66 @@ const Expenses = () => {
 
   const expenseCategories = categories.filter(cat => cat.tipe_kategori === 'expense');
 
+  // useEffect untuk fetch data berdasarkan filter tanggal
   useEffect(() => {
-    // fetchExpenses() sudah dipanggil di dalam useExpenses hook, tidak perlu di sini lagi
+    const startDate = dateRange.from?.toISOString().split('T')[0];
+    const endDate = dateRange.to?.toISOString().split('T')[0];
+    fetchExpenses(startDate, endDate);
+  }, [dateRange]);
+
+  useEffect(() => {
     fetchCategories();
     fetchBanks();
   }, []);
+
+  // Fungsi export PDF
+  const handleExportPDF = () => {
+    toast({ title: "Mengekspor PDF...", description: "Harap tunggu sebentar." });
+    
+    const preparedData = expenses.map(expense => ({
+      tanggal: formatShortDate(expense.tanggal),
+      kategori: expense.category?.nama_kategori || '-',
+      jumlah: formatCurrency(expense.jumlah || 0),
+      bank: expense.bank?.nama_bank || 'Kas',
+      keterangan: expense.keterangan || '-',
+    }));
+
+    exportDataTableAsPDF({
+      data: preparedData,
+      columns: [
+        { title: 'Tanggal', dataKey: 'tanggal' },
+        { title: 'Kategori', dataKey: 'kategori' },
+        { title: 'Jumlah', dataKey: 'jumlah' },
+        { title: 'Bank', dataKey: 'bank' },
+        { title: 'Keterangan', dataKey: 'keterangan' },
+      ],
+      title: `Laporan Pengeluaran (${formatDate(dateRange.from)} - ${formatDate(dateRange.to)})`,
+      filename: `Laporan-Pengeluaran-${new Date().toISOString().split('T')[0]}.pdf`,
+      companyInfo: {
+        name: 'FINTracks Ultimate Suite',
+        address: 'Tasikmalaya, Indonesia'
+      }
+    });
+  };
+
+  // Fungsi export CSV
+  const handleExportCSV = () => {
+    toast({ title: "Mengekspor CSV...", description: "Harap tunggu sebentar." });
+
+    const preparedData = expenses.map(expense => ({
+      Tanggal: formatShortDate(expense.tanggal),
+      Kategori: expense.category?.nama_kategori || '-',
+      Jumlah: expense.jumlah || 0,
+      'Dibayar dari': expense.bank?.nama_bank || 'Kas',
+      'Nama Pemilik': expense.bank?.nama_pemilik || '-',
+      Keterangan: expense.keterangan || '-'
+    }));
+    
+    exportToCSV({
+      data: preparedData,
+      filename: `Laporan-Pengeluaran-${new Date().toISOString().split('T')[0]}.csv`,
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,13 +227,18 @@ const Expenses = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Pengeluaran</h1>
+        <div>
+          <h1 className="text-3xl font-bold gradient-text">Pengeluaran</h1>
+          <p className="text-muted-foreground">
+            Kelola transaksi pengeluaran dan biaya operasional
+          </p>
+        </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) resetForm();
         }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="gradient-primary">
               <Plus className="h-4 w-4 mr-2" />
               Tambah Pengeluaran
             </Button>
@@ -260,20 +336,39 @@ const Expenses = () => {
         </Dialog>
       </div>
 
+      {/* Filter Tanggal */}
+      <Card className="glass-card border-0">
+        <CardHeader className="pb-3 md:pb-6">
+          <CardTitle className="text-base md:text-lg flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+            📅 Filter Periode Pengeluaran
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DateFilter
+            value={dateRange}
+            onChange={setDateRange}
+            className="w-full md:max-w-md"
+          />
+          <div className="mt-3 text-sm text-muted-foreground">
+            Menampilkan data dari {formatDate(dateRange.from)} sampai {formatDate(dateRange.to)}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
+        <Card className="glass-card border-0">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Pengeluaran</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</div>
-            <p className="text-xs text-muted-foreground">Semua periode</p>
+            <p className="text-xs text-muted-foreground">Periode terpilih</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="glass-card border-0">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Bulan Ini</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -286,7 +381,7 @@ const Expenses = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="glass-card border-0">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Transaksi</CardTitle>
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
@@ -299,9 +394,12 @@ const Expenses = () => {
       </div>
 
       {/* Expenses Table */}
-      <Card>
+      <Card className="glass-card border-0">
         <CardHeader>
-          <CardTitle>Daftar Pengeluaran</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingDown className="h-5 w-5" />
+            Daftar Pengeluaran
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -310,6 +408,18 @@ const Expenses = () => {
             loading={loading}
             searchable={true}
             searchPlaceholder="Cari pengeluaran..."
+            actions={
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportPDF}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export PDF
+                </Button>
+              </div>
+            }
           />
         </CardContent>
       </Card>

@@ -1,18 +1,26 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input, InputCurrency } from '@/components/ui/input'; // Impor InputCurrency
+import { Input, InputCurrency } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, ShoppingBag, Edit, Trash2 } from 'lucide-react';
+import { Plus, ShoppingBag, Edit, Trash2, Download, Calendar, DollarSign } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useStock, useSuppliers, useBanks, usePurchases } from '@/hooks/useSupabase';
 import { DataTable } from '@/components/common/DataTable';
-import { formatCurrency, formatShortDate } from '@/utils/format';
+import { formatCurrency, formatShortDate, formatDate } from '@/utils/format';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { exportDataTableAsPDF } from '@/utils/pdfExport';
+import { exportToCSV } from '@/utils/csvExport';
+import DateFilter from '@/components/dashboard/DateFilter';
+
+interface DateRange {
+  from: Date | undefined;
+  to: Date | undefined;
+}
 
 interface PurchaseFormData {
   tanggal: string;
@@ -37,6 +45,12 @@ const Purchases = () => {
   const { stock: stockProducts, fetchStock } = useStock();
   const { suppliers, fetchSuppliers } = useSuppliers();
   const { banks, fetchBanks } = useBanks();
+  
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    to: new Date()
+  });
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<any>(null);
   const [formData, setFormData] = useState<PurchaseFormData>({
@@ -51,11 +65,67 @@ const Purchases = () => {
   });
 
   useEffect(() => {
-    fetchPurchases();
+    const startDate = dateRange.from?.toISOString().split('T')[0];
+    const endDate = dateRange.to?.toISOString().split('T')[0];
+    fetchPurchases(startDate, endDate);
+  }, [dateRange]);
+
+  useEffect(() => {
     fetchStock();
     fetchSuppliers();
     fetchBanks();
   }, []);
+
+  const handleExportPDF = () => {
+    toast({ title: "Mengekspor PDF...", description: "Harap tunggu sebentar." });
+    
+    const preparedData = purchases.map(purchase => ({
+      tanggal: formatShortDate(purchase?.tanggal),
+      supplier: purchase?.supplier?.nama_supplier || '-',
+      invoice: purchase?.no_invoice_supplier || '-',
+      bank: purchase?.bank?.nama_bank || 'N/A',
+      total: formatCurrency(purchase?.total || 0),
+      status: purchase?.payment_status === 'paid' ? 'Lunas' : 'Pending',
+    }));
+
+    exportDataTableAsPDF({
+      data: preparedData,
+      columns: [
+        { title: 'Tanggal', dataKey: 'tanggal' },
+        { title: 'Supplier', dataKey: 'supplier' },
+        { title: 'Invoice', dataKey: 'invoice' },
+        { title: 'Bank', dataKey: 'bank' },
+        { title: 'Total', dataKey: 'total' },
+        { title: 'Status', dataKey: 'status' },
+      ],
+      title: `Laporan Pembelian (${formatDate(dateRange.from)} - ${formatDate(dateRange.to)})`,
+      filename: `Laporan-Pembelian-${new Date().toISOString().split('T')[0]}.pdf`,
+      companyInfo: {
+        name: 'FINTracks Ultimate Suite',
+        address: 'Tasikmalaya, Indonesia'
+      }
+    });
+  };
+
+  const handleExportCSV = () => {
+    toast({ title: "Mengekspor CSV...", description: "Harap tunggu sebentar." });
+
+    const preparedData = purchases.map(purchase => ({
+      Tanggal: formatShortDate(purchase?.tanggal),
+      Supplier: purchase?.supplier?.nama_supplier || '-',
+      'No Invoice': purchase?.no_invoice_supplier || '-',
+      'Bank/Metode': purchase?.bank?.nama_bank || purchase?.payment_method || 'N/A',
+      'Nama Pemilik': purchase?.bank?.nama_pemilik || '-',
+      'Total Pembelian': purchase?.total || 0,
+      'Status Pembayaran': purchase?.payment_status === 'paid' ? 'Lunas' : 'Pending',
+      Catatan: purchase?.notes || '-'
+    }));
+    
+    exportToCSV({
+      data: preparedData,
+      filename: `Laporan-Pembelian-${new Date().toISOString().split('T')[0]}.csv`,
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -323,6 +393,11 @@ const Purchases = () => {
     }
   ];
 
+  const totalPurchases = purchases.reduce((total, purchase) => total + (purchase?.total || 0), 0);
+  const thisMonthPurchases = purchases.filter(purchase => 
+    purchase?.tanggal && new Date(purchase.tanggal).getMonth() === new Date().getMonth()
+  ).reduce((total, purchase) => total + (purchase?.total || 0), 0);
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -589,6 +664,61 @@ const Purchases = () => {
       </div>
 
       <Card className="glass-card border-0">
+        <CardHeader className="pb-3 md:pb-6">
+          <CardTitle className="text-base md:text-lg flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+            📅 Filter Periode Pembelian
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DateFilter
+            value={dateRange}
+            onChange={setDateRange}
+            className="w-full md:max-w-md"
+          />
+          <div className="mt-3 text-sm text-muted-foreground">
+            Menampilkan data dari {formatDate(dateRange.from)} sampai {formatDate(dateRange.to)}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="glass-card border-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Pembelian</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{formatCurrency(totalPurchases)}</div>
+            <p className="text-xs text-muted-foreground">Periode terpilih</p>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Bulan Ini</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{formatCurrency(thisMonthPurchases)}</div>
+            <p className="text-xs text-muted-foreground">
+              {new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Transaksi</CardTitle>
+            <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{purchases.length}</div>
+            <p className="text-xs text-muted-foreground">Total pembelian</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="glass-card border-0">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShoppingBag className="h-5 w-5" />
@@ -602,6 +732,18 @@ const Purchases = () => {
             loading={loading}
             searchable={true}
             searchPlaceholder="Cari pembelian..."
+            actions={
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportPDF}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export PDF
+                </Button>
+              </div>
+            }
           />
         </CardContent>
       </Card>
