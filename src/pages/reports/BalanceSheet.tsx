@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/utils/format';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { exportToPDF } from '@/utils/pdfExport';
 
 interface BalanceSheetData {
   assets: {
@@ -266,11 +267,28 @@ const BalanceSheet = () => {
     }
   });
 
-  const exportToPDF = () => {
-    toast({
-      title: "Info",
-      description: "Fitur ekspor PDF akan segera tersedia"
-    });
+  const exportToPDFReport = async () => {
+    try {
+      await exportToPDF('balance-sheet-content', {
+        filename: `neraca-${format(reportDate, 'yyyy-MM-dd')}.pdf`,
+        title: 'Neraca',
+        orientation: 'portrait',
+        companyInfo: {
+          name: 'EQUINE Fashion',
+          address: 'Indonesia'
+        }
+      });
+      toast({
+        title: "Sukses",
+        description: "Laporan PDF berhasil diunduh"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Gagal mengekspor PDF",
+        variant: "destructive"
+      });
+    }
   };
 
   // Calculate balance validation
@@ -293,7 +311,7 @@ const BalanceSheet = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={exportToPDF} variant="outline">
+          <Button onClick={exportToPDFReport} variant="outline">
             <Download className="h-4 w-4 mr-2" />
             Export PDF
           </Button>
@@ -341,7 +359,7 @@ const BalanceSheet = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid md:grid-cols-2 gap-6">
+        <div id="balance-sheet-content" className="grid md:grid-cols-2 gap-6">
           {/* Left Side - Assets */}
           <div className="space-y-6">
             <Card>

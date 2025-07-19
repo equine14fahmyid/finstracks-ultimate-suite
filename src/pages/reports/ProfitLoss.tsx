@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/utils/format';
 import { toast } from '@/hooks/use-toast';
 import { calculateProfitLoss, ProfitLossCalculation } from '@/utils/financialCalculations';
+import { exportToPDF } from '@/utils/pdfExport';
 
 const ProfitLoss = () => {
   const [startDate, setStartDate] = useState<Date>(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
@@ -42,11 +43,28 @@ const ProfitLoss = () => {
   // --- PERBAIKAN 2: Cek apakah ada data transaksi yang valid ---
   const hasTransactions = profitLossData && (profitLossData.revenue.total_penjualan > 0 || profitLossData.expenses.total_expenses > 0);
 
-  const exportToPDF = () => {
-    toast({
-      title: "Info",
-      description: "Fitur ekspor PDF akan segera tersedia"
-    });
+  const exportToPDFReport = async () => {
+    try {
+      await exportToPDF('profit-loss-content', {
+        filename: `laporan-laba-rugi-${format(startDate, 'yyyy-MM-dd')}-${format(endDate, 'yyyy-MM-dd')}.pdf`,
+        title: 'Laporan Laba Rugi',
+        orientation: 'portrait',
+        companyInfo: {
+          name: 'EQUINE Fashion',
+          address: 'Indonesia'
+        }
+      });
+      toast({
+        title: "Sukses",
+        description: "Laporan PDF berhasil diunduh"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Gagal mengekspor PDF",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -60,7 +78,7 @@ const ProfitLoss = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={exportToPDF} variant="outline" disabled={!hasTransactions}>
+          <Button onClick={exportToPDFReport} variant="outline" disabled={!hasTransactions}>
             <Download className="h-4 w-4 mr-2" />
             Export PDF
           </Button>
@@ -149,7 +167,7 @@ const ProfitLoss = () => {
       )}
 
       {!isLoading && !isError && hasTransactions && (
-        <div className="grid gap-6">
+        <div id="profit-loss-content" className="grid gap-6">
           {/* Revenue Section */}
           <Card>
             <CardHeader>

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, TrendingUp, TrendingDown, Package, Users } from 'lucide-react';
+import { CalendarIcon, TrendingUp, TrendingDown, Package, Users, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ import { formatCurrency } from '@/utils/format';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { exportToPDF } from '@/utils/pdfExport';
 
 interface AnalyticsData {
   salesTrend: Array<{
@@ -180,6 +181,30 @@ const Analytics = () => {
     }
   });
 
+  const exportToPDFReport = async () => {
+    try {
+      await exportToPDF('analytics-content', {
+        filename: `analitik-${format(startDate, 'yyyy-MM-dd')}-${format(endDate, 'yyyy-MM-dd')}.pdf`,
+        title: 'Analitik & Laporan Performa',
+        orientation: 'landscape',
+        companyInfo: {
+          name: 'EQUINE Fashion',
+          address: 'Indonesia'
+        }
+      });
+      toast({
+        title: "Sukses",
+        description: "Laporan PDF berhasil diunduh"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Gagal mengekspor PDF",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -189,6 +214,12 @@ const Analytics = () => {
           <p className="text-muted-foreground">
             Periode: {format(startDate, 'dd MMM yyyy', { locale: id })} - {format(endDate, 'dd MMM yyyy', { locale: id })}
           </p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={exportToPDFReport} variant="outline" disabled={isLoading}>
+            <Download className="h-4 w-4 mr-2" />
+            Export PDF
+          </Button>
         </div>
       </div>
 
@@ -248,7 +279,7 @@ const Analytics = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
+        <div id="analytics-content" className="space-y-6">
           {/* Sales Trend Chart */}
           <Card>
             <CardHeader>

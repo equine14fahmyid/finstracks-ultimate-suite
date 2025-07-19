@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/utils/format';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { exportToPDF } from '@/utils/pdfExport';
 
 interface CashFlowData {
   operating_activities: {
@@ -140,11 +141,28 @@ const CashFlow = () => {
     }
   });
 
-  const exportToPDF = () => {
-    toast({
-      title: "Info",
-      description: "Fitur ekspor PDF akan segera tersedia"
-    });
+  const exportToPDFReport = async () => {
+    try {
+      await exportToPDF('cash-flow-content', {
+        filename: `arus-kas-${format(startDate, 'yyyy-MM-dd')}-${format(endDate, 'yyyy-MM-dd')}.pdf`,
+        title: 'Laporan Arus Kas',
+        orientation: 'portrait',
+        companyInfo: {
+          name: 'EQUINE Fashion',
+          address: 'Indonesia'
+        }
+      });
+      toast({
+        title: "Sukses",
+        description: "Laporan PDF berhasil diunduh"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Gagal mengekspor PDF",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -158,7 +176,7 @@ const CashFlow = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={exportToPDF} variant="outline">
+          <Button onClick={exportToPDFReport} variant="outline">
             <Download className="h-4 w-4 mr-2" />
             Export PDF
           </Button>
@@ -222,7 +240,7 @@ const CashFlow = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
+        <div id="cash-flow-content" className="space-y-6">
           {/* Operating Activities */}
           <Card>
             <CardHeader>
