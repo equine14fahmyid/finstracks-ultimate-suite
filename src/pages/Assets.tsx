@@ -210,20 +210,21 @@ const Assets = () => {
   ];
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-4 md:space-y-6 p-3 md:p-6">
+      <div className="flex flex-col gap-3 md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold gradient-text">Manajemen Aset</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold gradient-text">Manajemen Aset</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Kelola aset tetap perusahaan Anda
           </p>
         </div>
         {hasPermission('assets.create') && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gradient-primary" onClick={resetForm}>
+              <Button className="gradient-primary w-full sm:w-auto" onClick={resetForm}>
                 <Plus className="h-4 w-4 mr-2" />
-                Tambah Aset
+                <span className="hidden sm:inline">Tambah Aset</span>
+                <span className="sm:hidden">Tambah</span>
               </Button>
             </DialogTrigger>
             <DialogContent>

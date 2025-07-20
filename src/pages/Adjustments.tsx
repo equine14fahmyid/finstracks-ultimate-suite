@@ -89,20 +89,22 @@ export default function Adjustments() {
               variant="default"
               onClick={() => handleValidate(sale)}
               disabled={actionLoading}
-              className="flex items-center gap-1"
+              className="flex items-center gap-1 w-full sm:w-auto"
             >
               <CheckCircle className="h-4 w-4" />
-              Validasi
+              <span className="hidden sm:inline">Validasi</span>
+              <span className="sm:hidden">✓</span>
             </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={() => handleRevise(sale)}
               disabled={actionLoading}
-              className="flex items-center gap-1"
+              className="flex items-center gap-1 w-full sm:w-auto"
             >
               <Settings className="h-4 w-4" />
-              Revisi
+              <span className="hidden sm:inline">Revisi</span>
+              <span className="sm:hidden">⚙</span>
             </Button>
           </div>
         );
@@ -178,31 +180,34 @@ export default function Adjustments() {
   const totalAdjustmentAmount = adjustments.reduce((sum, adj) => sum + adj.amount, 0);
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
+    <div className="container mx-auto py-4 md:py-8 px-3 md:px-6 space-y-4 md:space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Penyesuaian & Validasi</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Penyesuaian & Validasi</h1>
+        <p className="text-sm md:text-base text-muted-foreground">
           Validasi penjualan yang sudah selesai dan buat penyesuaian jika diperlukan
         </p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
         {/* Summary Cards */}
       </div>
 
-      <Tabs defaultValue="pending" className="space-y-6">
-        <div className="flex justify-between items-center">
-            <TabsList>
-            <TabsTrigger value="pending">
-                Pending Validasi ({pendingSales.length})
+      <Tabs defaultValue="pending" className="space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+            <TabsList className="w-full sm:w-auto">
+            <TabsTrigger value="pending" className="flex-1 sm:flex-none">
+                <span className="hidden sm:inline">Pending Validasi ({pendingSales.length})</span>
+                <span className="sm:hidden">Pending ({pendingSales.length})</span>
             </TabsTrigger>
-            <TabsTrigger value="adjustments">
-                Riwayat Penyesuaian ({adjustments.length})
+            <TabsTrigger value="adjustments" className="flex-1 sm:flex-none">
+                <span className="hidden sm:inline">Riwayat Penyesuaian ({adjustments.length})</span>
+                <span className="sm:hidden">Riwayat ({adjustments.length})</span>
             </TabsTrigger>
             </TabsList>
-            <Button variant="outline" size="sm" onClick={() => refreshData()} disabled={loading}>
+            <Button variant="outline" size="sm" onClick={() => refreshData()} disabled={loading} className="w-full sm:w-auto">
                 <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
+                <span className="hidden sm:inline">Refresh</span>
+                <span className="sm:hidden">Sync</span>
             </Button>
         </div>
 

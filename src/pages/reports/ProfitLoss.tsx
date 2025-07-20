@@ -68,19 +68,20 @@ const ProfitLoss = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Laporan Laba Rugi</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold">Laporan Laba Rugi</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Periode: {format(startDate, 'dd MMM yyyy', { locale: id })} - {format(endDate, 'dd MMM yyyy', { locale: id })}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={exportToPDFReport} variant="outline" disabled={!hasTransactions}>
+          <Button onClick={exportToPDFReport} variant="outline" disabled={!hasTransactions} className="w-full sm:w-auto">
             <Download className="h-4 w-4 mr-2" />
-            Export PDF
+            <span className="hidden sm:inline">Export PDF</span>
+            <span className="sm:hidden">PDF</span>
           </Button>
         </div>
       </div>
@@ -90,12 +91,12 @@ const ProfitLoss = () => {
         <CardHeader>
           <CardTitle>Filter Periode</CardTitle>
         </CardHeader>
-        <CardContent className="flex gap-4">
-          <div>
+        <CardContent className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
             <label className="text-sm font-medium">Tanggal Mulai</label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
+                <Button variant="outline" className={cn("w-full sm:w-[240px] justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {startDate ? format(startDate, 'dd MMM yyyy', { locale: id }) : 'Pilih tanggal'}
                 </Button>
@@ -111,11 +112,11 @@ const ProfitLoss = () => {
               </PopoverContent>
             </Popover>
           </div>
-          <div>
+          <div className="flex-1">
             <label className="text-sm font-medium">Tanggal Akhir</label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
+                <Button variant="outline" className={cn("w-full sm:w-[240px] justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {endDate ? format(endDate, 'dd MMM yyyy', { locale: id }) : 'Pilih tanggal'}
                 </Button>

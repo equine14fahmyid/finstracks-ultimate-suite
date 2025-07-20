@@ -177,12 +177,15 @@ const Users = () => {
   ];
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-foreground">User Management</h1>
-        <Button onClick={() => setIsDialogOpen(true)}>
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
+      <div className="flex flex-col gap-3 md:gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">User Management</h1>
+        </div>
+        <Button onClick={() => setIsDialogOpen(true)} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
-          Tambah Pengguna
+          <span className="hidden sm:inline">Tambah Pengguna</span>
+          <span className="sm:hidden">Tambah</span>
         </Button>
       </div>
 

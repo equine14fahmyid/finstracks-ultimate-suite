@@ -97,21 +97,41 @@ const Settings = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-foreground">Settings</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Settings</h1>
       </div>
 
       <Form {...form}>
         {/* PENTING: Bungkus semua Tabs dengan satu <form> */}
         <form onSubmit={form.handleSubmit(handleSettingsSubmit)} className="space-y-6">
-          <Tabs defaultValue="company" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="company" className="flex items-center gap-2"><Building className="h-4 w-4" />Perusahaan</TabsTrigger>
-              <TabsTrigger value="user" className="flex items-center gap-2"><User className="h-4 w-4" />Pengguna</TabsTrigger>
-              <TabsTrigger value="notifications" className="flex items-center gap-2"><Bell className="h-4 w-4" />Notifikasi</TabsTrigger>
-              <TabsTrigger value="security" className="flex items-center gap-2"><Shield className="h-4 w-4" />Keamanan</TabsTrigger>
-              <TabsTrigger value="system" className="flex items-center gap-2"><Database className="h-4 w-4" />Sistem</TabsTrigger>
+          <Tabs defaultValue="company" className="space-y-4 md:space-y-6">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 gap-1">
+              <TabsTrigger value="company" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                <Building className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Perusahaan</span>
+                <span className="sm:hidden">Co.</span>
+              </TabsTrigger>
+              <TabsTrigger value="user" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                <User className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Pengguna</span>
+                <span className="sm:hidden">User</span>
+              </TabsTrigger>
+              <TabsTrigger value="notifications" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                <Bell className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Notifikasi</span>
+                <span className="sm:hidden">Bell</span>
+              </TabsTrigger>
+              <TabsTrigger value="security" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                <Shield className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Keamanan</span>
+                <span className="sm:hidden">Sec</span>
+              </TabsTrigger>
+              <TabsTrigger value="system" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm col-span-2 md:col-span-1">
+                <Database className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Sistem</span>
+                <span className="sm:hidden">Sys</span>
+              </TabsTrigger>
             </TabsList>
 
             {/* Konten Tab Perusahaan (Tidak ada perubahan signifikan) */}
@@ -125,17 +145,17 @@ const Settings = () => {
                     <div className="space-y-4">
                       {/* ... (kode form perusahaan yang sudah ada tidak saya tampilkan ulang agar ringkas) ... */}
                       {/* Letakkan kode form Perusahaan Anda yang sudah ada di sini */}
-                      <div className="grid grid-cols-2 gap-4">
-                          <FormField control={form.control} name="company_name" render={({ field }) => (<FormItem><FormLabel>Nama Perusahaan *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                          <FormField control={form.control} name="modal_awal" render={({ field }) => (<FormItem><FormLabel>Modal Awal</FormLabel><FormControl><Input type="number" placeholder="0" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)} /></FormControl><FormMessage /></FormItem>)} />
-                      </div>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <FormField control={form.control} name="company_name" render={({ field }) => (<FormItem><FormLabel>Nama Perusahaan *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                           <FormField control={form.control} name="modal_awal" render={({ field }) => (<FormItem><FormLabel>Modal Awal</FormLabel><FormControl><Input type="number" placeholder="0" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)} /></FormControl><FormMessage /></FormItem>)} />
+                       </div>
                       <FormField control={form.control} name="tax_number" render={({ field }) => (<FormItem><FormLabel>NPWP</FormLabel><FormControl><Input placeholder="00.000.000.0-000.000" {...field} /></FormControl><FormMessage /></FormItem>)}/>
                       <FormField control={form.control} name="company_address" render={({ field }) => (<FormItem><FormLabel>Alamat</FormLabel><FormControl><Textarea placeholder="Alamat lengkap perusahaan" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                      <div className="grid grid-cols-3 gap-4">
-                          <FormField control={form.control} name="company_phone" render={({ field }) => (<FormItem><FormLabel>No. Telepon</FormLabel><FormControl><Input placeholder="021-xxxxxxxx" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                          <FormField control={form.control} name="company_email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="info@company.com" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                          <FormField control={form.control} name="company_website" render={({ field }) => (<FormItem><FormLabel>Website</FormLabel><FormControl><Input placeholder="https://company.com" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                      </div>
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                           <FormField control={form.control} name="company_phone" render={({ field }) => (<FormItem><FormLabel>No. Telepon</FormLabel><FormControl><Input placeholder="021-xxxxxxxx" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                           <FormField control={form.control} name="company_email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="info@company.com" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                           <FormField control={form.control} name="company_website" render={({ field }) => (<FormItem><FormLabel>Website</FormLabel><FormControl><Input placeholder="https://company.com" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                       </div>
                       <FormField control={form.control} name="logo_url" render={({ field }) => (<FormItem><FormLabel>URL Logo</FormLabel><FormControl><Input placeholder="https://..." {...field} /></FormControl><FormMessage /></FormItem>)} />
                     </div>
                   )}
@@ -216,13 +236,21 @@ const Settings = () => {
               <Card>
                 <CardHeader><CardTitle>Pengaturan Sistem</CardTitle></CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-medium">Backup & Restore</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <Button onClick={handleBackup} disabled={loading} type="button"><Download className="mr-2 h-4 w-4" />Backup Data</Button>
-                      <Button variant="outline" disabled={true} type="button"><Upload className="mr-2 h-4 w-4" />Restore Data</Button>
-                    </div>
-                  </div>
+                   <div className="space-y-2">
+                     <h3 className="text-base md:text-lg font-medium">Backup & Restore</h3>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       <Button onClick={handleBackup} disabled={loading} type="button" className="w-full">
+                         <Download className="mr-2 h-4 w-4" />
+                         <span className="hidden sm:inline">Backup Data</span>
+                         <span className="sm:hidden">Backup</span>
+                       </Button>
+                       <Button variant="outline" disabled={true} type="button" className="w-full">
+                         <Upload className="mr-2 h-4 w-4" />
+                         <span className="hidden sm:inline">Restore Data</span>
+                         <span className="sm:hidden">Restore</span>
+                       </Button>
+                     </div>
+                   </div>
                 </CardContent>
               </Card>
             </TabsContent>

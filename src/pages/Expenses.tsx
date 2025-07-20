@@ -225,11 +225,11 @@ const Expenses = () => {
   ).reduce((total, expense) => total + (expense?.jumlah || 0), 0);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
+      <div className="flex flex-col gap-3 md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold gradient-text">Pengeluaran</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold gradient-text">Pengeluaran</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Kelola transaksi pengeluaran dan biaya operasional
           </p>
         </div>
@@ -238,9 +238,10 @@ const Expenses = () => {
           if (!open) resetForm();
         }}>
           <DialogTrigger asChild>
-            <Button className="gradient-primary">
+            <Button className="gradient-primary w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
-              Tambah Pengeluaran
+              <span className="hidden sm:inline">Tambah Pengeluaran</span>
+              <span className="sm:hidden">Tambah</span>
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
@@ -356,7 +357,7 @@ const Expenses = () => {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
         <Card className="glass-card border-0">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Pengeluaran</CardTitle>
@@ -409,14 +410,16 @@ const Expenses = () => {
             searchable={true}
             searchPlaceholder="Cari pengeluaran..."
             actions={
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleExportCSV}>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button variant="outline" size="sm" onClick={handleExportCSV} className="w-full sm:w-auto">
                   <Download className="h-4 w-4 mr-2" />
-                  Export CSV
+                  <span className="hidden sm:inline">Export CSV</span>
+                  <span className="sm:hidden">CSV</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleExportPDF}>
+                <Button variant="outline" size="sm" onClick={handleExportPDF} className="w-full sm:w-auto">
                   <Download className="h-4 w-4 mr-2" />
-                  Export PDF
+                  <span className="hidden sm:inline">Export PDF</span>
+                  <span className="sm:hidden">PDF</span>
                 </Button>
               </div>
             }

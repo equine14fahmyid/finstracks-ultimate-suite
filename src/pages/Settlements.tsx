@@ -318,20 +318,21 @@ const Settlements = () => {
   ];
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-4 md:space-y-6 p-3 md:p-6">
+      <div className="flex flex-col gap-3 md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold gradient-text">Pencairan Dana</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold gradient-text">Pencairan Dana</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Catat pencairan dana dari platform ke rekening bank
           </p>
         </div>
         {hasPermission('settlements.create') && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gradient-primary" onClick={resetForm}>
+              <Button className="gradient-primary w-full sm:w-auto" onClick={resetForm}>
                 <Plus className="h-4 w-4 mr-2" />
-                Tambah Pencairan
+                <span className="hidden sm:inline">Tambah Pencairan</span>
+                <span className="sm:hidden">Tambah</span>
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -464,14 +465,16 @@ const Settlements = () => {
             searchable={true}
             searchPlaceholder="Cari pencairan..."
             actions={
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleExportCSV}>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button variant="outline" size="sm" onClick={handleExportCSV} className="w-full sm:w-auto">
                   <Download className="h-4 w-4 mr-2" />
-                  Export CSV
+                  <span className="hidden sm:inline">Export CSV</span>
+                  <span className="sm:hidden">CSV</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleExportPDF}>
+                <Button variant="outline" size="sm" onClick={handleExportPDF} className="w-full sm:w-auto">
                   <Download className="h-4 w-4 mr-2" />
-                  Export PDF
+                  <span className="hidden sm:inline">Export PDF</span>
+                  <span className="sm:hidden">PDF</span>
                 </Button>
               </div>
             }

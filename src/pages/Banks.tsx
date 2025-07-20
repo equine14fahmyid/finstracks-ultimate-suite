@@ -324,20 +324,22 @@ const Banks = () => {
   ];
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
+      <div className="flex flex-col gap-3 md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Master Data Bank</h1>
-          <p className="text-muted-foreground">Data saldo real-time terupdate otomatis</p>
+          <h1 className="text-2xl md:text-3xl font-bold">Master Data Bank</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Data saldo real-time terupdate otomatis</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Button 
             variant="outline" 
             onClick={fetchBanks}
             disabled={loading}
+            className="w-full sm:w-auto"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
+            <span className="sm:hidden">Sync</span>
           </Button>
           <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
             setIsAddDialogOpen(open);
@@ -347,9 +349,10 @@ const Banks = () => {
             }
           }}>
             <DialogTrigger asChild>
-              <Button onClick={() => setIsAddDialogOpen(true)}>
+              <Button onClick={() => setIsAddDialogOpen(true)} className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
-                Tambah Bank
+                <span className="hidden sm:inline">Tambah Bank</span>
+                <span className="sm:hidden">Tambah</span>
               </Button>
             </DialogTrigger>
             <DialogContent>

@@ -114,19 +114,22 @@ const Categories = () => {
   ];
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-foreground">Category Management</h1>
-        <Button onClick={() => setIsDialogOpen(true)}>
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
+      <div className="flex flex-col gap-3 md:gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Category Management</h1>
+        </div>
+        <Button onClick={() => setIsDialogOpen(true)} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
-          Tambah Kategori
+          <span className="hidden sm:inline">Tambah Kategori</span>
+          <span className="sm:hidden">Tambah</span>
         </Button>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Daftar Kategori</CardTitle>
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -137,7 +140,7 @@ const Categories = () => {
               />
             </div>
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

@@ -397,11 +397,11 @@ const Purchases = () => {
   ).reduce((total, purchase) => total + (purchase?.total || 0), 0);
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-4 md:space-y-6 p-3 md:p-6">
+      <div className="flex flex-col gap-3 md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold gradient-text">Manajemen Pembelian</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold gradient-text">Manajemen Pembelian</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Kelola transaksi pembelian dari supplier
           </p>
         </div>
@@ -409,9 +409,10 @@ const Purchases = () => {
         {hasPermission('purchases.create') && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gradient-primary" onClick={resetForm}>
+              <Button className="gradient-primary w-full sm:w-auto" onClick={resetForm}>
                 <Plus className="h-4 w-4 mr-2" />
-                {editingPurchase ? 'Edit Pembelian' : 'Tambah Pembelian'}
+                <span className="hidden sm:inline">{editingPurchase ? 'Edit Pembelian' : 'Tambah Pembelian'}</span>
+                <span className="sm:hidden">{editingPurchase ? 'Edit' : 'Tambah'}</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
