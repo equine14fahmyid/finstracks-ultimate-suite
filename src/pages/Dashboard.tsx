@@ -187,41 +187,48 @@ const handleExportPDF = async () => {
           </div>
         </div>
         
-        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="glass-button h-10 md:h-auto"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+        <div className="flex flex-col space-y-3 md:space-y-0 md:flex-row md:items-center md:justify-between md:gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold gradient-text">Dashboard</h1>
+            {/* ... (kode lainnya) ... */}
+          </div>
           
-          {hasPermission('reports.export') && (
-            <div className="flex gap-2 md:gap-3">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleExportCSV}
-                disabled={exporting}
-                className="glass-button flex-1 md:flex-none h-10 md:h-auto"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                CSV
-              </Button>
-              <Button 
-                size="sm" 
-                onClick={handleExportPDF}
-                disabled={exporting}
-                className="gradient-primary flex-1 md:flex-none h-10 md:h-auto"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                {exporting ? 'Mengekspor...' : 'PDF'}
-              </Button>
-            </div>
-          )}
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="glass-button h-10 md:h-auto" // Atur tinggi untuk mobile
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            
+            {hasPermission('reports.export') && (
+              <div className="flex gap-2 md:gap-3">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleExportCSV}
+                  disabled={exporting}
+                  className="glass-button flex-1 md:flex-none h-10 md:h-auto" // Atur tinggi & lebar untuk mobile
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  CSV
+                </Button>
+                <Button 
+                  size="sm" 
+                  onClick={handleExportPDF}
+                  disabled={exporting}
+                  className="gradient-primary flex-1 md:flex-none h-10 md:h-auto" // Atur tinggi & lebar untuk mobile
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {exporting ? 'Mengekspor...' : 'PDF'}
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
