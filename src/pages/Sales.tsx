@@ -634,20 +634,22 @@ const Sales = () => {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-3 md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold gradient-text">Manajemen Penjualan</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold gradient-text">Manajemen Penjualan</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Kelola transaksi penjualan dan order customer
           </p>
         </div>
-
+      
         {hasPermission('sales.create') && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gradient-primary" onClick={resetForm}>
+              {/* Tambahkan kelas w-full sm:w-auto agar tombol responsif */}
+              <Button className="gradient-primary w-full sm:w-auto" onClick={resetForm}>
                 <Plus className="h-4 w-4 mr-2" />
-                {editingSale ? 'Edit Penjualan' : 'Tambah Penjualan'}
+                <span className="hidden sm:inline">{editingSale ? 'Edit Penjualan' : 'Tambah Penjualan'}</span>
+                <span className="sm:hidden">{editingSale ? 'Edit' : 'Tambah'}</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
