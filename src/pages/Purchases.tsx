@@ -417,32 +417,33 @@ const Purchases = () => {
             </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>{editingPurchase ? 'Edit Pembelian' : 'Tambah Pembelian Baru'}</DialogTitle>
+                <DialogTitle className="text-lg md:text-xl">{editingPurchase ? 'Edit Pembelian' : 'Tambah Pembelian Baru'}</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                   <div>
-                    <Label htmlFor="tanggal">Tanggal *</Label>
+                    <Label htmlFor="tanggal" className="text-sm md:text-base">Tanggal *</Label>
                     <Input
                       id="tanggal"
                       type="date"
                       value={formData.tanggal}
                       onChange={(e) => setFormData(prev => ({ ...prev, tanggal: e.target.value }))}
                       required
+                      className="text-sm md:text-base"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="supplier_id">Supplier *</Label>
+                    <Label htmlFor="supplier_id" className="text-sm md:text-base">Supplier *</Label>
                     <Select 
                       value={formData.supplier_id} 
                       onValueChange={(value) => setFormData(prev => ({ ...prev, supplier_id: value }))}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="text-sm md:text-base">
                         <SelectValue placeholder="Pilih supplier" />
                       </SelectTrigger>
                       <SelectContent>
                         {suppliers?.map((supplier) => (
-                          <SelectItem key={supplier.id} value={supplier.id}>
+                          <SelectItem key={supplier.id} value={supplier.id} className="text-sm md:text-base">
                             {supplier?.nama_supplier || 'Supplier tidak diketahui'}
                           </SelectItem>
                         )) || <SelectItem value="" disabled>Tidak ada supplier tersedia</SelectItem>}
@@ -450,46 +451,50 @@ const Purchases = () => {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="no_invoice_supplier">No. Invoice Supplier</Label>
+                    <Label htmlFor="no_invoice_supplier" className="text-sm md:text-base">No. Invoice Supplier</Label>
                     <Input
                       id="no_invoice_supplier"
                       value={formData.no_invoice_supplier}
                       onChange={(e) => setFormData(prev => ({ ...prev, no_invoice_supplier: e.target.value }))}
                       placeholder="INV-001"
+                      className="text-sm md:text-base"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="payment_method">Metode Pembayaran</Label>
+                    <Label htmlFor="payment_method" className="text-sm md:text-base">Metode Pembayaran</Label>
                     <Select 
                       value={formData.payment_method} 
                       onValueChange={(value: any) => setFormData(prev => ({ ...prev, payment_method: value, bank_id: value === 'credit' ? '' : prev.bank_id }))}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="text-sm md:text-base">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cash">Tunai</SelectItem>
-                        <SelectItem value="transfer">Transfer</SelectItem>
-                        <SelectItem value="credit">Kredit</SelectItem>
+                        <SelectItem value="cash" className="text-sm md:text-base">Tunai</SelectItem>
+                        <SelectItem value="transfer" className="text-sm md:text-base">Transfer</SelectItem>
+                        <SelectItem value="credit" className="text-sm md:text-base">Kredit</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   
                   {formData.payment_method !== 'credit' && (
                     <div>
-                      <Label htmlFor="bank_id">Bank Account *</Label>
+                      <Label htmlFor="bank_id" className="text-sm md:text-base">Bank Account *</Label>
                       <Select 
                         value={formData.bank_id} 
                         onValueChange={(value) => setFormData(prev => ({ ...prev, bank_id: value }))}
                         required
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="text-sm md:text-base">
                           <SelectValue placeholder="Pilih bank" />
                         </SelectTrigger>
                         <SelectContent>
                           {banks?.filter(bank => bank.is_active).map((bank) => (
-                            <SelectItem key={bank.id} value={bank.id}>
-                              {bank.nama_bank} - {bank.nama_pemilik} (Saldo: {formatCurrency(bank.saldo_akhir || 0)})
+                            <SelectItem key={bank.id} value={bank.id} className="text-sm md:text-base">
+                              <div className="block">
+                                <div>{bank.nama_bank} - {bank.nama_pemilik}</div>
+                                <div className="text-xs text-muted-foreground">Saldo: {formatCurrency(bank.saldo_akhir || 0)}</div>
+                              </div>
                             </SelectItem>
                           )) || <SelectItem value="" disabled>Tidak ada bank tersedia</SelectItem>}
                         </SelectContent>
@@ -498,28 +503,29 @@ const Purchases = () => {
                   )}
                   
                   <div>
-                    <Label htmlFor="payment_status">Status Pembayaran</Label>
+                    <Label htmlFor="payment_status" className="text-sm md:text-base">Status Pembayaran</Label>
                     <Select 
                       value={formData.payment_status} 
                       onValueChange={(value) => setFormData(prev => ({ ...prev, payment_status: value }))}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="text-sm md:text-base">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="paid">Lunas</SelectItem>
+                        <SelectItem value="pending" className="text-sm md:text-base">Pending</SelectItem>
+                        <SelectItem value="paid" className="text-sm md:text-base">Lunas</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="md:col-span-2">
-                    <Label htmlFor="notes">Keterangan</Label>
+                    <Label htmlFor="notes" className="text-sm md:text-base">Keterangan</Label>
                     <Textarea
                       id="notes"
                       value={formData.notes}
                       onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                       placeholder="Catatan pembelian"
                       rows={2}
+                      className="text-sm md:text-base"
                     />
                   </div>
                 </div>
@@ -534,20 +540,20 @@ const Purchases = () => {
                       
                       return (
                         <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
+                          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                             <span>Bank:</span>
                             <span className="font-medium">{bank?.nama_bank} - {bank?.nama_pemilik}</span>
                           </div>
-                          <div className="flex justify-between">
+                          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                             <span>Saldo Saat Ini:</span>
                             <span className="font-medium">{formatCurrency(bank?.saldo_akhir || 0)}</span>
                           </div>
-                          <div className="flex justify-between">
+                          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                             <span>Total Pembelian:</span>
                             <span className="font-medium">{formatCurrency(total)}</span>
                           </div>
                           <hr className="border-blue-200" />
-                          <div className="flex justify-between">
+                          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                             <span>Sisa Saldo:</span>
                             <span className={`font-bold ${remaining < 0 ? 'text-red-600' : 'text-green-600'}`}>
                               {formatCurrency(remaining)}
@@ -567,28 +573,28 @@ const Purchases = () => {
                 )}
 
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <Label>Detail Produk *</Label>
-                    <Button type="button" size="sm" variant="outline" onClick={addItem}>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-2">
+                    <Label className="text-sm md:text-base">Detail Produk *</Label>
+                    <Button type="button" size="sm" variant="outline" onClick={addItem} className="w-full sm:w-auto">
                       <Plus className="h-4 w-4 mr-1" />
                       Tambah Item
                     </Button>
                   </div>
                   <div className="space-y-3">
                     {formData.items.map((item, index) => (
-                      <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-2 p-3 border rounded-lg">
-                        <div className="md:col-span-2">
-                          <Label>Produk</Label>
+                      <div key={index} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 p-3 border rounded-lg">
+                        <div className="sm:col-span-2 lg:col-span-2">
+                          <Label className="text-sm">Produk</Label>
                           <Select 
                             value={item.product_variant_id} 
                             onValueChange={(value) => updateItem(index, 'product_variant_id', value)}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="text-sm">
                               <SelectValue placeholder="Pilih produk" />
                             </SelectTrigger>
                             <SelectContent>
                               {stockProducts?.map((product) => (
-                                <SelectItem key={product.id} value={product.id}>
+                                <SelectItem key={product.id} value={product.id} className="text-sm">
                                   {product?.products?.nama_produk || 'Produk tidak diketahui'} - {product?.warna || '-'} {product?.size || '-'}
                                 </SelectItem>
                               )) || <SelectItem value="" disabled>Tidak ada produk tersedia</SelectItem>}
@@ -596,25 +602,27 @@ const Purchases = () => {
                           </Select>
                         </div>
                         <div>
-                          <Label>Qty</Label>
+                          <Label className="text-sm">Qty</Label>
                           <Input
                             type="number"
                             value={item.quantity}
                             onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
                             min="1"
+                            className="text-sm"
                           />
                         </div>
                         <div>
-                          <Label>Harga Beli Satuan</Label>
+                          <Label className="text-sm">Harga Beli Satuan</Label>
                           <InputCurrency
                             value={item.harga_beli_satuan}
                             onValueChange={(value) => updateItem(index, 'harga_beli_satuan', value)}
                             placeholder="Rp 0"
+                            className="text-sm"
                           />
                         </div>
                         <div className="flex items-end">
                           <div className="w-full">
-                            <Label>Subtotal</Label>
+                            <Label className="text-sm">Subtotal</Label>
                             <div className="text-sm font-medium p-2 bg-muted rounded">
                               {formatCurrency(item.quantity * item.harga_beli_satuan)}
                             </div>
@@ -625,7 +633,7 @@ const Purchases = () => {
                               size="sm"
                               variant="outline"
                               onClick={() => removeItem(index)}
-                              className="ml-2"
+                              className="ml-2 shrink-0"
                             >
                               ×
                             </Button>
@@ -638,9 +646,9 @@ const Purchases = () => {
 
                 <div className="bg-muted p-4 rounded-lg">
                   <div className="space-y-2">
-                    <div className="flex justify-between font-bold text-lg">
-                      <span>Total:</span>
-                      <span className="text-primary">{formatCurrency(calculateSubtotal())}</span>
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+                      <span className="font-bold text-base md:text-lg">Total:</span>
+                      <span className="text-primary font-bold text-base md:text-lg">{formatCurrency(calculateSubtotal())}</span>
                     </div>
                     <div className="text-xs text-muted-foreground">
                       * Stok produk akan otomatis bertambah setelah pembelian disimpan
@@ -648,11 +656,11 @@ const Purchases = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-2 pt-4">
-                  <Button type="submit" disabled={loading} className="gradient-primary">
+                <div className="flex flex-col sm:flex-row gap-2 pt-4">
+                  <Button type="submit" disabled={loading} className="gradient-primary w-full sm:w-auto">
                     {loading ? 'Menyimpan...' : editingPurchase ? 'Update Pembelian' : 'Simpan Pembelian'}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="w-full sm:w-auto">
                     Batal
                   </Button>
                 </div>
@@ -680,14 +688,14 @@ const Purchases = () => {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         <Card className="glass-card border-0">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Pembelian</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{formatCurrency(totalPurchases)}</div>
+            <div className="text-xl md:text-2xl font-bold text-blue-600">{formatCurrency(totalPurchases)}</div>
             <p className="text-xs text-muted-foreground">Periode terpilih</p>
           </CardContent>
         </Card>
@@ -698,20 +706,20 @@ const Purchases = () => {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{formatCurrency(thisMonthPurchases)}</div>
+            <div className="text-xl md:text-2xl font-bold text-blue-600">{formatCurrency(thisMonthPurchases)}</div>
             <p className="text-xs text-muted-foreground">
               {new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0">
+        <Card className="glass-card border-0 sm:col-span-2 lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Transaksi</CardTitle>
             <ShoppingBag className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{purchases.length}</div>
+            <div className="text-xl md:text-2xl font-bold">{purchases.length}</div>
             <p className="text-xs text-muted-foreground">Total pembelian</p>
           </CardContent>
         </Card>
@@ -719,7 +727,7 @@ const Purchases = () => {
 
       <Card className="glass-card border-0">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="text-base md:text-lg flex items-center gap-2">
             <ShoppingBag className="h-5 w-5" />
             Daftar Pembelian
           </CardTitle>
@@ -732,12 +740,12 @@ const Purchases = () => {
             searchable={true}
             searchPlaceholder="Cari pembelian..."
             actions={
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleExportCSV}>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button variant="outline" size="sm" onClick={handleExportCSV} className="w-full sm:w-auto">
                   <Download className="h-4 w-4 mr-2" />
                   Export CSV
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleExportPDF}>
+                <Button variant="outline" size="sm" onClick={handleExportPDF} className="w-full sm:w-auto">
                   <Download className="h-4 w-4 mr-2" />
                   Export PDF
                 </Button>
