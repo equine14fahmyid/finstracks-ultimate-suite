@@ -226,7 +226,7 @@ const Expenses = () => {
 
   return (
     <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
-      <div className="flex flex-col gap-3 md:gap-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold gradient-text">Pengeluaran</h1>
           <p className="text-sm md:text-base text-muted-foreground">
@@ -238,6 +238,7 @@ const Expenses = () => {
           if (!open) resetForm();
         }}>
           <DialogTrigger asChild>
+            {/* Tambahkan kelas agar tombol memenuhi lebar di mobile */}
             <Button className="gradient-primary w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Tambah Pengeluaran</span>
