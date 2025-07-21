@@ -1,4 +1,4 @@
-// src/pages/Sales.tsx (Kode Lengkap dengan Fitur Filter Tanggal)
+// src/pages/Sales.tsx (Kode Lengkap dengan Perbaikan Responsif)
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +20,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from '@/integrations/supabase/client';
 import { exportDataTableAsPDF } from '@/utils/pdfExport';
 import { exportToCSV } from '@/utils/csvExport';
-import DateFilter from '@/components/dashboard/DateFilter'; // Import komponen filter tanggal
+import DateFilter from '@/components/dashboard/DateFilter';
 
 // Interface untuk rentang tanggal
 interface DateRange {
@@ -57,10 +57,9 @@ const Sales = () => {
   const { expeditions, fetchExpeditions } = useExpeditions();
   const { stores, fetchStores } = useStores();
   
-  // State untuk filter tanggal
   const [dateRange, setDateRange] = useState<DateRange>({
-    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1), // Default: Awal bulan ini
-    to: new Date() // Default: Hari ini
+    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    to: new Date()
   });
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -80,7 +79,6 @@ const Sales = () => {
     items: [{ product_variant_id: '', quantity: 1, harga_satuan: 0 }]
   });
 
-  // useEffect untuk fetch data berdasarkan filter tanggal
   useEffect(() => {
     const startDate = dateRange.from?.toISOString().split('T')[0];
     const endDate = dateRange.to?.toISOString().split('T')[0];
@@ -105,7 +103,6 @@ const Sales = () => {
     return labels[status] || status;
   };
 
-  // Fungsi untuk menangani ekspor PDF
   const handleExportPDF = () => {
       toast({ title: "Mengekspor PDF...", description: "Harap tunggu sebentar." });
       
@@ -137,7 +134,6 @@ const Sales = () => {
       });
   };
 
-  // Fungsi untuk menangani ekspor CSV
   const handleExportCSV = () => {
       toast({ title: "Mengekspor CSV...", description: "Harap tunggu sebentar." });
 
@@ -633,19 +629,20 @@ const Sales = () => {
   ];
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-3 md:gap-4">
+    // PERBAIKAN 1: Menambahkan padding dan gap yang konsisten untuk seluruh halaman
+    <div className="space-y-4 md:space-y-6 p-3 md:p-6">
+      {/* PERBAIKAN 2: Membuat header halaman responsif */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold gradient-text">Manajemen Penjualan</h1>
           <p className="text-sm md:text-base text-muted-foreground">
             Kelola transaksi penjualan dan order customer
           </p>
         </div>
-      
+        
         {hasPermission('sales.create') && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              {/* Tambahkan kelas w-full sm:w-auto agar tombol responsif */}
               <Button className="gradient-primary w-full sm:w-auto" onClick={resetForm}>
                 <Plus className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">{editingSale ? 'Edit Penjualan' : 'Tambah Penjualan'}</span>
@@ -920,7 +917,6 @@ const Sales = () => {
         )}
       </div>
 
-      {/* Filter Tanggal - Fitur Baru */}
       <Card className="glass-card border-0">
         <CardHeader className="pb-3 md:pb-6">
           <CardTitle className="text-base md:text-lg flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
@@ -954,14 +950,17 @@ const Sales = () => {
             searchable={true}
             searchPlaceholder="Cari no. pesanan, nama customer..."
             actions={
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleExportCSV}>
+              // PERBAIKAN 3: Membuat grup tombol ekspor menjadi responsif
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button variant="outline" size="sm" onClick={handleExportCSV} className="w-full sm:w-auto">
                   <Download className="h-4 w-4 mr-2" />
-                  Export CSV
+                  <span className="hidden sm:inline">Export CSV</span>
+                  <span className="sm:hidden">CSV</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleExportPDF}>
+                <Button variant="outline" size="sm" onClick={handleExportPDF} className="w-full sm:w-auto">
                   <Download className="h-4 w-4 mr-2" />
-                  Export PDF
+                  <span className="hidden sm:inline">Export PDF</span>
+                  <span className="sm:hidden">PDF</span>
                 </Button>
               </div>
             }
