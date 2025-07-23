@@ -10,6 +10,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { AlertTriangle, Trash2, Save, X } from 'lucide-react';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -45,14 +47,14 @@ export const ConfirmDialog = ({
     }
   };
 
-  const getConfirmVariant = () => {
+  const getConfirmClassName = () => {
     switch (variant) {
       case 'destructive':
-        return 'destructive';
+        return cn(buttonVariants({ variant: 'destructive' }));
       case 'warning':
-        return 'default';
+        return cn(buttonVariants({ variant: 'default' }));
       default:
-        return 'default';
+        return cn(buttonVariants({ variant: 'default' }));
     }
   };
 
@@ -75,7 +77,7 @@ export const ConfirmDialog = ({
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
-            variant={getConfirmVariant()}
+            className={getConfirmClassName()}
             disabled={loading}
           >
             {loading ? 'Memproses...' : confirmText}
