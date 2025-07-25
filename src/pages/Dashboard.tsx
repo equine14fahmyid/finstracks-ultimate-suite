@@ -17,6 +17,7 @@ import { useRealtimeDashboard, useInteractiveAnalytics } from '@/hooks/useRealti
 import { useTopProducts, usePlatformPerformance } from '@/hooks/useSupabase';
 import { exportToPDF } from '@/utils/pdfExport';
 import { exportToCSV } from '@/utils/csvExport';
+import { supabase } from '@/integrations/supabase/client';
 
 // Interface untuk rentang tanggal
 interface DateRange {
@@ -72,6 +73,94 @@ const Dashboard = () => {
   // Mengatur loading berdasarkan loading analitik
   const loading = analyticsLoading;
 
+  // Fungsi untuk fetch detail produk
+  const handleProductClick = async (productName: string) => {
+    try {
+      // Fetch detail penjualan berdasarkan nama produk
+      const { data: saleItemsData, error } = await supabase
+        .from('sale_items')
+        .select(`
+          quantity,
+          harga_satuan,
+          subtotal,
+          product_variant:product_variants!inner(
+            warna,
+            size,
+            product:products!inner(nama_produk)
+          ),
+          sale:sales!inner(
+            tanggal,
+            customer_name,
+            store:stores!inner(
+              nama_toko,
+              platform:platforms!inner(nama_platform)
+            )
+          )
+        `)
+        .eq('product_variant.product.nama_produk', productName)
+        .gte('sale.tanggal', startDate)
+        .lte('sale.tanggal', endDate)
+        .eq('sale.status', 'delivered');
+
+      if (error) throw error;
+
+      // Set data untuk drill down
+      await fetchProductDrillDown(productName);
+    } catch (error) {
+      console.error('Error fetching product details:', error);
+      toast({
+        title: "Error",
+        description: "Gagal memuat detail produk",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Fungsi untuk fetch detail platform
+  const handlePlatformClick = async (platformName: string) => {
+    try {
+      // Fetch detail transaksi berdasarkan platform
+      const { data: salesData, error } = await supabase
+        .from('sales')
+        .select(`
+          total,
+          tanggal,
+          customer_name,
+          no_pesanan_platform,
+          status,
+          store:stores!inner(
+            nama_toko,
+            platform:platforms!inner(nama_platform)
+          ),
+          sale_items(
+            quantity,
+            harga_satuan,
+            product_variant:product_variants!inner(
+              warna,
+              size,
+              product:products!inner(nama_produk)
+            )
+          )
+        `)
+        .eq('store.platform.nama_platform', platformName)
+        .gte('tanggal', startDate)
+        .lte('tanggal', endDate)
+        .eq('status', 'delivered');
+
+      if (error) throw error;
+
+      // Set data untuk drill down
+      await fetchPlatformDrillDown(platformName);
+    } catch (error) {
+      console.error('Error fetching platform details:', error);
+      toast({
+        title: "Error",
+        description: "Gagal memuat detail platform",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Fungsi refresh manual
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -83,14 +172,9 @@ const Dashboard = () => {
     });
   };
 
- // Cari fungsi ini di dalam file src/pages/Dashboard.tsx
-
-const handleExportPDF = async () => {
+  const handleExportPDF = async () => {
     try {
       setExporting(true);
-
-      // --- PERBAIKAN DI SINI ---
-      // Kita hapus properti 'includeHeader' dan 'includeFooter'
       await exportToPDF('dashboard-content', {
         filename: `dashboard-${startDate}-${endDate}.pdf`,
         title: `Dashboard EQUINE Fashion - ${formatDate(dateRange.from || new Date())} s/d ${formatDate(dateRange.to || new Date())}`,
@@ -101,7 +185,6 @@ const handleExportPDF = async () => {
           email: 'info@equinefashion.com',
         },
       });
-      // --- BATAS PERBAIKAN ---
 
       toast({
         title: "Berhasil",
@@ -116,7 +199,7 @@ const handleExportPDF = async () => {
     } finally {
       setExporting(false);
     }
-};
+  };
 
   const handleExportCSV = () => {
     try {
@@ -187,48 +270,41 @@ const handleExportPDF = async () => {
           </div>
         </div>
         
-        <div className="flex flex-col space-y-3 md:space-y-0 md:flex-row md:items-center md:justify-between md:gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold gradient-text">Dashboard</h1>
-            {/* ... (kode lainnya) ... */}
-          </div>
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="glass-button h-10 md:h-auto"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           
-          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="glass-button h-10 md:h-auto" // Atur tinggi untuk mobile
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-            
-            {hasPermission('reports.export') && (
-              <div className="flex gap-2 md:gap-3">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleExportCSV}
-                  disabled={exporting}
-                  className="glass-button flex-1 md:flex-none h-10 md:h-auto" // Atur tinggi & lebar untuk mobile
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  CSV
-                </Button>
-                <Button 
-                  size="sm" 
-                  onClick={handleExportPDF}
-                  disabled={exporting}
-                  className="gradient-primary flex-1 md:flex-none h-10 md:h-auto" // Atur tinggi & lebar untuk mobile
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {exporting ? 'Mengekspor...' : 'PDF'}
-                </Button>
-              </div>
-            )}
-          </div>
+          {hasPermission('reports.export') && (
+            <div className="flex gap-2 md:gap-3">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleExportCSV}
+                disabled={exporting}
+                className="glass-button flex-1 md:flex-none h-10 md:h-auto"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                CSV
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={handleExportPDF}
+                disabled={exporting}
+                className="gradient-primary flex-1 md:flex-none h-10 md:h-auto"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {exporting ? 'Mengekspor...' : 'PDF'}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -265,7 +341,7 @@ const handleExportPDF = async () => {
         <InteractiveTopProductsChart 
           data={topProductsData} 
           loading={topProductsLoading}
-          onProductClick={fetchProductDrillDown}
+          onProductClick={handleProductClick}
           drillDownData={drillDownData as any}
           drillDownLoading={drillDownLoading}
           selectedProduct={selectedProduct}
@@ -275,7 +351,7 @@ const handleExportPDF = async () => {
         <InteractivePlatformChart 
           data={platformData} 
           loading={platformLoading}
-          onPlatformClick={fetchPlatformDrillDown}
+          onPlatformClick={handlePlatformClick}
           drillDownData={drillDownData as any}
           drillDownLoading={drillDownLoading}
           selectedPlatform={selectedPlatform}
