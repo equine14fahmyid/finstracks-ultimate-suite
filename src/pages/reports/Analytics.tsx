@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, TrendingUp, TrendingDown, Package, Users, Download } from 'lucide-react';
+import { CalendarIcon, TrendingUp, TrendingDown, Package, Users, Download, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { exportToPDF } from '@/utils/pdfExport';
+import { useInteractiveAnalytics } from '@/hooks/useRealtimeAnalytics';
+import InteractiveTopProductsChart from '@/components/dashboard/InteractiveTopProductsChart';
+import InteractivePlatformChart from '@/components/dashboard/InteractivePlatformChart';
 
 interface AnalyticsData {
   salesTrend: Array<{
@@ -22,14 +25,15 @@ interface AnalyticsData {
     transaction_count: number;
   }>;
   topProducts: Array<{
-    product_name: string;
-    variant_display: string;
-    quantity_sold: number;
-    total_revenue: number;
+    name: string;
+    productName: string;
+    variantName: string;
+    quantity: number;
+    revenue: number;
   }>;
   platformPerformance: Array<{
-    platform_name: string;
-    total_sales: number;
+    platform: string;
+    revenue: number;
     transaction_count: number;
   }>;
   lowStockItems: Array<{
@@ -45,17 +49,32 @@ const Analytics = () => {
   const [startDate, setStartDate] = useState<Date>(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [endDate, setEndDate] = useState<Date>(new Date());
 
-  const { data: analyticsData, isLoading } = useQuery({
+  // Use interactive analytics hook for drill-down functionality
+  const {
+    selectedProduct,
+    selectedPlatform,
+    drillDownData,
+    loading: drillDownLoading,
+    fetchProductDrillDown,
+    fetchPlatformDrillDown,
+    clearDrillDown
+  } = useInteractiveAnalytics(
+    format(startDate, 'yyyy-MM-dd'),
+    format(endDate, 'yyyy-MM-dd')
+  );
+
+  const { data: analyticsData, isLoading, refetch } = useQuery({
     queryKey: ['analytics', startDate, endDate],
     queryFn: async (): Promise<AnalyticsData> => {
       try {
-        // Fetch sales trend data
-        const { data: salesData } = await supabase
+        // Fetch sales trend data with better error handling
+        const { data: salesData, error: salesError } = await supabase
           .from('sales')
           .select(`
             tanggal,
             total,
             store_id,
+            status,
             stores!inner(
               platform_id,
               platforms!inner(nama_platform)
@@ -63,10 +82,13 @@ const Analytics = () => {
           `)
           .gte('tanggal', format(startDate, 'yyyy-MM-dd'))
           .lte('tanggal', format(endDate, 'yyyy-MM-dd'))
+          .eq('status', 'delivered')
           .order('tanggal');
 
-        // Fetch top products data
-        const { data: saleItemsData } = await supabase
+        if (salesError) throw salesError;
+
+        // Fetch top products data with proper joins
+        const { data: saleItemsData, error: itemsError } = await supabase
           .from('sale_items')
           .select(`
             quantity,
@@ -77,13 +99,19 @@ const Analytics = () => {
               size,
               products!inner(nama_produk)
             ),
-            sales!inner(tanggal)
+            sales!inner(
+              tanggal,
+              status
+            )
           `)
           .gte('sales.tanggal', format(startDate, 'yyyy-MM-dd'))
-          .lte('sales.tanggal', format(endDate, 'yyyy-MM-dd'));
+          .lte('sales.tanggal', format(endDate, 'yyyy-MM-dd'))
+          .eq('sales.status', 'delivered');
+
+        if (itemsError) throw itemsError;
 
         // Fetch low stock items
-        const { data: lowStockData } = await supabase
+        const { data: lowStockData, error: stockError } = await supabase
           .from('product_variants')
           .select(`
             stok,
@@ -94,6 +122,8 @@ const Analytics = () => {
           .eq('is_active', true)
           .lt('stok', 10)
           .order('stok');
+
+        if (stockError) throw stockError;
 
         // Process sales trend
         const salesByDate = salesData?.reduce((acc: any, sale) => {
@@ -124,38 +154,34 @@ const Analytics = () => {
         }, {}) || {};
 
         const platformPerformance = Object.entries(platformSales).map(([platform, data]: [string, any]) => ({
-          platform_name: platform,
-          total_sales: data.total,
+          platform,
+          revenue: data.total,
           transaction_count: data.count
         }));
 
         // Process top products
         const productSales = saleItemsData?.reduce((acc: any, item) => {
           const productName = item.product_variants?.products?.nama_produk || 'Unknown';
-          const variantDisplay = `${item.product_variants?.warna} - ${item.product_variants?.size}`;
-          const key = `${productName}_${variantDisplay}`;
+          const variantName = `${item.product_variants?.warna} - ${item.product_variants?.size}`;
+          const key = `${productName}_${variantName}`;
           
           if (!acc[key]) {
             acc[key] = {
-              product_name: productName,
-              variant_display: variantDisplay,
-              quantity_sold: 0,
-              total_revenue: 0
+              name: key,
+              productName,
+              variantName,
+              quantity: 0,
+              revenue: 0
             };
           }
-          acc[key].quantity_sold += item.quantity || 0;
-          acc[key].total_revenue += (item.quantity || 0) * (item.harga_satuan || 0);
+          acc[key].quantity += item.quantity || 0;
+          acc[key].revenue += (item.quantity || 0) * (item.harga_satuan || 0);
           return acc;
         }, {}) || {};
 
         const topProducts = Object.values(productSales)
-          .sort((a: any, b: any) => b.total_revenue - a.total_revenue)
-          .slice(0, 10) as Array<{
-            product_name: string;
-            variant_display: string;
-            quantity_sold: number;
-            total_revenue: number;
-          }>;
+          .sort((a: any, b: any) => b.revenue - a.revenue)
+          .slice(0, 10);
 
         // Process low stock items
         const lowStockItems = lowStockData?.map(item => ({
@@ -171,6 +197,7 @@ const Analytics = () => {
           lowStockItems
         };
       } catch (error) {
+        console.error('Analytics fetch error:', error);
         toast({
           title: "Error",
           description: "Gagal memuat data analitik",
@@ -205,10 +232,18 @@ const Analytics = () => {
     }
   };
 
+  const handleRefresh = () => {
+    refetch();
+    toast({
+      title: "Data Diperbarui",
+      description: "Data analitik telah dimuat ulang"
+    });
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold">Analitik & Laporan Performa</h1>
           <p className="text-muted-foreground">
@@ -216,6 +251,10 @@ const Analytics = () => {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={handleRefresh} variant="outline" disabled={isLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Button onClick={exportToPDFReport} variant="outline" disabled={isLoading}>
             <Download className="h-4 w-4 mr-2" />
             Export PDF
@@ -228,7 +267,7 @@ const Analytics = () => {
         <CardHeader>
           <CardTitle>Filter Periode</CardTitle>
         </CardHeader>
-        <CardContent className="flex gap-4">
+        <CardContent className="flex flex-col md:flex-row gap-4">
           <div>
             <label className="text-sm font-medium">Tanggal Mulai</label>
             <Popover>
@@ -244,7 +283,6 @@ const Analytics = () => {
                   selected={startDate}
                   onSelect={(date) => date && setStartDate(date)}
                   initialFocus
-                  className="pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
@@ -264,7 +302,6 @@ const Analytics = () => {
                   selected={endDate}
                   onSelect={(date) => date && setEndDate(date)}
                   initialFocus
-                  className="pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
@@ -275,6 +312,7 @@ const Analytics = () => {
       {isLoading ? (
         <Card>
           <CardContent className="p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
             <p>Memuat data analitik...</p>
           </CardContent>
         </Card>
@@ -293,7 +331,7 @@ const Analytics = () => {
                 <BarChart data={analyticsData?.salesTrend || []}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
-                  <YAxis />
+                  <YAxis tickFormatter={(value) => formatCurrency(value)} />
                   <Tooltip 
                     formatter={(value: any, name: string) => [
                       name === 'total' ? formatCurrency(value) : value,
@@ -307,62 +345,27 @@ const Analytics = () => {
           </Card>
 
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Platform Performance */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Performa Platform
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={analyticsData?.platformPerformance || []}
-                      dataKey="total_sales"
-                      nameKey="platform_name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      fill="#8884d8"
-                      label={({ platform_name, total_sales }) => `${platform_name}: ${formatCurrency(total_sales)}`}
-                    >
-                      {analyticsData?.platformPerformance?.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: any) => formatCurrency(value)} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+            {/* Interactive Platform Performance */}
+            <InteractivePlatformChart
+              data={analyticsData?.platformPerformance || []}
+              loading={isLoading}
+              onPlatformClick={fetchPlatformDrillDown}
+              drillDownData={drillDownData}
+              drillDownLoading={drillDownLoading}
+              selectedPlatform={selectedPlatform}
+              onCloseDrillDown={clearDrillDown}
+            />
 
-            {/* Top Products */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Produk Terlaris
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4 max-h-80 overflow-y-auto">
-                  {analyticsData?.topProducts?.slice(0, 5).map((product, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                      <div>
-                        <p className="font-medium">{product.product_name}</p>
-                        <p className="text-sm text-muted-foreground">{product.variant_display}</p>
-                        <p className="text-sm">Terjual: {product.quantity_sold} pcs</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold">{formatCurrency(product.total_revenue)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Interactive Top Products */}
+            <InteractiveTopProductsChart
+              data={analyticsData?.topProducts || []}
+              loading={isLoading}
+              onProductClick={fetchProductDrillDown}
+              drillDownData={drillDownData}
+              drillDownLoading={drillDownLoading}
+              selectedProduct={selectedProduct}
+              onCloseDrillDown={clearDrillDown}
+            />
           </div>
 
           {/* Low Stock Alert */}

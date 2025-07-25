@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -11,7 +12,7 @@ export interface PendingSale {
   store_id: string;
   store: {
     nama_toko: string;
-    saldo_dashboard?: number; // Tambahkan properti ini
+    saldo_dashboard?: number;
     platform: {
       nama_platform: string;
     } | null;
@@ -30,55 +31,67 @@ export const useAdjustments = () => {
   const [loading, setLoading] = useState(false);
 
   const fetchPendingSales = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('sales')
-      .select(`
-        id,
-        tanggal,
-        no_pesanan_platform,
-        customer_name,
-        total,
-        store_id,
-        store:stores(
-          nama_toko,
-          saldo_dashboard,
-          platform:platforms(nama_platform)
-        )
-      `)
-      .eq('status', 'delivered')
-      .is('validated_at', null)
-      .order('created_at', { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from('sales')
+        .select(`
+          id,
+          tanggal,
+          no_pesanan_platform,
+          customer_name,
+          total,
+          store_id,
+          store:stores(
+            nama_toko,
+            saldo_dashboard,
+            platform:platforms(nama_platform)
+          )
+        `)
+        .eq('status', 'delivered')
+        .is('validated_at', null)
+        .order('created_at', { ascending: true });
 
-    if (error) {
+      if (error) throw error;
+      return data as PendingSale[];
+    } catch (error) {
       console.error('Error fetching pending sales:', error);
-      toast({ title: "Error", description: "Gagal memuat penjualan pending", variant: "destructive" });
+      toast({ 
+        title: "Error", 
+        description: "Gagal memuat penjualan pending", 
+        variant: "destructive" 
+      });
       return [];
     }
-    return data as PendingSale[];
   }, []);
 
   const fetchAdjustments = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('sales_adjustments')
-      .select(`
-        *,
-        sale:sales(
-          no_pesanan_platform,
-          customer_name,
-          store:stores(
-            nama_toko,
-            platform:platforms(nama_platform)
+    try {
+      const { data, error } = await supabase
+        .from('sales_adjustments')
+        .select(`
+          *,
+          sale:sales(
+            no_pesanan_platform,
+            customer_name,
+            store:stores(
+              nama_toko,
+              platform:platforms(nama_platform)
+            )
           )
-        )
-      `)
-      .order('created_at', { ascending: false });
+        `)
+        .order('created_at', { ascending: false });
 
-    if (error) {
+      if (error) throw error;
+      return data;
+    } catch (error) {
       console.error('Error fetching adjustments:', error);
-      toast({ title: "Error", description: "Gagal memuat riwayat penyesuaian", variant: "destructive" });
+      toast({ 
+        title: "Error", 
+        description: "Gagal memuat riwayat penyesuaian", 
+        variant: "destructive" 
+      });
       return [];
     }
-    return data;
   }, []);
   
   const refreshData = useCallback(async () => {
@@ -92,6 +105,11 @@ export const useAdjustments = () => {
       setAdjustments(adjustmentsData);
     } catch (error) {
       console.error("Failed to refresh adjustment data", error);
+      toast({
+        title: "Error",
+        description: "Gagal memuat data penyesuaian",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -102,45 +120,96 @@ export const useAdjustments = () => {
   }, [refreshData]);
 
   const validateSale = async (saleId: string) => {
-    const saleToValidate = pendingSales.find(s => s.id === saleId);
-    if (!saleToValidate || !saleToValidate.store) {
-      toast({ title: "Error", description: "Penjualan atau data toko tidak ditemukan", variant: "destructive" });
-      return;
+    try {
+      const saleToValidate = pendingSales.find(s => s.id === saleId);
+      if (!saleToValidate || !saleToValidate.store) {
+        toast({ 
+          title: "Error", 
+          description: "Penjualan atau data toko tidak ditemukan", 
+          variant: "destructive" 
+        });
+        return;
+      }
+      
+      // Use database function for validation to ensure data consistency
+      const { error } = await supabase.rpc('validate_sale_with_adjustments', {
+        sale_id_param: saleId,
+        adjustments: []
+      });
+
+      if (error) {
+        console.error('Validation error:', error);
+        toast({ 
+          title: "Error", 
+          description: `Gagal validasi penjualan: ${error.message}`, 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      toast({ 
+        title: "Sukses", 
+        description: "Penjualan berhasil divalidasi dan saldo toko telah diperbarui." 
+      });
+      
+      await refreshData();
+    } catch (error) {
+      console.error('Validation error:', error);
+      toast({
+        title: "Error",
+        description: "Terjadi kesalahan saat validasi penjualan",
+        variant: "destructive"
+      });
     }
-    
-    // Menambah saldo toko secara langsung
-    const currentSaldo = saleToValidate.store.saldo_dashboard || 0;
-    const newSaldo = currentSaldo + saleToValidate.total;
-    
-    const { error: storeUpdateError } = await supabase
-        .from('stores')
-        .update({ saldo_dashboard: newSaldo })
-        .eq('id', saleToValidate.store_id);
-
-    if (storeUpdateError) {
-      toast({ title: "Error", description: `Gagal update saldo toko: ${storeUpdateError.message}`, variant: "destructive" });
-      return;
-    }
-
-    // Menandai penjualan sebagai sudah divalidasi
-    const { error: saleUpdateError } = await supabase
-      .from('sales')
-      .update({ validated_at: new Date().toISOString() })
-      .eq('id', saleId);
-
-    if (saleUpdateError) {
-      toast({ title: "Error", description: `Gagal validasi penjualan: ${saleUpdateError.message}`, variant: "destructive" });
-      // Pertimbangkan untuk mengembalikan saldo jika langkah ini gagal
-      await supabase.from('stores').update({ saldo_dashboard: currentSaldo }).eq('id', saleToValidate.store_id);
-      return;
-    }
-
-    toast({ title: "Sukses", description: "Penjualan berhasil divalidasi. Saldo toko telah diperbarui." });
-    await refreshData();
   };
 
   const createAdjustment = async (saleId: string, adjustmentItems: AdjustmentItem[]) => {
-      // Logika untuk membuat penyesuaian bisa ditambahkan di sini nanti
+    try {
+      if (!adjustmentItems || adjustmentItems.length === 0) {
+        toast({
+          title: "Error",
+          description: "Tidak ada item penyesuaian yang dibuat",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Convert adjustment items to proper format for database function
+      const adjustmentsJson = adjustmentItems.map(item => ({
+        type: item.type,
+        amount: item.amount,
+        notes: item.notes
+      }));
+
+      const { error } = await supabase.rpc('validate_sale_with_adjustments', {
+        sale_id_param: saleId,
+        adjustments: adjustmentsJson
+      });
+
+      if (error) {
+        console.error('Adjustment creation error:', error);
+        toast({
+          title: "Error",
+          description: `Gagal membuat penyesuaian: ${error.message}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "Sukses",
+        description: "Penyesuaian berhasil dibuat dan penjualan telah divalidasi"
+      });
+
+      await refreshData();
+    } catch (error) {
+      console.error('Adjustment creation error:', error);
+      toast({
+        title: "Error",
+        description: "Terjadi kesalahan saat membuat penyesuaian",
+        variant: "destructive"
+      });
+    }
   };
 
   return { 

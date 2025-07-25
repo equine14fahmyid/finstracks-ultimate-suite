@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +9,7 @@ import { DataTable } from '@/components/common/DataTable';
 import { AdjustmentForm } from '@/components/adjustments/AdjustmentForm';
 import { useAdjustments, PendingSale, AdjustmentItem } from '@/hooks/useAdjustments';
 import { formatCurrency, formatDate } from '@/utils/format';
-import { CheckCircle, AlertTriangle, Settings, FileText, RefreshCw } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Settings, FileText, RefreshCw, TrendingUp, AlertCircle } from 'lucide-react';
 
 export default function Adjustments() {
   const { pendingSales, adjustments, loading, validateSale, createAdjustment, refreshData } = useAdjustments();
@@ -52,7 +53,11 @@ export default function Adjustments() {
     {
       key: 'no_pesanan_platform',
       title: 'No. Pesanan',
-      render: (value: any, record: PendingSale) => record.no_pesanan_platform
+      render: (value: any, record: PendingSale) => (
+        <div className="font-mono text-sm">
+          {record.no_pesanan_platform}
+        </div>
+      )
     },
     {
       key: 'customer_name',
@@ -76,7 +81,11 @@ export default function Adjustments() {
     {
       key: 'total',
       title: 'Total',
-      render: (value: any, record: PendingSale) => formatCurrency(record.total),
+      render: (value: any, record: PendingSale) => (
+        <div className="font-medium text-green-600">
+          {formatCurrency(record.total)}
+        </div>
+      ),
     },
     {
       key: 'actions',
@@ -124,7 +133,7 @@ export default function Adjustments() {
       render: (value: any, record: any) => {
         return record.sale ? (
           <div>
-            <div className="font-medium">{record.sale.no_pesanan_platform}</div>
+            <div className="font-medium font-mono text-sm">{record.sale.no_pesanan_platform}</div>
             <div className="text-sm text-muted-foreground">{record.sale.customer_name}</div>
           </div>
         ) : '-';
@@ -134,14 +143,15 @@ export default function Adjustments() {
       key: 'adjustment_type',
       title: 'Jenis',
       render: (value: any, record: any) => {
-        const typeLabels: Record<string, string> = {
-          denda: 'Denda',
-          selisih_ongkir: 'Selisih Ongkir',
-          pinalti: 'Pinalti',
+        const typeLabels: Record<string, { label: string; variant: 'default' | 'destructive' | 'secondary' | 'outline' }> = {
+          denda: { label: 'Denda', variant: 'destructive' },
+          selisih_ongkir: { label: 'Selisih Ongkir', variant: 'secondary' },
+          pinalti: { label: 'Pinalti', variant: 'outline' },
         };
+        const config = typeLabels[record.adjustment_type] || { label: record.adjustment_type, variant: 'outline' };
         return (
-          <Badge variant="outline">
-            {typeLabels[record.adjustment_type] || record.adjustment_type}
+          <Badge variant={config.variant}>
+            {config.label}
           </Badge>
         );
       },
@@ -188,27 +198,74 @@ export default function Adjustments() {
         </p>
       </div>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
-        {/* Summary Cards */}
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Pending Validasi</p>
+                <p className="text-2xl font-bold">{pendingSales.length}</p>
+              </div>
+              <AlertCircle className="h-4 w-4 text-warning ml-auto" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Pending</p>
+                <p className="text-2xl font-bold">{formatCurrency(totalPendingAmount)}</p>
+              </div>
+              <TrendingUp className="h-4 w-4 text-success ml-auto" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Penyesuaian</p>
+                <p className="text-2xl font-bold text-destructive">-{formatCurrency(totalAdjustmentAmount)}</p>
+              </div>
+              <AlertTriangle className="h-4 w-4 text-destructive ml-auto" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Riwayat Penyesuaian</p>
+                <p className="text-2xl font-bold">{adjustments.length}</p>
+              </div>
+              <FileText className="h-4 w-4 text-info ml-auto" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="pending" className="space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-            <TabsList className="w-full sm:w-auto">
+          <TabsList className="w-full sm:w-auto">
             <TabsTrigger value="pending" className="flex-1 sm:flex-none">
-                <span className="hidden sm:inline">Pending Validasi ({pendingSales.length})</span>
-                <span className="sm:hidden">Pending ({pendingSales.length})</span>
+              <span className="hidden sm:inline">Pending Validasi ({pendingSales.length})</span>
+              <span className="sm:hidden">Pending ({pendingSales.length})</span>
             </TabsTrigger>
             <TabsTrigger value="adjustments" className="flex-1 sm:flex-none">
-                <span className="hidden sm:inline">Riwayat Penyesuaian ({adjustments.length})</span>
-                <span className="sm:hidden">Riwayat ({adjustments.length})</span>
+              <span className="hidden sm:inline">Riwayat Penyesuaian ({adjustments.length})</span>
+              <span className="sm:hidden">Riwayat ({adjustments.length})</span>
             </TabsTrigger>
-            </TabsList>
-            <Button variant="outline" size="sm" onClick={() => refreshData()} disabled={loading} className="w-full sm:w-auto">
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">Refresh</span>
-                <span className="sm:hidden">Sync</span>
-            </Button>
+          </TabsList>
+          <Button variant="outline" size="sm" onClick={() => refreshData()} disabled={loading} className="w-full sm:w-auto">
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+            <span className="sm:hidden">Sync</span>
+          </Button>
         </div>
 
         <TabsContent value="pending" className="space-y-4">
@@ -221,12 +278,12 @@ export default function Adjustments() {
             </CardHeader>
             <CardContent>
               <DataTable
-                  columns={pendingSalesColumns}
-                  data={pendingSales}
-                  loading={loading}
-                  searchable={true}
-                  searchPlaceholder="Cari no. pesanan..."
-                />
+                columns={pendingSalesColumns}
+                data={pendingSales}
+                loading={loading}
+                searchable={true}
+                searchPlaceholder="Cari no. pesanan..."
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -237,20 +294,39 @@ export default function Adjustments() {
               <CardTitle>Riwayat Penyesuaian</CardTitle>
             </CardHeader>
             <CardContent>
-               <DataTable
-                  columns={adjustmentsColumns}
-                  data={adjustments}
-                  loading={loading}
-                  searchable={true}
-                  searchPlaceholder="Cari no. pesanan..."
-                />
+              <DataTable
+                columns={adjustmentsColumns}
+                data={adjustments}
+                loading={loading}
+                searchable={true}
+                searchPlaceholder="Cari no. pesanan..."
+              />
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
       <Dialog open={showAdjustmentForm} onOpenChange={setShowAdjustmentForm}>
-        {/* ... Dialog Content ... */}
+        <DialogContent className="sm:max-w-[625px]">
+          <DialogHeader>
+            <DialogTitle>Buat Penyesuaian</DialogTitle>
+          </DialogHeader>
+          {selectedSale && (
+            <div className="space-y-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <h4 className="font-medium">Detail Penjualan</h4>
+                <p className="text-sm text-muted-foreground">No. Pesanan: {selectedSale.no_pesanan_platform}</p>
+                <p className="text-sm text-muted-foreground">Customer: {selectedSale.customer_name}</p>
+                <p className="text-sm text-muted-foreground">Total: {formatCurrency(selectedSale.total)}</p>
+              </div>
+              <AdjustmentForm
+                onSubmit={handleSubmitAdjustment}
+                onCancel={() => setShowAdjustmentForm(false)}
+                loading={actionLoading}
+              />
+            </div>
+          )}
+        </DialogContent>
       </Dialog>
     </div>
   );
