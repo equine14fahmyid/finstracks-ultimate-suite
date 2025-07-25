@@ -23,11 +23,12 @@ interface TopProductData {
   revenue: number;
 }
 
+// Use the same structure as expected by PlatformPerformanceChart
 interface PlatformData {
-  name: string;
+  platform: string;
   revenue: number;
-  orders: number;
-  commission: number;
+  transaction_count: number;
+  commission?: number;
 }
 
 interface SalesAnalytics {
@@ -135,25 +136,25 @@ export default function Analytics() {
         .sort((a, b) => b.revenue - a.revenue)
         .slice(0, 10);
 
-      // Platform performance
-      const platformMap = new Map<string, { revenue: number; orders: number; commission: number }>();
+      // Platform performance - using the correct structure
+      const platformMap = new Map<string, { revenue: number; transaction_count: number; commission: number }>();
       
       salesData?.forEach(sale => {
         if (sale.store?.platform?.nama_platform) {
           const platformName = sale.store.platform.nama_platform;
-          const existing = platformMap.get(platformName) || { revenue: 0, orders: 0, commission: 0 };
+          const existing = platformMap.get(platformName) || { revenue: 0, transaction_count: 0, commission: 0 };
           existing.revenue += sale.total || 0;
-          existing.orders += 1;
+          existing.transaction_count += 1;
           existing.commission += (sale.total || 0) * ((sale.store.platform.komisi_default_persen || 0) / 100);
           platformMap.set(platformName, existing);
         }
       });
 
       const platformPerformance: PlatformData[] = Array.from(platformMap.entries())
-        .map(([name, data]) => ({
-          name,
+        .map(([platform, data]) => ({
+          platform,
           revenue: data.revenue,
-          orders: data.orders,
+          transaction_count: data.transaction_count,
           commission: data.commission
         }))
         .sort((a, b) => b.revenue - a.revenue);
@@ -334,7 +335,7 @@ export default function Analytics() {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ platform, percent }) => `${platform} ${(percent * 100).toFixed(0)}%`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="revenue"
