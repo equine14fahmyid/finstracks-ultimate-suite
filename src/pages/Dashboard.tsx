@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,10 +8,10 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import DateFilter from '@/components/dashboard/DateFilter';
 import SummaryCards from '@/components/dashboard/SummaryCards';
-import SalesChart from '@/components/dashboard/SalesChart';
 import InteractiveTopProductsChart from '@/components/dashboard/InteractiveTopProductsChart';
 import InteractivePlatformChart from '@/components/dashboard/InteractivePlatformChart';
-import { formatDate } from '@/utils/format';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { formatDate, formatCurrency } from '@/utils/format';
 import { useRealtimeDashboard, useInteractiveAnalytics } from '@/hooks/useRealtimeAnalytics';
 import { useTopProducts, usePlatformPerformance } from '@/hooks/useSupabase';
 import { exportToPDF } from '@/utils/pdfExport';
@@ -23,6 +22,27 @@ import { supabase } from '@/integrations/supabase/client';
 interface DateRange {
   from: Date | undefined;
   to: Date | undefined;
+}
+
+// Interface untuk data analytics
+interface TopProductData {
+  name: string;
+  productName: string;
+  variantName: string;
+  quantity: number;
+  revenue: number;
+}
+
+interface PlatformData {
+  platform: string;
+  revenue: number;
+  transaction_count: number;
+}
+
+interface SalesChartData {
+  date: string;
+  total: number;
+  transaction_count: number;
 }
 
 const Dashboard = () => {
@@ -73,10 +93,42 @@ const Dashboard = () => {
   // Mengatur loading berdasarkan loading analitik
   const loading = analyticsLoading;
 
+  // Transform data for charts
+  const transformTopProductsData = (data: any[]): TopProductData[] => {
+    if (!data || data.length === 0) return [];
+    
+    return data.map(item => ({
+      name: `${item.product_name} (${item.variant_display})`,
+      productName: item.product_name,
+      variantName: item.variant_display,
+      quantity: item.quantity_sold || 0,
+      revenue: item.total_revenue || 0
+    }));
+  };
+
+  const transformPlatformData = (data: any[]): PlatformData[] => {
+    if (!data || data.length === 0) return [];
+    
+    return data.map(item => ({
+      platform: item.platform_name,
+      revenue: item.total_sales || 0,
+      transaction_count: item.transaction_count || 0
+    }));
+  };
+
+  const transformSalesData = (data: any[]): SalesChartData[] => {
+    if (!data || data.length === 0) return [];
+    
+    return data.map(item => ({
+      date: item.date,
+      total: item.total || 0,
+      transaction_count: item.transaction_count || 0
+    }));
+  };
+
   // Fungsi untuk fetch detail produk
   const handleProductClick = async (productName: string) => {
     try {
-      // Fetch detail penjualan berdasarkan nama produk
       const { data: saleItemsData, error } = await supabase
         .from('sale_items')
         .select(`
@@ -103,8 +155,6 @@ const Dashboard = () => {
         .eq('sale.status', 'delivered');
 
       if (error) throw error;
-
-      // Set data untuk drill down
       await fetchProductDrillDown(productName);
     } catch (error) {
       console.error('Error fetching product details:', error);
@@ -119,7 +169,6 @@ const Dashboard = () => {
   // Fungsi untuk fetch detail platform
   const handlePlatformClick = async (platformName: string) => {
     try {
-      // Fetch detail transaksi berdasarkan platform
       const { data: salesData, error } = await supabase
         .from('sales')
         .select(`
@@ -148,8 +197,6 @@ const Dashboard = () => {
         .eq('status', 'delivered');
 
       if (error) throw error;
-
-      // Set data untuk drill down
       await fetchPlatformDrillDown(platformName);
     } catch (error) {
       console.error('Error fetching platform details:', error);
@@ -161,7 +208,6 @@ const Dashboard = () => {
     }
   };
 
-  // Fungsi refresh manual
   const handleRefresh = async () => {
     setRefreshing(true);
     await refreshDashboard();
@@ -175,7 +221,8 @@ const Dashboard = () => {
   const handleExportPDF = async () => {
     try {
       setExporting(true);
-      await exportToPDF('dashboard-content', {
+      await exportToPDF({
+        elementId: 'dashboard-content',
         filename: `dashboard-${startDate}-${endDate}.pdf`,
         title: `Dashboard EQUINE Fashion - ${formatDate(dateRange.from || new Date())} s/d ${formatDate(dateRange.to || new Date())}`,
         orientation: 'landscape',
@@ -205,7 +252,6 @@ const Dashboard = () => {
     try {
       setExporting(true);
       
-      // Menyiapkan data ringkasan dashboard untuk CSV
       const summaryData = [{
         'Periode': `${formatDate(dateRange.from || new Date())} - ${formatDate(dateRange.to || new Date())}`,
         'Total Penjualan': dashboardData?.total_penjualan || 0,
@@ -330,16 +376,78 @@ const Dashboard = () => {
       {/* Kartu Ringkasan */}
       <SummaryCards data={dashboardData} loading={loading} />
 
+      {/* Sales Trend Chart */}
+      <Card className="glass-card border-0">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-lg font-semibold">Tren Penjualan</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Grafik penjualan harian dalam periode terpilih
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="h-80 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Memuat data penjualan...</p>
+              </div>
+            </div>
+          ) : !transformSalesData(salesData) || transformSalesData(salesData).length === 0 ? (
+            <div className="h-80 flex items-center justify-center">
+              <div className="text-center">
+                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                <p className="text-muted-foreground">Tidak ada data penjualan</p>
+                <p className="text-sm text-muted-foreground">pada periode yang dipilih</p>
+              </div>
+            </div>
+          ) : (
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={transformSalesData(salesData)}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" />
+                  <XAxis 
+                    dataKey="date" 
+                    className="text-xs fill-muted-foreground"
+                    tickFormatter={(value) => formatDate(new Date(value))}
+                  />
+                  <YAxis 
+                    className="text-xs fill-muted-foreground"
+                    tickFormatter={(value) => formatCurrency(value)}
+                  />
+                  <Tooltip 
+                    formatter={(value: any, name: string) => [
+                      name === 'total' ? formatCurrency(value) : value,
+                      name === 'total' ? 'Penjualan' : 'Transaksi'
+                    ]}
+                    labelFormatter={(label) => formatDate(new Date(label))}
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--background))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="total" 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--primary))' }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Bagian Grafik */}
       <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
-        {/* Grafik Tren Penjualan */}
-        <div className="lg:col-span-2">
-          <SalesChart data={salesData} loading={loading} />
-        </div>
-
         {/* Grafik Interaktif dengan Drill-down */}
         <InteractiveTopProductsChart 
-          data={topProductsData} 
+          data={transformTopProductsData(topProductsData)} 
           loading={topProductsLoading}
           onProductClick={handleProductClick}
           drillDownData={drillDownData as any}
@@ -349,7 +457,7 @@ const Dashboard = () => {
         />
 
         <InteractivePlatformChart 
-          data={platformData} 
+          data={transformPlatformData(platformData)} 
           loading={platformLoading}
           onPlatformClick={handlePlatformClick}
           drillDownData={drillDownData as any}
