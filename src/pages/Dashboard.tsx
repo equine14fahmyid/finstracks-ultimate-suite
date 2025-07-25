@@ -394,7 +394,7 @@ const Dashboard = () => {
                 <p className="text-muted-foreground">Memuat data penjualan...</p>
               </div>
             </div>
-          ) : !transformSalesData(salesData) || transformSalesData(salesData).length === 0 ? (
+          ) : !salesData || salesData.length === 0 ? (
             <div className="h-80 flex items-center justify-center">
               <div className="text-center">
                 <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
