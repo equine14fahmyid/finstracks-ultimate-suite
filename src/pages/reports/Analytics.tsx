@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { DateFilter } from '@/components/dashboard/DateFilter';
-import { InteractiveTopProductsChart } from '@/components/dashboard/InteractiveTopProductsChart';
-import { InteractivePlatformChart } from '@/components/dashboard/InteractivePlatformChart';
+import DateFilter from '@/components/dashboard/DateFilter';
+import InteractiveTopProductsChart from '@/components/dashboard/InteractiveTopProductsChart';
+import InteractivePlatformChart from '@/components/dashboard/InteractivePlatformChart';
 import { useInteractiveAnalytics } from '@/hooks/useRealtimeAnalytics';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatDate } from '@/utils/format';
@@ -41,8 +41,8 @@ interface SalesAnalytics {
 
 export default function Analytics() {
   const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0]
+    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    to: new Date()
   });
   const [analyticsData, setAnalyticsData] = useState<SalesAnalytics>({
     totalSales: 0,
@@ -53,7 +53,6 @@ export default function Analytics() {
     salesTrend: []
   });
   const [loading, setLoading] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState('month');
 
   const {
     selectedProduct,
@@ -63,11 +62,17 @@ export default function Analytics() {
     fetchProductDrillDown,
     fetchPlatformDrillDown,
     clearDrillDown
-  } = useInteractiveAnalytics(dateRange.startDate, dateRange.endDate);
+  } = useInteractiveAnalytics(
+    dateRange.from?.toISOString().split('T')[0] || '',
+    dateRange.to?.toISOString().split('T')[0] || ''
+  );
 
   const fetchAnalyticsData = async () => {
     setLoading(true);
     try {
+      const startDate = dateRange.from?.toISOString().split('T')[0] || '';
+      const endDate = dateRange.to?.toISOString().split('T')[0] || '';
+      
       // Fetch sales data
       const { data: salesData, error: salesError } = await supabase
         .from('sales')
@@ -88,8 +93,8 @@ export default function Analytics() {
             platform:platforms(nama_platform, komisi_default_persen)
           )
         `)
-        .gte('tanggal', dateRange.startDate)
-        .lte('tanggal', dateRange.endDate)
+        .gte('tanggal', startDate)
+        .lte('tanggal', endDate)
         .eq('status', 'delivered');
 
       if (salesError) throw salesError;
@@ -189,15 +194,22 @@ export default function Analytics() {
 
   useEffect(() => {
     fetchAnalyticsData();
-  }, [dateRange.startDate, dateRange.endDate]);
+  }, [dateRange.from, dateRange.to]);
 
-  const handleDateRangeChange = (start: string, end: string) => {
-    setDateRange({ startDate: start, endDate: end });
+  const handleDateRangeChange = (range: { from: Date | undefined; to: Date | undefined }) => {
+    setDateRange(range);
   };
 
   const handleExportPDF = async () => {
     try {
-      await exportToPDF('analytics-report', `Analytics_Report_${dateRange.startDate}_to_${dateRange.endDate}.pdf`);
+      const startDateStr = dateRange.from?.toISOString().split('T')[0] || '';
+      const endDateStr = dateRange.to?.toISOString().split('T')[0] || '';
+      
+      await exportToPDF('analytics-report', {
+        filename: `Analytics_Report_${startDateStr}_to_${endDateStr}.pdf`,
+        title: 'Laporan Analytics',
+        orientation: 'landscape'
+      });
     } catch (error) {
       console.error('Error exporting PDF:', error);
     }
@@ -215,7 +227,7 @@ export default function Analytics() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
-          <DateFilter onDateRangeChange={handleDateRangeChange} />
+          <DateFilter value={dateRange} onChange={handleDateRangeChange} />
           <Button onClick={handleExportPDF} variant="outline" size="sm" className="w-full sm:w-auto">
             <Download className="h-4 w-4 mr-2" />
             Export PDF
