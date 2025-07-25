@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -320,6 +319,7 @@ export default function Adjustments() {
                 <p className="text-sm text-muted-foreground">Total: {formatCurrency(selectedSale.total)}</p>
               </div>
               <AdjustmentForm
+                saleTotal={selectedSale.total}
                 onSubmit={handleSubmitAdjustment}
                 onCancel={() => setShowAdjustmentForm(false)}
                 loading={actionLoading}
