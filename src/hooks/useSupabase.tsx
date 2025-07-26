@@ -590,7 +590,12 @@ export const useProducts = () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select(`
+          *,
+          product_variants (
+            *
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -602,16 +607,32 @@ export const useProducts = () => {
     }
   };
 
-  const createProduct = async (productData: any) => {
+  const createProduct = async (productData: any, variants?: any[]) => {
     try {
-      const { data, error } = await supabase
+      const { data: product, error: productError } = await supabase
         .from('products')
         .insert([productData])
-        .select();
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (productError) throw productError;
+
+      // If variants are provided, create them
+      if (variants && variants.length > 0) {
+        const variantData = variants.map(variant => ({
+          ...variant,
+          product_id: product.id
+        }));
+
+        const { error: variantError } = await supabase
+          .from('product_variants')
+          .insert(variantData);
+
+        if (variantError) throw variantError;
+      }
+
       await fetchProducts();
-      return { success: true, data };
+      return { success: true, data: product };
     } catch (error) {
       console.error('Error creating product:', error);
       return { success: false, error };
