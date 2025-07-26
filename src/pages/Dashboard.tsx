@@ -97,7 +97,9 @@ export default function Dashboard() {
     return acc;
   }, {} as Record<string, SalesData>) || {};
 
-  const trendData: SalesData[] = Object.values(salesByDate).sort((a, b) => 
+  // Convert to properly typed array
+  const trendData: SalesData[] = Object.values(salesByDate);
+  const sortedTrendData = trendData.sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
@@ -229,8 +231,8 @@ export default function Dashboard() {
               <div className="h-64 flex items-center justify-center text-muted-foreground">
                 <p>Error loading sales data</p>
               </div>
-            ) : trendData.length > 0 ? (
-              <SalesChart data={trendData} />
+            ) : sortedTrendData.length > 0 ? (
+              <SalesChart data={sortedTrendData} />
             ) : (
               <div className="h-64 flex items-center justify-center text-muted-foreground">
                 <p>Tidak ada data penjualan untuk periode ini</p>

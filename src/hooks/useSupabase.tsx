@@ -582,7 +582,7 @@ export const useSuppliers = () => {
   };
 };
 
-export const useProduct = () => {
+export const useProducts = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 

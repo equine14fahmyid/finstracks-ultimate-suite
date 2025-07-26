@@ -65,3 +65,7 @@ export const useRealtimeAnalytics = (startDate: string, endDate: string) => {
     refreshData
   };
 };
+
+export const useInteractiveAnalytics = (startDate: string, endDate: string) => {
+  return useRealtimeAnalytics(startDate, endDate);
+};
