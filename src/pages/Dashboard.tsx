@@ -28,6 +28,12 @@ import InteractiveTopProductsChart from '@/components/dashboard/InteractiveTopPr
 import InteractivePlatformChart from '@/components/dashboard/InteractivePlatformChart';
 import { formatCurrency, formatDate } from '@/utils/format';
 
+interface SalesData {
+  date: string;
+  total: number;
+  transaction_count: number;
+}
+
 export default function Dashboard() {
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -74,14 +80,14 @@ export default function Dashboard() {
   const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
   // Transform sales data for charts
-  const salesChartData = salesData?.map(sale => ({
+  const salesChartData = salesData?.map((sale: any) => ({
     date: formatDate(sale.tanggal),
     revenue: sale.total,
     orders: 1
   })) || [];
 
   // Group sales by date for trend analysis
-  const salesByDate = salesData?.reduce((acc, sale) => {
+  const salesByDate = salesData?.reduce((acc: any, sale: any) => {
     const date = sale.tanggal;
     if (!acc[date]) {
       acc[date] = { date, total: 0, transaction_count: 0 };
@@ -89,14 +95,14 @@ export default function Dashboard() {
     acc[date].total += sale.total;
     acc[date].transaction_count += 1;
     return acc;
-  }, {} as Record<string, { date: string; total: number; transaction_count: number }>) || {};
+  }, {} as Record<string, SalesData>) || {};
 
-  const trendData = Object.values(salesByDate).sort((a, b) => 
+  const trendData: SalesData[] = Object.values(salesByDate).sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
   // Recent activity data
-  const recentActivity = salesData?.slice(0, 5).map(sale => ({
+  const recentActivity = salesData?.slice(0, 5).map((sale: any) => ({
     id: sale.id,
     type: 'sale' as const,
     description: `Penjualan ${sale.no_pesanan_platform}`,

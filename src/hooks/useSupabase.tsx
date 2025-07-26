@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -167,9 +168,22 @@ export const useStock = () => {
   const fetchStockMovements = async () => {
     setLoading(true);
     try {
-      // This would fetch from a stock_movements table if it exists
-      // For now, returning empty array as placeholder
-      setMovements([]);
+      const { data, error } = await supabase
+        .from('stock_movements')
+        .select(`
+          *,
+          product_variant:product_variants (
+            warna,
+            size,
+            product:products (
+              nama_produk
+            )
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setMovements(data || []);
     } catch (error) {
       console.error('Error fetching stock movements:', error);
     } finally {
@@ -253,7 +267,6 @@ export const useStock = () => {
   };
 };
 
-// Fix useSales hook to include missing methods
 export const useSales = () => {
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -343,7 +356,7 @@ export const useSales = () => {
     try {
       const { error } = await supabase
         .from('sales')
-        .update({ status })
+        .update({ status: status as any })
         .eq('id', id);
 
       if (error) throw error;
@@ -382,7 +395,6 @@ export const useSales = () => {
   };
 };
 
-// Fix usePurchases hook to include missing methods
 export const usePurchases = () => {
   const [purchases, setPurchases] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -570,86 +582,6 @@ export const useSuppliers = () => {
   };
 };
 
-export const useCustomers = () => {
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchCustomers = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setCustomers(data || []);
-    } catch (error) {
-      console.error('Error fetching customers:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-   const createCustomer = async (customerData: any) => {
-    try {
-      const { data, error } = await supabase
-        .from('customers')
-        .insert([customerData])
-        .select();
-
-      if (error) throw error;
-      await fetchCustomers();
-      return { success: true, data };
-    } catch (error) {
-      console.error('Error creating customer:', error);
-      return { success: false, error };
-    }
-  };
-
-  const updateCustomer = async (id: string, customerData: any) => {
-    try {
-      const { error } = await supabase
-        .from('customers')
-        .update(customerData)
-        .eq('id', id);
-
-      if (error) throw error;
-      await fetchCustomers();
-      return { success: true };
-    } catch (error) {
-      console.error('Error updating customer:', error);
-      return { success: false, error };
-    }
-  };
-
-  const deleteCustomer = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('customers')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      await fetchCustomers();
-      return { success: true };
-    } catch (error) {
-      console.error('Error deleting customer:', error);
-      return { success: false, error };
-    }
-  };
-
-
-  return {
-    customers,
-    loading,
-    fetchCustomers,
-    createCustomer,
-    updateCustomer,
-    deleteCustomer
-  };
-};
-
 export const useProduct = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -671,7 +603,7 @@ export const useProduct = () => {
     }
   };
 
-   const createProduct = async (productData: any) => {
+  const createProduct = async (productData: any) => {
     try {
       const { data, error } = await supabase
         .from('products')
@@ -719,7 +651,6 @@ export const useProduct = () => {
     }
   };
 
-
   return {
     products,
     loading,
@@ -727,5 +658,484 @@ export const useProduct = () => {
     createProduct,
     updateProduct,
     deleteProduct
+  };
+};
+
+export const useCategories = () => {
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchCategories = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createCategory = async (categoryData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .insert([categoryData])
+        .select();
+
+      if (error) throw error;
+      await fetchCategories();
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error creating category:', error);
+      return { success: false, error };
+    }
+  };
+
+  const updateCategory = async (id: string, categoryData: any) => {
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .update(categoryData)
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchCategories();
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating category:', error);
+      return { success: false, error };
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchCategories();
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      return { success: false, error };
+    }
+  };
+
+  return {
+    categories,
+    loading,
+    fetchCategories,
+    createCategory,
+    updateCategory,
+    deleteCategory
+  };
+};
+
+export const useBanks = () => {
+  const [banks, setBanks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchBanks = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('banks')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setBanks(data || []);
+    } catch (error) {
+      console.error('Error fetching banks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createBank = async (bankData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('banks')
+        .insert([bankData])
+        .select();
+
+      if (error) throw error;
+      await fetchBanks();
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error creating bank:', error);
+      return { success: false, error };
+    }
+  };
+
+  const updateBank = async (id: string, bankData: any) => {
+    try {
+      const { error } = await supabase
+        .from('banks')
+        .update(bankData)
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchBanks();
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating bank:', error);
+      return { success: false, error };
+    }
+  };
+
+  const deleteBank = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('banks')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchBanks();
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting bank:', error);
+      return { success: false, error };
+    }
+  };
+
+  return {
+    banks,
+    loading,
+    fetchBanks,
+    createBank,
+    updateBank,
+    deleteBank
+  };
+};
+
+export const useExpeditions = () => {
+  const [expeditions, setExpeditions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchExpeditions = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('expeditions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setExpeditions(data || []);
+    } catch (error) {
+      console.error('Error fetching expeditions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createExpedition = async (expeditionData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('expeditions')
+        .insert([expeditionData])
+        .select();
+
+      if (error) throw error;
+      await fetchExpeditions();
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error creating expedition:', error);
+      return { success: false, error };
+    }
+  };
+
+  const updateExpedition = async (id: string, expeditionData: any) => {
+    try {
+      const { error } = await supabase
+        .from('expeditions')
+        .update(expeditionData)
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchExpeditions();
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating expedition:', error);
+      return { success: false, error };
+    }
+  };
+
+  const deleteExpedition = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('expeditions')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchExpeditions();
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting expedition:', error);
+      return { success: false, error };
+    }
+  };
+
+  return {
+    expeditions,
+    loading,
+    fetchExpeditions,
+    createExpedition,
+    updateExpedition,
+    deleteExpedition
+  };
+};
+
+export const usePlatforms = () => {
+  const [platforms, setPlatforms] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchPlatforms = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('platforms')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPlatforms(data || []);
+    } catch (error) {
+      console.error('Error fetching platforms:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createPlatform = async (platformData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('platforms')
+        .insert([platformData])
+        .select();
+
+      if (error) throw error;
+      await fetchPlatforms();
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error creating platform:', error);
+      return { success: false, error };
+    }
+  };
+
+  const updatePlatform = async (id: string, platformData: any) => {
+    try {
+      const { error } = await supabase
+        .from('platforms')
+        .update(platformData)
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchPlatforms();
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating platform:', error);
+      return { success: false, error };
+    }
+  };
+
+  const deletePlatform = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('platforms')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchPlatforms();
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting platform:', error);
+      return { success: false, error };
+    }
+  };
+
+  return {
+    platforms,
+    loading,
+    fetchPlatforms,
+    createPlatform,
+    updatePlatform,
+    deletePlatform
+  };
+};
+
+export const useStores = () => {
+  const [stores, setStores] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchStores = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('stores')
+        .select(`
+          *,
+          platform:platforms (
+            nama_platform
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setStores(data || []);
+    } catch (error) {
+      console.error('Error fetching stores:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createStore = async (storeData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('stores')
+        .insert([storeData])
+        .select();
+
+      if (error) throw error;
+      await fetchStores();
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error creating store:', error);
+      return { success: false, error };
+    }
+  };
+
+  const updateStore = async (id: string, storeData: any) => {
+    try {
+      const { error } = await supabase
+        .from('stores')
+        .update(storeData)
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchStores();
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating store:', error);
+      return { success: false, error };
+    }
+  };
+
+  const deleteStore = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('stores')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchStores();
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting store:', error);
+      return { success: false, error };
+    }
+  };
+
+  return {
+    stores,
+    loading,
+    fetchStores,
+    createStore,
+    updateStore,
+    deleteStore
+  };
+};
+
+export const useUserProfiles = () => {
+  const [userProfiles, setUserProfiles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchUserProfiles = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setUserProfiles(data || []);
+    } catch (error) {
+      console.error('Error fetching user profiles:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createUserProfile = async (profileData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .insert([profileData])
+        .select();
+
+      if (error) throw error;
+      await fetchUserProfiles();
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error creating user profile:', error);
+      return { success: false, error };
+    }
+  };
+
+  const updateUserProfile = async (id: string, profileData: any) => {
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update(profileData)
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchUserProfiles();
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      return { success: false, error };
+    }
+  };
+
+  const deleteUserProfile = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchUserProfiles();
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting user profile:', error);
+      return { success: false, error };
+    }
+  };
+
+  return {
+    userProfiles,
+    loading,
+    fetchUserProfiles,
+    createUserProfile,
+    updateUserProfile,
+    deleteUserProfile
   };
 };
