@@ -39,7 +39,7 @@ export const useRealtimeDashboard = (startDate: string, endDate: string) => {
       // Fetch real sales data
       const { data: salesData, error: salesError } = await supabase
         .from('sales')
-        .select('total, tanggal')
+        .select('total, tanggal, stores!inner(platforms!inner(nama_platform))')
         .gte('tanggal', startDate)
         .lte('tanggal', endDate)
         .eq('status', 'delivered');
@@ -87,7 +87,7 @@ export const useRealtimeDashboard = (startDate: string, endDate: string) => {
         saldo_kas_bank: saldoKasBank
       });
 
-      // Generate sales chart data from real sales
+      // Generate sales chart data from real sales - FIX: Proper date grouping
       const salesByDate = salesData?.reduce((acc: Record<string, { total: number; count: number }>, sale) => {
         const date = sale.tanggal;
         if (!acc[date]) {
@@ -98,10 +98,12 @@ export const useRealtimeDashboard = (startDate: string, endDate: string) => {
         return acc;
       }, {}) || {};
 
-      const chartData = Object.entries(salesByDate).map(([date, data]) => ({
+      // Sort by date and create chart data
+      const sortedDates = Object.keys(salesByDate).sort();
+      const chartData = sortedDates.map(date => ({
         date,
-        total: data.total,
-        transaction_count: data.count
+        total: salesByDate[date].total,
+        transaction_count: salesByDate[date].count
       }));
 
       setSalesChart(chartData);

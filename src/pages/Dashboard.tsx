@@ -71,12 +71,14 @@ const Dashboard = () => {
   // Data produk terlaris dan platform
   const { 
     data: topProductsData, 
-    loading: topProductsLoading 
+    loading: topProductsLoading,
+    error: topProductsError
   } = useTopProducts(startDate, endDate, 5);
 
   const { 
     data: platformData, 
-    loading: platformLoading 
+    loading: platformLoading,
+    error: platformError
   } = usePlatformPerformance(startDate, endDate);
 
   // Analitik interaktif untuk drill-down
@@ -445,7 +447,7 @@ const Dashboard = () => {
 
       {/* Bagian Grafik */}
       <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
-        {/* Grafik Interaktif dengan Drill-down */}
+        {/* Grafik Produk Terlaris */}
         <InteractiveTopProductsChart 
           data={transformTopProductsData(topProductsData)} 
           loading={topProductsLoading}
@@ -456,6 +458,7 @@ const Dashboard = () => {
           onCloseDrillDown={clearDrillDown}
         />
 
+        {/* Grafik Performa Platform */}
         <InteractivePlatformChart 
           data={transformPlatformData(platformData)} 
           loading={platformLoading}
