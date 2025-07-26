@@ -67,5 +67,63 @@ export const useRealtimeAnalytics = (startDate: string, endDate: string) => {
 };
 
 export const useInteractiveAnalytics = (startDate: string, endDate: string) => {
-  return useRealtimeAnalytics(startDate, endDate);
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const [drillDownData, setDrillDownData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchProductDrillDown = async (productName: string) => {
+    setLoading(true);
+    setSelectedProduct(productName);
+    try {
+      // Mock drill-down data for product
+      const mockData = [
+        { date: '2024-01-01', quantity_sold: 5, revenue: 250000 },
+        { date: '2024-01-02', quantity_sold: 3, revenue: 150000 },
+        { date: '2024-01-03', quantity_sold: 7, revenue: 350000 },
+      ];
+      setDrillDownData(mockData);
+    } catch (error) {
+      console.error('Error fetching product drill-down:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchPlatformDrillDown = async (platformName: string) => {
+    setLoading(true);
+    setSelectedPlatform(platformName);
+    try {
+      // Mock drill-down data for platform
+      const mockData = [
+        { date: '2024-01-01', transaction_count: 15, revenue: 750000 },
+        { date: '2024-01-02', transaction_count: 12, revenue: 600000 },
+        { date: '2024-01-03', transaction_count: 18, revenue: 900000 },
+      ];
+      setDrillDownData(mockData);
+    } catch (error) {
+      console.error('Error fetching platform drill-down:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearDrillDown = () => {
+    setSelectedProduct(null);
+    setSelectedPlatform(null);
+    setDrillDownData([]);
+  };
+
+  const realtimeData = useRealtimeAnalytics(startDate, endDate);
+
+  return {
+    ...realtimeData,
+    selectedProduct,
+    selectedPlatform,
+    drillDownData,
+    loading: loading || realtimeData.loading,
+    fetchProductDrillDown,
+    fetchPlatformDrillDown,
+    clearDrillDown
+  };
 };

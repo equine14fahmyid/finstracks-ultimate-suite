@@ -356,7 +356,7 @@ export const useSales = () => {
     try {
       const { error } = await supabase
         .from('sales')
-        .update({ status: status as any })
+        .update({ status })
         .eq('id', id);
 
       if (error) throw error;
