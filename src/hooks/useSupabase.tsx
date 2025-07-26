@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -271,7 +270,7 @@ export const useSales = () => {
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchSales = async () => {
+  const fetchSales = async (startDate?: string, endDate?: string) => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -336,7 +335,7 @@ export const useSales = () => {
     }
   };
 
-  const updateSale = async (id: string, saleData: any) => {
+  const updateSale = async (id: string, saleData: any, items: any[], existingItems?: any[]) => {
     try {
       const { error } = await supabase
         .from('sales')
@@ -352,7 +351,7 @@ export const useSales = () => {
     }
   };
 
-  const updateSaleStatus = async (id: string, status: string) => {
+  const updateSaleStatus = async (id: string, status: "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "returned") => {
     try {
       const { error } = await supabase
         .from('sales')
@@ -361,7 +360,7 @@ export const useSales = () => {
 
       if (error) throw error;
       await fetchSales();
-      return { success: true };
+      return { success: true, message: 'Status berhasil diperbarui' };
     } catch (error) {
       console.error('Error updating sale status:', error);
       return { success: false, error };
@@ -461,7 +460,7 @@ export const usePurchases = () => {
     }
   };
 
-  const updatePurchase = async (id: string, purchaseData: any) => {
+  const updatePurchase = async (id: string, purchaseData: any, items: any[], existingItems?: any[]) => {
     try {
       const { error } = await supabase
         .from('purchases')
@@ -470,7 +469,7 @@ export const usePurchases = () => {
 
       if (error) throw error;
       await fetchPurchases();
-      return { success: true };
+      return { success: true, message: 'Pembelian berhasil diperbarui' };
     } catch (error) {
       console.error('Error updating purchase:', error);
       return { success: false, error };
@@ -628,7 +627,7 @@ export const useProducts = () => {
 
       if (error) throw error;
       await fetchProducts();
-      return { success: true };
+      return { success: true, message: 'Produk berhasil diperbarui' };
     } catch (error) {
       console.error('Error updating product:', error);
       return { success: false, error };
