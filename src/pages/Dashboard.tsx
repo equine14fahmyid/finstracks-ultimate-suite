@@ -20,12 +20,12 @@ import {
 } from 'lucide-react';
 import { useRealtimeAnalytics } from '@/hooks/useRealtimeAnalytics';
 import { useTopProducts, usePlatformPerformance } from '@/hooks/useSupabase';
-import { SummaryCards } from '@/components/dashboard/SummaryCards';
-import { SalesChart } from '@/components/dashboard/SalesChart';
-import { TopProductsChart } from '@/components/dashboard/TopProductsChart';
-import { PlatformPerformanceChart } from '@/components/dashboard/PlatformPerformanceChart';
-import { InteractiveTopProductsChart } from '@/components/dashboard/InteractiveTopProductsChart';
-import { InteractivePlatformChart } from '@/components/dashboard/InteractivePlatformChart';
+import SummaryCards from '@/components/dashboard/SummaryCards';
+import SalesChart from '@/components/dashboard/SalesChart';
+import TopProductsChart from '@/components/dashboard/TopProductsChart';
+import PlatformPerformanceChart from '@/components/dashboard/PlatformPerformanceChart';
+import InteractiveTopProductsChart from '@/components/dashboard/InteractiveTopProductsChart';
+import InteractivePlatformChart from '@/components/dashboard/InteractivePlatformChart';
 import { formatCurrency, formatDate } from '@/utils/format';
 
 export default function Dashboard() {
@@ -84,12 +84,12 @@ export default function Dashboard() {
   const salesByDate = salesData?.reduce((acc, sale) => {
     const date = sale.tanggal;
     if (!acc[date]) {
-      acc[date] = { date, revenue: 0, orders: 0 };
+      acc[date] = { date, total: 0, transaction_count: 0 };
     }
-    acc[date].revenue += sale.total;
-    acc[date].orders += 1;
+    acc[date].total += sale.total;
+    acc[date].transaction_count += 1;
     return acc;
-  }, {} as Record<string, { date: string; revenue: number; orders: number }>) || {};
+  }, {} as Record<string, { date: string; total: number; transaction_count: number }>) || {};
 
   const trendData = Object.values(salesByDate).sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -112,6 +112,14 @@ export default function Dashboard() {
     { id: 2, product: 'Celana Jeans', variant: 'L', stock: 2 },
     { id: 3, product: 'Jaket Hoodie', variant: 'XL', stock: 1 }
   ];
+
+  // Summary data for SummaryCards
+  const summaryData = {
+    total_penjualan: totalRevenue,
+    total_pengeluaran: 0, // TODO: Implement expenses calculation
+    laba_bersih: totalRevenue, // TODO: Implement profit calculation
+    saldo_kas_bank: 0 // TODO: Implement cash/bank balance
+  };
 
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6">
@@ -194,55 +202,7 @@ export default function Dashboard() {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="glass-card border-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pendapatan</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(totalRevenue)}
-            </div>
-            <p className="text-xs text-muted-foreground">Periode terpilih</p>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pesanan</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalOrders}</div>
-            <p className="text-xs text-muted-foreground">Transaksi selesai</p>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rata-rata Nilai Pesanan</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(averageOrderValue)}
-            </div>
-            <p className="text-xs text-muted-foreground">Per transaksi</p>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card border-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Pelanggan</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalCustomers}</div>
-            <p className="text-xs text-muted-foreground">Pelanggan aktif</p>
-          </CardContent>
-        </Card>
-      </div>
+      <SummaryCards data={summaryData} loading={realtimeLoading} />
 
       {/* Main Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
