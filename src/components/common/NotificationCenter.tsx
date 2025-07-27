@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Bell, Check, X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,12 +10,13 @@ import {
 } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useSystemNotifications } from '@/hooks/useSystemNotifications';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { formatDistanceToNow } from 'date-fns';
 import { id } from 'date-fns/locale';
 
 export const NotificationCenter = () => {
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useSystemNotifications();
   const [open, setOpen] = useState(false);
 
   const getNotificationIcon = (type: string) => {
@@ -36,9 +38,20 @@ export const NotificationCenter = () => {
     }
     
     if (notification.action_url) {
-      window.open(notification.action_url, '_blank');
+      window.location.href = notification.action_url;
     }
   };
+
+  if (loading) {
+    return (
+      <Button variant="ghost" size="sm" className="relative">
+        <Bell className="h-4 w-4" />
+        <Badge variant="secondary" className="absolute -top-1 -right-1 h-5 w-5 p-0 text-xs">
+          ...
+        </Badge>
+      </Button>
+    );
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -71,7 +84,8 @@ export const NotificationCenter = () => {
         
         {notifications.length === 0 ? (
           <div className="p-4 text-center text-muted-foreground">
-            Tidak ada notifikasi
+            <Bell className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+            <p>Tidak ada notifikasi</p>
           </div>
         ) : (
           <ScrollArea className="h-[300px]">
