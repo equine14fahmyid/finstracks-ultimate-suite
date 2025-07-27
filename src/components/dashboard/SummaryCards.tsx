@@ -17,7 +17,7 @@ interface SummaryCardsProps {
 }
 
 const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
-  // Use real data from Supabase with safe fallback values
+  // Use real data from dashboard metrics
   const summaryData = data || {
     total_penjualan: 0,
     total_pengeluaran: 0,
@@ -33,7 +33,8 @@ const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
       gradient: 'from-success to-success-light',
       textColor: 'text-success',
       bgColor: 'bg-success/10',
-      description: summaryData.total_penjualan === 0 ? 'Belum ada penjualan' : 'Penjualan periode ini'
+      description: summaryData.total_penjualan === 0 ? 'Belum ada penjualan' : 'Penjualan periode ini',
+      trend: summaryData.total_penjualan > 0 ? '+' : ''
     },
     {
       title: 'Total Pengeluaran',
@@ -42,7 +43,8 @@ const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
       gradient: 'from-warning to-warning-light',
       textColor: 'text-warning',
       bgColor: 'bg-warning/10',
-      description: summaryData.total_pengeluaran === 0 ? 'Belum ada pengeluaran' : 'Pengeluaran periode ini'
+      description: summaryData.total_pengeluaran === 0 ? 'Belum ada pengeluaran' : 'Pengeluaran periode ini',
+      trend: summaryData.total_pengeluaran > 0 ? '-' : ''
     },
     {
       title: 'Laba Bersih',
@@ -51,16 +53,20 @@ const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
       gradient: summaryData.laba_bersih >= 0 ? 'from-primary to-primary-light' : 'from-error to-error-light',
       textColor: summaryData.laba_bersih >= 0 ? 'text-primary' : 'text-error',
       bgColor: summaryData.laba_bersih >= 0 ? 'bg-primary/10' : 'bg-error/10',
-      description: summaryData.laba_bersih === 0 ? 'Belum ada keuntungan' : summaryData.laba_bersih >= 0 ? 'Keuntungan bersih' : 'Kerugian bersih'
+      description: summaryData.laba_bersih === 0 ? 'Belum ada keuntungan' : 
+                  summaryData.laba_bersih >= 0 ? 'Keuntungan bersih' : 'Kerugian bersih',
+      trend: summaryData.laba_bersih >= 0 ? '+' : '-'
     },
     {
       title: 'Saldo Kas & Bank',
       value: summaryData.saldo_kas_bank,
       icon: Wallet,
-      gradient: 'from-secondary to-secondary-light',
-      textColor: 'text-secondary',
-      bgColor: 'bg-secondary/10',
-      description: summaryData.saldo_kas_bank === 0 ? 'Belum ada saldo' : 'Total saldo tersedia'
+      gradient: summaryData.saldo_kas_bank >= 0 ? 'from-secondary to-secondary-light' : 'from-error to-error-light',
+      textColor: summaryData.saldo_kas_bank >= 0 ? 'text-secondary' : 'text-error',
+      bgColor: summaryData.saldo_kas_bank >= 0 ? 'bg-secondary/10' : 'bg-error/10',
+      description: summaryData.saldo_kas_bank === 0 ? 'Belum ada saldo' : 
+                  summaryData.saldo_kas_bank >= 0 ? 'Total saldo tersedia' : 'Saldo negatif',
+      trend: ''
     }
   ];
 
@@ -90,7 +96,12 @@ const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
                 {loading ? (
                   <div className="h-6 md:h-8 bg-muted animate-pulse rounded w-20 md:w-24"></div>
                 ) : (
-                  <span className="text-lg md:text-2xl">{formatCurrency(card.value)}</span>
+                  <div className="flex items-center gap-1">
+                    {card.trend && (
+                      <span className="text-sm opacity-60">{card.trend}</span>
+                    )}
+                    <span className="text-lg md:text-2xl">{formatCurrency(card.value)}</span>
+                  </div>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -104,7 +115,7 @@ const SummaryCards = ({ data, loading }: SummaryCardsProps) => {
                 className={cn(
                   "h-full rounded-full bg-gradient-to-r transition-all duration-1000",
                   card.gradient,
-                  loading ? "w-0" : card.value > 0 ? "w-full" : "w-1"
+                  loading ? "w-0" : Math.abs(card.value) > 0 ? "w-full" : "w-1"
                 )}
                 style={{ 
                   animationDelay: `${(index * 100) + 500}ms`,

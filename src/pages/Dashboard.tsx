@@ -16,16 +16,20 @@ import {
   BarChart3,
   PieChart,
   Activity,
-  RefreshCw
+  RefreshCw,
+  Bell
 } from 'lucide-react';
 import { useRealtimeAnalytics } from '@/hooks/useRealtimeAnalytics';
 import { useTopProducts, usePlatformPerformance } from '@/hooks/useSupabase';
+import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { useAutoNotifications } from '@/hooks/useAutoNotifications';
 import SummaryCards from '@/components/dashboard/SummaryCards';
 import SalesChart from '@/components/dashboard/SalesChart';
 import TopProductsChart from '@/components/dashboard/TopProductsChart';
 import PlatformPerformanceChart from '@/components/dashboard/PlatformPerformanceChart';
 import InteractiveTopProductsChart from '@/components/dashboard/InteractiveTopProductsChart';
 import InteractivePlatformChart from '@/components/dashboard/InteractivePlatformChart';
+import LowStockAlertsCard from '@/components/dashboard/LowStockAlertsCard';
 import { formatCurrency, formatDate } from '@/utils/format';
 
 interface SalesData {
@@ -45,6 +49,23 @@ export default function Dashboard() {
 
   const startDate = dateRange.from.toISOString().split('T')[0];
   const endDate = dateRange.to.toISOString().split('T')[0];
+
+  // Use new dashboard metrics hook
+  const { 
+    metrics: dashboardMetrics, 
+    loading: metricsLoading, 
+    error: metricsError,
+    refreshMetrics 
+  } = useDashboardMetrics(startDate, endDate);
+
+  // Use auto notifications hook
+  const { 
+    notifications, 
+    unreadCount, 
+    markAsRead, 
+    markAllAsRead,
+    createNotification 
+  } = useAutoNotifications();
 
   const { 
     salesData, 
@@ -70,7 +91,10 @@ export default function Dashboard() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await refreshRealtimeData();
+      await Promise.all([
+        refreshRealtimeData(),
+        refreshMetrics()
+      ]);
     } finally {
       setRefreshing(false);
     }
@@ -114,20 +138,16 @@ export default function Dashboard() {
     status: sale.status
   })) || [];
 
-  // Low stock alerts (mock data for now)
-  const lowStockAlerts = [
-    { id: 1, product: 'Kaos Polos Hitam', variant: 'M', stock: 3 },
-    { id: 2, product: 'Celana Jeans', variant: 'L', stock: 2 },
-    { id: 3, product: 'Jaket Hoodie', variant: 'XL', stock: 1 }
-  ];
-
-  // Summary data for SummaryCards
-  const summaryData = {
-    total_penjualan: totalRevenue,
-    total_pengeluaran: 0, // TODO: Implement expenses calculation
-    laba_bersih: totalRevenue, // TODO: Implement profit calculation
-    saldo_kas_bank: 0 // TODO: Implement cash/bank balance
-  };
+  // Auto-create notifications for low stock (example)
+  useEffect(() => {
+    if (dashboardMetrics?.saldo_kas_bank < 100000) {
+      createNotification({
+        title: 'Saldo Kas Rendah',
+        message: `Saldo kas & bank saat ini ${formatCurrency(dashboardMetrics.saldo_kas_bank)}. Pertimbangkan untuk menambah modal.`,
+        type: 'warning'
+      });
+    }
+  }, [dashboardMetrics?.saldo_kas_bank]);
 
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6">
@@ -141,6 +161,17 @@ export default function Dashboard() {
         </div>
         
         <div className="flex items-center gap-3">
+          {/* Notification indicator */}
+          <Button variant="outline" size="sm" className="relative">
+            <Bell className="h-4 w-4 mr-2" />
+            Notifikasi
+            {unreadCount > 0 && (
+              <Badge variant="destructive" className="absolute -top-2 -right-2 text-xs">
+                {unreadCount}
+              </Badge>
+            )}
+          </Button>
+
           <div className="flex items-center gap-2">
             <Button
               variant={viewMode === 'overview' ? 'default' : 'outline'}
@@ -209,8 +240,8 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Summary Cards */}
-      <SummaryCards data={summaryData} loading={realtimeLoading} />
+      {/* Summary Cards - Now using real data */}
+      <SummaryCards data={dashboardMetrics} loading={metricsLoading} />
 
       {/* Main Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -344,30 +375,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Low Stock Alerts */}
-        <Card className="glass-card border-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Peringatan Stok Rendah
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {lowStockAlerts.map((alert) => (
-                <div key={alert.id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                  <div>
-                    <p className="font-medium">{alert.product}</p>
-                    <p className="text-sm text-muted-foreground">Varian: {alert.variant}</p>
-                  </div>
-                  <Badge variant="destructive">
-                    {alert.stock} pcs
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Low Stock Alerts - Now using real data */}
+        <LowStockAlertsCard />
       </div>
     </div>
   );
