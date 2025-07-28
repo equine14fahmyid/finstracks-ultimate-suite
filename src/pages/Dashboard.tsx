@@ -2,24 +2,24 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { SummaryCards } from '@/components/dashboard/SummaryCards';
-import SalesChart from '@/components/dashboard/SalesChart';
-import TopProductsChart from '@/components/dashboard/TopProductsChart';
-import PlatformPerformanceChart from '@/components/dashboard/PlatformPerformanceChart';
+import { SalesChart } from '@/components/dashboard/SalesChart';
+import { TopProductsChart } from '@/components/dashboard/TopProductsChart';
+import { PlatformPerformanceChart } from '@/components/dashboard/PlatformPerformanceChart';
 import { LowStockAlertsCard } from '@/components/dashboard/LowStockAlertsCard';
-import DateFilter from '@/components/dashboard/DateFilter';
-import InteractiveTopProductsChart from '@/components/dashboard/InteractiveTopProductsChart';
-import InteractivePlatformChart from '@/components/dashboard/InteractivePlatformChart';
+import { DateFilter } from '@/components/dashboard/DateFilter';
+import { InteractiveTopProductsChart } from '@/components/dashboard/InteractiveTopProductsChart';
+import { InteractivePlatformChart } from '@/components/dashboard/InteractivePlatformChart';
 import { useAutoAlerts } from '@/hooks/useAutoAlerts';
 
 const Dashboard = () => {
-  const [dateRange, setDateRange] = useState(() => {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 30);
-    return {
-      from: startDate,
-      to: endDate
-    };
+  const [startDate, setStartDate] = useState(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30);
+    return date.toISOString().split('T')[0];
+  });
+  
+  const [endDate, setEndDate] = useState(() => {
+    return new Date().toISOString().split('T')[0];
   });
 
   // Initialize auto alerts system
@@ -36,16 +36,15 @@ const Dashboard = () => {
           </p>
         </div>
         <DateFilter 
-          value={dateRange}
-          onChange={setDateRange}
+          startDate={startDate}
+          endDate={endDate}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
         />
       </div>
 
       {/* Summary Cards */}
-      <SummaryCards 
-        startDate={dateRange.from?.toISOString().split('T')[0] || ''} 
-        endDate={dateRange.to?.toISOString().split('T')[0] || ''} 
-      />
+      <SummaryCards startDate={startDate} endDate={endDate} />
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -58,10 +57,7 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <SalesChart 
-              data={[]}
-              loading={false}
-            />
+            <SalesChart startDate={startDate} endDate={endDate} />
           </CardContent>
         </Card>
 
@@ -79,10 +75,7 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <InteractiveTopProductsChart 
-              data={[]} 
-              loading={false}
-            />
+            <InteractiveTopProductsChart startDate={startDate} endDate={endDate} />
           </CardContent>
         </Card>
 
@@ -94,10 +87,7 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <InteractivePlatformChart 
-              data={[]} 
-              loading={false}
-            />
+            <InteractivePlatformChart startDate={startDate} endDate={endDate} />
           </CardContent>
         </Card>
       </div>

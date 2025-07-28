@@ -4,7 +4,7 @@ import { Navigate } from 'react-router-dom';
 import { ThemeProvider } from 'next-themes';
 import { useAuth } from '@/hooks/useAuth';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Header } from './Header';
+import Header from './Header';
 import Sidebar from './Sidebar';
 import { Loader2 } from 'lucide-react';
 
