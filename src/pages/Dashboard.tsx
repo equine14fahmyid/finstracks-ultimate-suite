@@ -58,7 +58,10 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <SalesChart />
+            <SalesChart 
+              data={[]}
+              loading={false}
+            />
           </CardContent>
         </Card>
 
