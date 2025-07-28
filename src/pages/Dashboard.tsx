@@ -2,13 +2,13 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { SummaryCards } from '@/components/dashboard/SummaryCards';
-import { SalesChart } from '@/components/dashboard/SalesChart';
-import { TopProductsChart } from '@/components/dashboard/TopProductsChart';
-import { PlatformPerformanceChart } from '@/components/dashboard/PlatformPerformanceChart';
+import SalesChart from '@/components/dashboard/SalesChart';
+import TopProductsChart from '@/components/dashboard/TopProductsChart';
+import PlatformPerformanceChart from '@/components/dashboard/PlatformPerformanceChart';
 import { LowStockAlertsCard } from '@/components/dashboard/LowStockAlertsCard';
-import { DateFilter } from '@/components/dashboard/DateFilter';
-import { InteractiveTopProductsChart } from '@/components/dashboard/InteractiveTopProductsChart';
-import { InteractivePlatformChart } from '@/components/dashboard/InteractivePlatformChart';
+import DateFilter from '@/components/dashboard/DateFilter';
+import InteractiveTopProductsChart from '@/components/dashboard/InteractiveTopProductsChart';
+import InteractivePlatformChart from '@/components/dashboard/InteractivePlatformChart';
 import { useAutoAlerts } from '@/hooks/useAutoAlerts';
 
 const Dashboard = () => {
