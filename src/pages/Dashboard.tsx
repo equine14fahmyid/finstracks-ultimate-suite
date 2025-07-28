@@ -12,14 +12,14 @@ import InteractivePlatformChart from '@/components/dashboard/InteractivePlatform
 import { useAutoAlerts } from '@/hooks/useAutoAlerts';
 
 const Dashboard = () => {
-  const [startDate, setStartDate] = useState(() => {
-    const date = new Date();
-    date.setDate(date.getDate() - 30);
-    return date.toISOString().split('T')[0];
-  });
-  
-  const [endDate, setEndDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+  const [dateRange, setDateRange] = useState(() => {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+    return {
+      from: startDate,
+      to: endDate
+    };
   });
 
   // Initialize auto alerts system
@@ -36,15 +36,16 @@ const Dashboard = () => {
           </p>
         </div>
         <DateFilter 
-          startDate={startDate}
-          endDate={endDate}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
+          value={dateRange}
+          onChange={setDateRange}
         />
       </div>
 
       {/* Summary Cards */}
-      <SummaryCards startDate={startDate} endDate={endDate} />
+      <SummaryCards 
+        startDate={dateRange.from?.toISOString().split('T')[0] || ''} 
+        endDate={dateRange.to?.toISOString().split('T')[0] || ''} 
+      />
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -57,7 +58,7 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <SalesChart startDate={startDate} endDate={endDate} />
+            <SalesChart />
           </CardContent>
         </Card>
 
@@ -75,7 +76,10 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <InteractiveTopProductsChart startDate={startDate} endDate={endDate} />
+            <InteractiveTopProductsChart 
+              data={[]} 
+              loading={false}
+            />
           </CardContent>
         </Card>
 
@@ -87,7 +91,10 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <InteractivePlatformChart startDate={startDate} endDate={endDate} />
+            <InteractivePlatformChart 
+              data={[]} 
+              loading={false}
+            />
           </CardContent>
         </Card>
       </div>
