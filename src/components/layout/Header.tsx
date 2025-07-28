@@ -16,10 +16,10 @@ import { useSystemNotifications } from '@/hooks/useSystemNotifications';
 import { NotificationCenter } from '@/components/common/NotificationCenter';
 
 interface HeaderProps {
-  onMenuClick: () => void;
+  onToggleSidebar: () => void;
 }
 
-export const Header = ({ onMenuClick }: HeaderProps) => {
+export const Header = ({ onToggleSidebar }: HeaderProps) => {
   const { user, profile, signOut } = useAuth();
   const { unreadCount } = useSystemNotifications();
 
@@ -34,7 +34,7 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={onMenuClick}
+            onClick={onToggleSidebar}
             className="mr-4 md:hidden"
           >
             <Menu className="h-5 w-5" />
