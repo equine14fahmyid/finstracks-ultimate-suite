@@ -1,121 +1,96 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 
 interface DashboardMetrics {
-  totalSales: number;
-  totalExpenses: number;
-  totalCOGS: number;
-  netProfit: number;
-  totalCashBank: number;
-  salesCount: number;
-  loading: boolean;
-  error: string | null;
+  total_penjualan: number;
+  total_pengeluaran: number;
+  total_cogs: number;
+  laba_bersih: number;
+  saldo_kas_bank: number;
 }
 
 export const useDashboardMetrics = (startDate: string, endDate: string) => {
-  const { user } = useAuth();
-  const [metrics, setMetrics] = useState<DashboardMetrics>({
-    totalSales: 0,
-    totalExpenses: 0,
-    totalCOGS: 0,
-    netProfit: 0,
-    totalCashBank: 0,
-    salesCount: 0,
-    loading: true,
-    error: null
-  });
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchMetrics = async () => {
-    if (!user) return;
-
     try {
-      setMetrics(prev => ({ ...prev, loading: true, error: null }));
+      setLoading(true);
+      setError(null);
 
-      // Fetch total sales with proper error handling
+      // 1. Fetch total penjualan (revenue)
       const { data: salesData, error: salesError } = await supabase
         .from('sales')
         .select('total')
-        .eq('status', 'delivered')
         .gte('tanggal', startDate)
-        .lte('tanggal', endDate);
+        .lte('tanggal', endDate)
+        .eq('status', 'delivered');
 
-      if (salesError) {
-        console.error('Error fetching sales:', salesError);
-        throw new Error('Failed to fetch sales data');
-      }
+      if (salesError) throw salesError;
 
-      // Fetch total expenses with proper error handling
+      const total_penjualan = salesData?.reduce((sum, sale) => sum + sale.total, 0) || 0;
+
+      // 2. Fetch total pengeluaran (expenses)
       const { data: expensesData, error: expensesError } = await supabase
         .from('expenses')
         .select('jumlah')
         .gte('tanggal', startDate)
         .lte('tanggal', endDate);
 
-      if (expensesError) {
-        console.error('Error fetching expenses:', expensesError);
-        throw new Error('Failed to fetch expenses data');
-      }
+      if (expensesError) throw expensesError;
 
-      // Fetch COGS from purchases
+      const total_pengeluaran = expensesData?.reduce((sum, expense) => sum + expense.jumlah, 0) || 0;
+
+      // 3. Fetch total COGS (Cost of Goods Sold) from purchases
       const { data: purchasesData, error: purchasesError } = await supabase
         .from('purchases')
         .select('total')
-        .eq('payment_status', 'paid')
         .gte('tanggal', startDate)
-        .lte('tanggal', endDate);
+        .lte('tanggal', endDate)
+        .in('payment_status', ['paid', 'partial']);
 
-      if (purchasesError) {
-        console.error('Error fetching purchases:', purchasesError);
-        // Don't throw error, set COGS to 0 if not available
-      }
+      if (purchasesError) throw purchasesError;
 
-      // Fetch total cash and bank balance
+      const total_cogs = purchasesData?.reduce((sum, purchase) => sum + purchase.total, 0) || 0;
+
+      // 4. Fetch total saldo kas & bank
       const { data: banksData, error: banksError } = await supabase
         .from('banks')
         .select('saldo_akhir')
         .eq('is_active', true);
 
-      if (banksError) {
-        console.error('Error fetching banks:', banksError);
-        // Don't throw error, set cash balance to 0 if not available
-      }
+      if (banksError) throw banksError;
 
-      const totalSales = salesData?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
-      const totalExpenses = expensesData?.reduce((sum, expense) => sum + (expense.jumlah || 0), 0) || 0;
-      const totalCOGS = purchasesData?.reduce((sum, purchase) => sum + (purchase.total || 0), 0) || 0;
-      const totalCashBank = banksData?.reduce((sum, bank) => sum + (bank.saldo_akhir || 0), 0) || 0;
-      const salesCount = salesData?.length || 0;
-      const netProfit = totalSales - totalExpenses - totalCOGS;
+      const saldo_kas_bank = banksData?.reduce((sum, bank) => sum + (bank.saldo_akhir || 0), 0) || 0;
+
+      // 5. Calculate laba bersih (net profit)
+      const laba_bersih = total_penjualan - total_pengeluaran - total_cogs;
 
       setMetrics({
-        totalSales,
-        totalExpenses,
-        totalCOGS,
-        netProfit,
-        totalCashBank,
-        salesCount,
-        loading: false,
-        error: null
+        total_penjualan,
+        total_pengeluaran,
+        total_cogs,
+        laba_bersih,
+        saldo_kas_bank
       });
-
-    } catch (error) {
-      console.error('Error fetching dashboard metrics:', error);
-      setMetrics(prev => ({
-        ...prev,
-        loading: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
-      }));
+    } catch (err) {
+      console.error('Error fetching dashboard metrics:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch dashboard metrics');
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchMetrics();
-  }, [startDate, endDate, user]);
+  }, [startDate, endDate]);
 
   return {
-    ...metrics,
+    metrics,
+    loading,
+    error,
     refreshMetrics: fetchMetrics
   };
 };
