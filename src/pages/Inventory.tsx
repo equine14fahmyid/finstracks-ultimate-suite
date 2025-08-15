@@ -13,6 +13,10 @@ import { toast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/utils/format';
 import { useNavigate } from 'react-router-dom';
 import EmptyState from '@/components/common/EmptyState';
+import { StockMovementTracker } from '@/components/inventory/StockMovementTracker';
+import { StockMovementSummary } from '@/components/inventory/StockMovementSummary';
+import { StockAdjustmentDialog } from '@/components/inventory/StockAdjustmentDialog';
+
 const Inventory = () => {
   const navigate = useNavigate();
   const {
@@ -530,6 +534,12 @@ const Inventory = () => {
         </Card>
       </div>
 
+      {/* Stock Movement Summary */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Ringkasan Pergerakan Stok</h2>
+        <StockMovementSummary period="month" />
+      </div>
+
       {/* Stock Level Table */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -632,15 +642,8 @@ const Inventory = () => {
         </CardContent>
       </Card>
 
-      {/* Stock Movement History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Riwayat Pergerakan Stok</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {filteredMovements.length > 0 ? <DataTable columns={movementColumns} data={filteredMovements} loading={loading} searchable={true} searchPlaceholder="Cari riwayat..." /> : <EmptyState icon="📊" title="Belum Ada Pergerakan Stok" description="Riwayat pergerakan stok akan muncul ketika ada transaksi penjualan, pembelian, atau penyesuaian stok." />}
-        </CardContent>
-      </Card>
+      {/* Stock Movement Tracker */}
+      <StockMovementTracker showFilters={true} />
 
       {/* Stock Adjustment Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -701,4 +704,5 @@ const Inventory = () => {
       </Dialog>
     </div>;
 };
+
 export default Inventory;

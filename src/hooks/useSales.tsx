@@ -46,7 +46,6 @@ export const useSales = () => {
     }
   };
 
-
   const updateSaleStatus = async (saleId: string, newStatus: SaleStatus) => {
     try {
       const { data, error } = await supabase
@@ -104,8 +103,10 @@ export const useSales = () => {
 
       if (itemsError) throw itemsError;
 
+      // Create stock movements and update stock only for shipped/delivered sales
       if (saleData.status === 'shipped' || saleData.status === 'delivered') {
         for (const item of items) {
+          // Update stock
           const { data: currentStock, error: stockFetchError } = await supabase
             .from('product_variants')
             .select('stok')
@@ -126,6 +127,7 @@ export const useSales = () => {
 
           if (stockError) console.error('Stock update error:', stockError);
 
+          // Create stock movement record with enhanced details
           const { error: movementError } = await supabase
             .from('stock_movements')
             .insert([{
@@ -134,7 +136,7 @@ export const useSales = () => {
               quantity: Number(item.quantity),
               reference_type: 'sale',
               reference_id: saleResult.id,
-              notes: `Penjualan: ${saleData.no_pesanan_platform}`
+              notes: `Penjualan: ${saleData.no_pesanan_platform} - ${saleData.customer_name} (${saleData.status})`
             }]);
 
           if (movementError) console.error('Movement error:', movementError);
@@ -161,7 +163,6 @@ export const useSales = () => {
     }
   };
 
-  // V V V PERBAIKANNYA ADA DI BARIS INI V V V
   const updateSale = async (saleId: string, saleData: any, items: any[], existingItems?: any[]) => {
     setLoading(true);
     try {
@@ -186,6 +187,7 @@ export const useSales = () => {
       const { error: saleError } = await supabase.from('sales').update(completeData).eq('id', saleId);
       if (saleError) throw saleError;
 
+      // Restore stock from old items if they were shipped/delivered
       if (existingItems && existingItems.length > 0 && (oldStatus === 'shipped' || oldStatus === 'delivered')) {
         console.log('Restoring stock from old items...');
         for (const existingItem of existingItems) {
@@ -206,15 +208,28 @@ export const useSales = () => {
             .eq('id', existingItem.product_variant_id);
 
           if (restoreError) console.error('Stock restore error:', restoreError);
+
+          // Create reverse stock movement record
+          const { error: reverseMovementError } = await supabase
+            .from('stock_movements')
+            .insert([{
+              product_variant_id: existingItem.product_variant_id,
+              movement_type: 'in',
+              quantity: Number(existingItem.quantity),
+              reference_type: 'sale',
+              reference_id: saleId,
+              notes: `Pembatalan/Edit penjualan: ${saleData.no_pesanan_platform} (status berubah dari ${oldStatus} ke ${newStatus})`
+            }]);
+
+          if (reverseMovementError) console.error('Reverse movement error:', reverseMovementError);
         }
       }
 
+      // Delete old sale items and movements
       const { error: deleteError } = await supabase.from('sale_items').delete().eq('sale_id', saleId);
       if (deleteError) throw deleteError;
 
-      const { error: deleteMoveError } = await supabase.from('stock_movements').delete().eq('reference_id', saleId).eq('reference_type', 'sale');
-      if (deleteMoveError) console.error('Delete movement error:', deleteMoveError);
-
+      // Insert new sale items
       const newSaleItems = items.map(item => ({
         sale_id: saleId,
         product_variant_id: item.product_variant_id,
@@ -226,6 +241,7 @@ export const useSales = () => {
       const { error: newItemsError } = await supabase.from('sale_items').insert(newSaleItems);
       if (newItemsError) throw newItemsError;
 
+      // Create new stock movements for shipped/delivered items
       if (newStatus === 'shipped' || newStatus === 'delivered') {
         console.log('Deducting stock for new items...');
         for (const item of items) {
@@ -243,13 +259,14 @@ export const useSales = () => {
           const { error: stockError } = await supabase.from('product_variants').update({ stok: newStock }).eq('id', item.product_variant_id);
           if (stockError) console.error('Stock update error:', stockError);
 
+          // Create new stock movement record
           const { error: movementError } = await supabase.from('stock_movements').insert([{
             product_variant_id: item.product_variant_id,
             movement_type: 'out',
             quantity: Number(item.quantity),
             reference_type: 'sale',
             reference_id: saleId,
-            notes: `Update penjualan: ${saleData.no_pesanan_platform}`
+            notes: `Update penjualan: ${saleData.no_pesanan_platform} - ${saleData.customer_name} (${newStatus})`
           }]);
           if (movementError) console.error('Movement error:', movementError);
         }

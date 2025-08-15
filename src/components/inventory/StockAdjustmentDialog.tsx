@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Edit3 } from 'lucide-react';
 import { useStock } from '@/hooks/useSupabase';
+import { useStockMovements } from '@/hooks/useStockMovements';
 import { toast } from '@/hooks/use-toast';
 
 interface StockAdjustmentDialogProps {
@@ -28,6 +29,7 @@ export const StockAdjustmentDialog = ({ variant, onStockUpdated }: StockAdjustme
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const { adjustStock } = useStock();
+  const { createStockMovement } = useStockMovements();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,13 +54,29 @@ export const StockAdjustmentDialog = ({ variant, onStockUpdated }: StockAdjustme
 
     setLoading(true);
     try {
+      const currentStock = variant.stok || 0;
+      const difference = newStock - currentStock;
+      
+      // First, adjust the stock
       await adjustStock(variant.id, newStock, notes || 'Penyesuaian stok manual');
+      
+      // Then, create stock movement record
+      if (difference !== 0) {
+        await createStockMovement({
+          productVariantId: variant.id,
+          movementType: 'adjustment',
+          quantity: Math.abs(difference),
+          referenceType: 'adjustment',
+          notes: `${notes || 'Penyesuaian stok manual'} (${currentStock} → ${newStock})`
+        });
+      }
+      
       setOpen(false);
       setNotes('');
       onStockUpdated?.();
       toast({
         title: "Sukses",
-        description: "Stok berhasil disesuaikan",
+        description: `Stok berhasil disesuaikan dari ${currentStock} menjadi ${newStock}`,
       });
     } catch (error) {
       console.error('Stock adjustment error:', error);
@@ -88,7 +106,7 @@ export const StockAdjustmentDialog = ({ variant, onStockUpdated }: StockAdjustme
         <DialogHeader>
           <DialogTitle>Sesuaikan Stok</DialogTitle>
           <DialogDescription>
-            Sesuaikan stok untuk {variant?.products?.nama_produk || 'N/A'} - {variant?.warna || 'N/A'} {variant?.size || 'N/A'}
+            Sesuaikan stok untuk {variant?.products?.nama_produk || variant?.product?.nama_produk || 'N/A'} - {variant?.warna || 'N/A'} {variant?.size || 'N/A'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -110,6 +128,14 @@ export const StockAdjustmentDialog = ({ variant, onStockUpdated }: StockAdjustme
                 min="0"
                 required
               />
+              <div className="text-xs text-muted-foreground">
+                {newStock > (variant?.stok || 0) ? 
+                  `Akan menambah ${newStock - (variant?.stok || 0)} unit` : 
+                  newStock < (variant?.stok || 0) ? 
+                  `Akan mengurangi ${(variant?.stok || 0) - newStock} unit` : 
+                  'Tidak ada perubahan'
+                }
+              </div>
             </div>
 
             <div className="space-y-2">
