@@ -43,34 +43,39 @@ export const StockMovementTracker = ({
 
     // Filter by product variant if specified
     if (productVariantId) {
-      filtered = filtered.filter(m => m.product_variant_id === productVariantId);
+      filtered = filtered.filter(m => m?.product_variant_id === productVariantId);
     }
 
     // Apply date filters
     if (filters.startDate) {
-      filtered = filtered.filter(m => new Date(m.created_at) >= new Date(filters.startDate));
+      filtered = filtered.filter(m => m?.created_at && new Date(m.created_at) >= new Date(filters.startDate));
     }
     if (filters.endDate) {
-      filtered = filtered.filter(m => new Date(m.created_at) <= new Date(filters.endDate));
+      filtered = filtered.filter(m => m?.created_at && new Date(m.created_at) <= new Date(filters.endDate));
     }
 
     // Apply type filters
     if (filters.movementType) {
-      filtered = filtered.filter(m => m.movement_type === filters.movementType);
+      filtered = filtered.filter(m => m?.movement_type === filters.movementType);
     }
     if (filters.referenceType) {
-      filtered = filtered.filter(m => m.reference_type === filters.referenceType);
+      filtered = filtered.filter(m => m?.reference_type === filters.referenceType);
     }
 
     // Apply search
     if (filters.searchTerm) {
       const term = filters.searchTerm.toLowerCase();
-      filtered = filtered.filter(m => 
-        m.product_variant?.products?.nama_produk?.toLowerCase().includes(term) ||
-        m.product_variant?.warna?.toLowerCase().includes(term) ||
-        m.product_variant?.size?.toLowerCase().includes(term) ||
-        m.notes?.toLowerCase().includes(term)
-      );
+      filtered = filtered.filter(m => {
+        const productName = m?.product_variant?.products?.nama_produk || m?.product_variant?.product?.nama_produk || '';
+        const warna = m?.product_variant?.warna || '';
+        const size = m?.product_variant?.size || '';
+        const notes = m?.notes || '';
+        
+        return productName.toLowerCase().includes(term) ||
+               warna.toLowerCase().includes(term) ||
+               size.toLowerCase().includes(term) ||
+               notes.toLowerCase().includes(term);
+      });
     }
 
     setFilteredMovements(filtered);
@@ -101,14 +106,17 @@ export const StockMovementTracker = ({
     {
       key: 'created_at',
       title: 'Tanggal',
-      render: (value: any, movement: any) => (
-        <div className="text-sm">
-          <div className="font-medium">{formatDate(movement.created_at)}</div>
-          <div className="text-muted-foreground text-xs">
-            {new Date(movement.created_at).toLocaleTimeString('id-ID')}
+      render: (value: any, movement: any) => {
+        if (!movement?.created_at) return <div className="text-sm">-</div>;
+        return (
+          <div className="text-sm">
+            <div className="font-medium">{formatDate(movement.created_at)}</div>
+            <div className="text-muted-foreground text-xs">
+              {new Date(movement.created_at).toLocaleTimeString('id-ID')}
+            </div>
           </div>
-        </div>
-      )
+        );
+      }
     },
     {
       key: 'product',
@@ -117,16 +125,16 @@ export const StockMovementTracker = ({
         const productName = movement?.product_variant?.products?.nama_produk || 
                            movement?.product_variant?.product?.nama_produk || 
                            'Produk tidak diketahui';
+        const warna = movement?.product_variant?.warna || 'N/A';
+        const size = movement?.product_variant?.size || 'N/A';
+        const sku = movement?.product_variant?.sku;
+        
         return (
           <div>
             <div className="font-medium">{productName}</div>
-            <div className="text-sm text-muted-foreground">
-              {movement?.product_variant?.warna} - {movement?.product_variant?.size}
-            </div>
-            {movement?.product_variant?.sku && (
-              <div className="text-xs text-muted-foreground">
-                SKU: {movement.product_variant.sku}
-              </div>
+            <div className="text-sm text-muted-foreground">{warna} - {size}</div>
+            {sku && (
+              <div className="text-xs text-muted-foreground">SKU: {sku}</div>
             )}
           </div>
         );
@@ -135,28 +143,31 @@ export const StockMovementTracker = ({
     {
       key: 'movement_type',
       title: 'Jenis',
-      render: (value: any, movement: any) => (
-        <Badge variant="outline" className={`${getMovementTypeColor(movement.movement_type)}`}>
-          {movement.movement_type === 'in' ? (
-            <><TrendingUp className="h-3 w-3 mr-1" />Masuk</>
-          ) : movement.movement_type === 'out' ? (
-            <><TrendingDown className="h-3 w-3 mr-1" />Keluar</>
-          ) : (
-            <><Package className="h-3 w-3 mr-1" />Penyesuaian</>
-          )}
-        </Badge>
-      )
+      render: (value: any, movement: any) => {
+        if (!movement?.movement_type) return <Badge variant="secondary">N/A</Badge>;
+        return (
+          <Badge variant="outline" className={`${getMovementTypeColor(movement.movement_type)}`}>
+            {movement.movement_type === 'in' ? (
+              <><TrendingUp className="h-3 w-3 mr-1" />Masuk</>
+            ) : movement.movement_type === 'out' ? (
+              <><TrendingDown className="h-3 w-3 mr-1" />Keluar</>
+            ) : (
+              <><Package className="h-3 w-3 mr-1" />Penyesuaian</>
+            )}
+          </Badge>
+        );
+      }
     },
     {
       key: 'quantity',
       title: 'Jumlah',
       render: (value: any, movement: any) => {
-        const quantity = movement.quantity || 0;
-        const color = movement.movement_type === 'in' ? 'text-green-600' : 
-                     movement.movement_type === 'out' ? 'text-red-600' : 'text-blue-600';
+        const quantity = movement?.quantity || 0;
+        const color = movement?.movement_type === 'in' ? 'text-green-600' : 
+                     movement?.movement_type === 'out' ? 'text-red-600' : 'text-blue-600';
         return (
           <span className={`font-medium ${color}`}>
-            {movement.movement_type === 'in' ? '+' : movement.movement_type === 'out' ? '-' : '±'}
+            {movement?.movement_type === 'in' ? '+' : movement?.movement_type === 'out' ? '-' : '±'}
             {quantity.toLocaleString('id-ID')}
           </span>
         );
@@ -165,25 +176,28 @@ export const StockMovementTracker = ({
     {
       key: 'reference_type',
       title: 'Referensi',
-      render: (value: any, movement: any) => (
-        <div className="text-sm">
-          <div className="font-medium">
-            {getReferenceTypeLabel(movement.reference_type || 'manual')}
+      render: (value: any, movement: any) => {
+        const referenceType = movement?.reference_type || 'manual';
+        const referenceId = movement?.reference_id;
+        
+        return (
+          <div className="text-sm">
+            <div className="font-medium">{getReferenceTypeLabel(referenceType)}</div>
+            {referenceId && (
+              <div className="text-muted-foreground text-xs">
+                ID: {referenceId.slice(-8)}
+              </div>
+            )}
           </div>
-          {movement.reference_id && (
-            <div className="text-muted-foreground text-xs">
-              ID: {movement.reference_id.slice(-8)}
-            </div>
-          )}
-        </div>
-      )
+        );
+      }
     },
     {
       key: 'notes',
       title: 'Catatan',
       render: (value: any, movement: any) => (
-        <div className="text-sm text-muted-foreground max-w-xs truncate" title={movement.notes}>
-          {movement.notes || '-'}
+        <div className="text-sm text-muted-foreground max-w-xs truncate" title={movement?.notes || ''}>
+          {movement?.notes || '-'}
         </div>
       )
     }
@@ -240,7 +254,7 @@ export const StockMovementTracker = ({
                   <SelectValue placeholder="Semua jenis" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Semua jenis</SelectItem>
+                  <SelectItem value="all">Semua jenis</SelectItem>
                   <SelectItem value="in">Masuk</SelectItem>
                   <SelectItem value="out">Keluar</SelectItem>
                   <SelectItem value="adjustment">Penyesuaian</SelectItem>
@@ -255,7 +269,7 @@ export const StockMovementTracker = ({
                   <SelectValue placeholder="Semua referensi" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Semua referensi</SelectItem>
+                  <SelectItem value="all">Semua referensi</SelectItem>
                   <SelectItem value="sale">Penjualan</SelectItem>
                   <SelectItem value="purchase">Pembelian</SelectItem>
                   <SelectItem value="adjustment">Penyesuaian</SelectItem>
