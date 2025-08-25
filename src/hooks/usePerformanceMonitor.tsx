@@ -134,7 +134,7 @@ export const usePerformanceMonitor = () => {
   }, [startMonitoring]);
 
   // API wrapper for measuring response times
-  const wrapApiCall = useCallback(async <T>(apiCall: () => Promise<T>): Promise<T> => {
+  const wrapApiCall = useCallback(async function<T>(apiCall: () => Promise<T>): Promise<T> {
     const startTime = performance.now();
     try {
       const result = await apiCall();
@@ -149,18 +149,18 @@ export const usePerformanceMonitor = () => {
   }, [measureApiResponse]);
 
   // Performance utilities
-  const formatBytes = (bytes: number) => {
+  const formatBytes = useCallback((bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+  }, []);
 
-  const formatTime = (ms: number) => {
+  const formatTime = useCallback((ms: number): string => {
     if (ms < 1000) return `${ms.toFixed(0)}ms`;
     return `${(ms / 1000).toFixed(2)}s`;
-  };
+  }, []);
 
   return {
     metrics,
