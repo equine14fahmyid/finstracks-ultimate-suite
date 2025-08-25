@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -50,14 +51,8 @@ export const useOptimizedQuery = <T = any>(config: QueryConfig): QueryResult<T> 
         return;
       }
 
-      // Build query - start with basic from() call
-      let query = supabase.from(config.table as any);
-
-      if (config.select) {
-        query = query.select(config.select);
-      } else {
-        query = query.select('*');
-      }
+      // Build query - start with basic from() call and select
+      let query = supabase.from(config.table as any).select(config.select || '*');
 
       // Apply filters
       if (config.filters) {
@@ -128,3 +123,4 @@ export const useOptimizedQuery = <T = any>(config: QueryConfig): QueryResult<T> 
     invalidateCache
   };
 };
+
