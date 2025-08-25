@@ -47,27 +47,42 @@ function App() {
               <Route path="/" element={<AppLayout><Outlet /></AppLayout>}>
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
-                <Route path="products" element={<Products />} />
-                <Route path="categories" element={<Categories />} />
-                <Route path="inventory" element={<Inventory />} />
+                
+                {/* Sales Routes */}
                 <Route path="sales" element={<Sales />} />
-                <Route path="suppliers" element={<Suppliers />} />
+                <Route path="sales/create" element={<Sales />} />
+                
+                {/* Purchase Routes */}
                 <Route path="purchases" element={<Purchases />} />
                 <Route path="purchases/create" element={<Purchases />} />
+                
+                {/* Inventory Routes */}
+                <Route path="products" element={<Products />} />
+                <Route path="inventory" element={<Inventory />} />
+                <Route path="suppliers" element={<Suppliers />} />
+                
+                {/* Finance Routes */}
                 <Route path="incomes" element={<Incomes />} />
                 <Route path="expenses" element={<Expenses />} />
                 <Route path="banks" element={<Banks />} />
+                <Route path="settlements" element={<Settlements />} />
+                <Route path="adjustments" element={<Adjustments />} />
+                
+                {/* Master Data Routes */}
                 <Route path="platforms" element={<Platforms />} />
                 <Route path="stores" element={<Stores />} />
                 <Route path="expeditions" element={<Expeditions />} />
+                <Route path="categories" element={<Categories />} />
                 <Route path="assets" element={<Assets />} />
-                <Route path="users" element={<Users />} />
-                <Route path="settlements" element={<Settlements />} />
-                <Route path="adjustments" element={<Adjustments />} />
+                
+                {/* Report Routes */}
                 <Route path="reports/profit-loss" element={<ProfitLoss />} />
                 <Route path="reports/balance-sheet" element={<BalanceSheet />} />
                 <Route path="reports/cash-flow" element={<CashFlow />} />
                 <Route path="reports/analytics" element={<Analytics />} />
+                
+                {/* Admin Routes */}
+                <Route path="users" element={<Users />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
               <Route path="*" element={<NotFound />} />

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -53,7 +52,7 @@ interface NavItem {
 const navigationItems: NavItem[] = [
   {
     title: 'Dashboard',
-    href: '/',
+    href: '/dashboard',
     icon: Home,
     permission: 'dashboard.view'
   },
@@ -81,7 +80,7 @@ const navigationItems: NavItem[] = [
     permission: 'inventory.read',
     children: [
       { title: 'Produk', href: '/products', icon: Package2 },
-      { title: 'Stok', href: '/inventori/stok', icon: BarChart3 },
+      { title: 'Stok', href: '/inventory', icon: BarChart3 },
       { title: 'Supplier', href: '/suppliers', icon: Building2 },
     ]
   },
@@ -106,7 +105,7 @@ const navigationItems: NavItem[] = [
       { title: 'Toko', href: '/stores', icon: Building2 },
       { title: 'Ekspedisi', href: '/expeditions', icon: Truck },
       { title: 'Kategori', href: '/categories', icon: Tags },
-      { title: 'Asset', href: '/master-data/asset', icon: Building },
+      { title: 'Asset', href: '/assets', icon: Building },
     ]
   },
   {
@@ -152,8 +151,8 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   };
 
   const isActive = (href: string) => {
-    if (href === '/') {
-      return location.pathname === '/';
+    if (href === '/dashboard') {
+      return location.pathname === '/dashboard' || location.pathname === '/';
     }
     return location.pathname.startsWith(href);
   };
