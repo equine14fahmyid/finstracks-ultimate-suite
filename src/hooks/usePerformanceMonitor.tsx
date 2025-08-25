@@ -148,23 +148,27 @@ export const usePerformanceMonitor = () => {
     }
   }, [measureApiResponse]);
 
+  // Performance utilities
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const formatTime = (ms: number) => {
+    if (ms < 1000) return `${ms.toFixed(0)}ms`;
+    return `${(ms / 1000).toFixed(2)}s`;
+  };
+
   return {
     metrics,
     alerts,
     isMonitoring,
     clearAlerts,
     wrapApiCall,
-    // Performance utilities
-    formatBytes: (bytes: number) => {
-      if (bytes === 0) return '0 Bytes';
-      const k = 1024;
-      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    },
-    formatTime: (ms: number) => {
-      if (ms < 1000) return `${ms.toFixed(0)}ms`;
-      return `${(ms / 1000).toFixed(2)}s`;
-    }
+    formatBytes,
+    formatTime
   };
 };
