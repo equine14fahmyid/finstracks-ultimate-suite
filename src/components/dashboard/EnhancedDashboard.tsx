@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePickerWithRange } from '@/components/ui/date-picker';
@@ -11,6 +10,7 @@ import TopProductsChart from './TopProductsChart';
 import PlatformComparisonChart from './PlatformComparisonChart';
 import LowStockAlertsCard from './LowStockAlertsCard';
 import { toast } from '@/hooks/use-toast';
+import { formatCurrency } from '@/utils/format';
 
 const EnhancedDashboard = () => {
   const [dateRange, setDateRange] = useState({
