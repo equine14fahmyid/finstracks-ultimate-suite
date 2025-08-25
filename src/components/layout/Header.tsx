@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -24,6 +23,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from 'next-themes';
 import { NotificationCenter } from '@/components/common/NotificationCenter';
+import { ThemeToggle } from '@/components/common/ThemeToggle';
 
 interface HeaderProps {
   onToggleSidebar?: () => void;
@@ -31,14 +31,9 @@ interface HeaderProps {
 
 const Header = ({ onToggleSidebar }: HeaderProps) => {
   const { profile, signOut } = useAuth();
-  const { theme, setTheme } = useTheme();
 
   const handleSignOut = async () => {
     await signOut();
-  };
-
-  const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
   const getRoleBadgeColor = (role: string) => {
@@ -97,19 +92,8 @@ const Header = ({ onToggleSidebar }: HeaderProps) => {
           {/* Notifications */}
           <NotificationCenter />
 
-          {/* Theme Toggle */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={toggleTheme}
-            className="hover-lift h-10 w-10 md:h-10 md:w-10"
-          >
-            {theme === 'dark' ? (
-              <Sun className="h-4 w-4 md:h-5 md:w-5" />
-            ) : (
-              <Moon className="h-4 w-4 md:h-5 md:w-5" />
-            )}
-          </Button>
+          {/* Theme Toggle - Now optimized */}
+          <ThemeToggle />
 
           {/* User Profile Dropdown */}
           <DropdownMenu>
