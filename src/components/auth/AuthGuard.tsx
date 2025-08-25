@@ -3,7 +3,7 @@ import { ReactNode, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthSession } from '@/hooks/useAuthSession';
 import { Navigate, useLocation } from 'react-router-dom';
-import { OptimizedLoading } from '@/components/common/OptimizedLoading';
+import { LoadingSpinner } from '@/components/common/OptimizedLoading';
 
 interface AuthGuardProps {
   children: ReactNode;
@@ -23,7 +23,11 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
 
   // Show loading while checking authentication
   if (loading) {
-    return <OptimizedLoading />;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
   }
 
   // Redirect to login if not authenticated
