@@ -16,6 +16,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   hasPermission: (permission: string) => boolean;
   userRole: UserRole | null;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -45,9 +46,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setProfile(null);
   };
 
-  // Fetch user profile data
-  const fetchUserProfile = async (userId: string) => {
+  // Fetch user profile data with retry logic
+  const fetchUserProfile = async (userId: string, retryCount = 0) => {
     try {
+      // Validate session first
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !sessionData.session) {
+        console.error('No valid session for profile fetch:', sessionError);
+        clearAuthState();
+        return;
+      }
+
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -56,6 +66,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       if (error) {
         console.error('Error fetching user profile:', error);
+        
+        // Retry once if it's a network error
+        if (retryCount < 1 && (error.message?.includes('network') || error.code === 'PGRST301')) {
+          setTimeout(() => fetchUserProfile(userId, retryCount + 1), 1000);
+          return;
+        }
+        
+        // If profile doesn't exist, create one
+        if (error.code === 'PGRST116') {
+          console.log('Profile not found, creating new profile...');
+          await createUserProfile(userId);
+          return;
+        }
+        
         return;
       }
 
@@ -65,38 +89,105 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  // Create user profile if it doesn't exist
+  const createUserProfile = async (userId: string) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData.user;
+      
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .insert([
+          {
+            id: userId,
+            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+            role: 'staff' as UserRole,
+            is_active: true
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating user profile:', error);
+        return;
+      }
+
+      setProfile(data);
+    } catch (error) {
+      console.error('Error in createUserProfile:', error);
+    }
+  };
+
+  // Refresh profile data
+  const refreshProfile = async () => {
+    if (user) {
+      await fetchUserProfile(user.id);
+    }
+  };
+
   // Initialize auth state
   useEffect(() => {
+    let mounted = true;
+
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserProfile(session.user.id);
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Session initialization error:', error);
+          clearAuthState();
+        } else if (session?.user && mounted) {
+          setSession(session);
+          setUser(session.user);
+          await fetchUserProfile(session.user.id);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        clearAuthState();
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-      setLoading(false);
-    });
+    };
+
+    initializeAuth();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
+
+        console.log('Auth state changed:', event, session?.user?.id);
+        
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user profile when logged in
+          // Delay profile fetch to avoid race conditions
           setTimeout(() => {
-            fetchUserProfile(session.user.id);
-          }, 0);
+            if (mounted) {
+              fetchUserProfile(session.user.id);
+            }
+          }, 100);
         } else {
           setProfile(null);
         }
         
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -117,6 +208,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           message = 'Email belum dikonfirmasi';
         } else if (error.message.includes('Too many requests')) {
           message = 'Terlalu banyak percobaan login. Coba lagi nanti';
+        } else if (error.message.includes('network')) {
+          message = 'Koneksi bermasalah. Periksa internet Anda';
         }
 
         return { error: { message } };
@@ -222,23 +315,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       setLoading(true);
       
-      // Check if there's a current session before attempting logout
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      
-      if (currentSession) {
-        // Attempt to sign out from Supabase
-        const { error } = await supabase.auth.signOut();
-        
-        if (error) {
-          console.error('Supabase signOut error:', error);
-          // Don't show error to user, just log it and continue with manual cleanup
-        }
-      }
-
-      // Always clear local state regardless of Supabase signOut result
+      // Always clear local state first
       clearAuthState();
       
-      // Clear any cached data in localStorage
+      // Clear localStorage
       try {
         localStorage.removeItem('supabase.auth.token');
         localStorage.removeItem('sb-xkrtbwecvfdeqfkvrdcb-auth-token');
@@ -246,28 +326,31 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         console.error('Error clearing localStorage:', e);
       }
 
+      // Try to sign out from Supabase (don't block on this)
+      const signOutPromise = supabase.auth.signOut();
+      
       toast({
         title: "Logout Berhasil",
         description: "Anda telah keluar dari sistem",
       });
 
-      // Force redirect to login page
+      // Force redirect immediately
       setTimeout(() => {
         window.location.href = '/login';
       }, 100);
 
+      // Wait for signOut to complete (but don't block the redirect)
+      await signOutPromise;
+
     } catch (error: any) {
       console.error('SignOut error:', error);
       
-      // Even if there's an error, clear local state and redirect
-      clearAuthState();
-      
+      // Even if there's an error, ensure redirect happens
       toast({
         title: "Logout",
         description: "Anda telah keluar dari sistem",
       });
       
-      // Force redirect even on error
       setTimeout(() => {
         window.location.href = '/login';
       }, 100);
@@ -310,6 +393,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     resetPassword,
     hasPermission,
     userRole: profile?.role || null,
+    refreshProfile,
   };
 
   return (

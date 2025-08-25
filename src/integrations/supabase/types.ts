@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -1122,8 +1122,8 @@ export type Database = {
       check_store_saldo: {
         Args: { store_id_param: string }
         Returns: {
-          store_name: string
           current_saldo: number
+          store_name: string
         }[]
       }
       create_sale_with_stock_check: {
@@ -1131,11 +1131,11 @@ export type Database = {
         Returns: string
       }
       debug_settlement: {
-        Args: { p_store_id: string; p_bank_id: string; p_amount: number }
+        Args: { p_amount: number; p_bank_id: string; p_store_id: string }
         Returns: Json
       }
       get_dashboard_analytics: {
-        Args: { start_date: string; end_date: string }
+        Args: { end_date: string; start_date: string }
         Returns: Json
       }
       get_inventory_value_on_date: {
@@ -1143,80 +1143,80 @@ export type Database = {
         Returns: number
       }
       manual_saldo_update: {
-        Args: { store_id_param: string; amount_param: number }
+        Args: { amount_param: number; store_id_param: string }
         Returns: boolean
       }
       process_settlement: {
         Args: {
-          p_store_id: string
-          p_bank_id: string
-          p_amount: number
           p_admin_fee: number
-          p_notes: string
+          p_amount: number
+          p_bank_id: string
           p_income_category_id: string
+          p_notes: string
           p_settlement_date: string
+          p_store_id: string
           p_user_id: string
         }
         Returns: undefined
       }
       process_settlement_debug: {
         Args: {
-          p_store_id: string
-          p_bank_id: string
-          p_amount: number
           p_admin_fee?: number
-          p_notes?: string
+          p_amount: number
+          p_bank_id: string
           p_income_category_id?: string
+          p_notes?: string
           p_settlement_date?: string
+          p_store_id: string
           p_user_id?: string
         }
         Returns: Json
       }
       process_settlement_test: {
         Args: {
-          p_store_id: string
-          p_bank_id: string
-          p_amount: number
           p_admin_fee?: number
-          p_notes?: string
+          p_amount: number
+          p_bank_id: string
           p_income_category_id?: string
+          p_notes?: string
           p_settlement_date?: string
+          p_store_id: string
           p_user_id?: string
         }
         Returns: Json
       }
       process_settlement_v2: {
         Args: {
-          p_store_id: string
-          p_bank_id: string
-          p_amount: number
           p_admin_fee?: number
-          p_notes?: string
+          p_amount: number
+          p_bank_id: string
           p_income_category_id?: string
+          p_notes?: string
           p_settlement_date?: string
+          p_store_id: string
           p_user_id?: string
         }
         Returns: Json
       }
       update_sale_status_only: {
-        Args: { sale_id: string; new_status: string }
+        Args: { new_status: string; sale_id: string }
         Returns: undefined
       }
       update_sale_with_stock_check: {
         Args: {
-          sale_id: string
-          sale_data: Json
-          sale_items: Json[]
           existing_items: Json[]
+          sale_data: Json
+          sale_id: string
+          sale_items: Json[]
         }
         Returns: undefined
       }
       update_store_saldo: {
-        Args: { store_id: string; amount: number }
+        Args: { amount: number; store_id: string }
         Returns: undefined
       }
       validate_sale_with_adjustments: {
-        Args: { sale_id_param: string; adjustments?: Json }
+        Args: { adjustments?: Json; sale_id_param: string }
         Returns: undefined
       }
     }
