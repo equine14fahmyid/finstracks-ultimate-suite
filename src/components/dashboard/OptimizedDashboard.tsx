@@ -1,5 +1,5 @@
 
-import { Suspense, lazy, useMemo } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { useAutoNotifications } from '@/hooks/useAutoNotifications';
@@ -18,13 +18,29 @@ const LowStockAlertsCard = lazy(() => import('./LowStockAlertsCard'));
 
 const OptimizedDashboard = () => {
   const { profile } = useAuth();
-  const today = new Date().toISOString().split('T')[0];
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   
-  const { metrics, loading: metricsLoading, error } = useDashboardMetrics(thirtyDaysAgo, today);
+  // Date filter state
+  const [dateRange, setDateRange] = useState({
+    from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    to: new Date()
+  });
+  
+  const startDate = dateRange.from?.toISOString().split('T')[0] || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const endDate = dateRange.to?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
+  
+  const { metrics, loading: metricsLoading, error } = useDashboardMetrics(startDate, endDate);
   
   // Auto notifications
   useAutoNotifications();
+
+  // Mock data for charts until we implement proper data fetching
+  const mockSalesData = [
+    { date: startDate, total: metrics?.total_penjualan || 0, transaction_count: 10 }
+  ];
+
+  const mockTopProductsData = [
+    { name: 'Product 1', productName: 'Cargo Pants', variantName: 'Army, L', quantity: 50, revenue: 2500000 }
+  ];
 
   // Memoized metrics calculations
   const calculatedMetrics = useMemo(() => {
@@ -69,7 +85,10 @@ const OptimizedDashboard = () => {
             Selamat datang kembali, {profile?.full_name || 'User'}
           </p>
         </div>
-        <DateFilter />
+        <DateFilter 
+          value={dateRange} 
+          onChange={setDateRange}
+        />
       </div>
 
       {/* Key Metrics Cards */}
@@ -194,7 +213,7 @@ const OptimizedDashboard = () => {
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Suspense fallback={<LoadingCard className="h-80" />}>
-              <SalesChart />
+              <SalesChart data={mockSalesData} loading={metricsLoading} />
             </Suspense>
             <Suspense fallback={<LoadingCard className="h-80" />}>
               <PlatformComparisonChart data={[]} loading={metricsLoading} />
@@ -205,7 +224,7 @@ const OptimizedDashboard = () => {
         <TabsContent value="analytics" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Suspense fallback={<LoadingCard className="h-80" />}>
-              <TopProductsChart />
+              <TopProductsChart data={mockTopProductsData} loading={metricsLoading} />
             </Suspense>
             <Card>
               <CardHeader>
