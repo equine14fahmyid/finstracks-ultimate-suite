@@ -1,12 +1,11 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LoadingSpinner } from '@/components/common/OptimizedLoading';
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
@@ -86,22 +85,23 @@ const Login = () => {
     }
   };
 
+  // Show loading spinner only during initial auth check
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-hero">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900">
         <LoadingSpinner size="lg" className="text-white" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-hero p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 p-4">
       <div className="w-full max-w-md">
-        <Card className="glass-card border-white/20 shadow-glow">
+        <Card className="backdrop-blur-sm bg-white/10 border border-white/20 shadow-2xl">
           <CardHeader className="text-center pb-8">
-            <div className="mx-auto mb-6 w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center">
-              <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-xl">E</span>
+            <div className="mx-auto mb-6 w-20 h-20 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+              <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
+                <span className="text-white font-bold text-xl">E</span>
               </div>
             </div>
             <CardTitle className="text-2xl font-bold text-white mb-2">
@@ -125,13 +125,13 @@ const Login = () => {
                     type="email"
                     value={formData.email}
                     onChange={(e) => handleInputChange('email', e.target.value)}
-                    className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-primary focus:ring-primary/20"
+                    className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-blue-400 focus:ring-blue-400/20"
                     placeholder="Masukkan email Anda"
                     disabled={isSubmitting}
                   />
                 </div>
                 {errors.email && (
-                  <p className="text-error text-xs flex items-center gap-1">
+                  <p className="text-red-400 text-xs flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
                     {errors.email}
                   </p>
@@ -149,7 +149,7 @@ const Login = () => {
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={(e) => handleInputChange('password', e.target.value)}
-                    className="pl-10 pr-10 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-primary focus:ring-primary/20"
+                    className="pl-10 pr-10 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-blue-400 focus:ring-blue-400/20"
                     placeholder="Masukkan password Anda"
                     disabled={isSubmitting}
                   />
@@ -163,7 +163,7 @@ const Login = () => {
                   </button>
                 </div>
                 {errors.password && (
-                  <p className="text-error text-xs flex items-center gap-1">
+                  <p className="text-red-400 text-xs flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
                     {errors.password}
                   </p>
@@ -172,7 +172,7 @@ const Login = () => {
 
               <Button
                 type="submit"
-                className="w-full bg-primary hover:bg-primary-dark text-primary-foreground font-semibold py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
