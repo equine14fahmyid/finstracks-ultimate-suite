@@ -152,7 +152,7 @@ const Sales = () => {
 
     // Check required fields
     for (const [field, label] of Object.entries(requiredFields)) {
-      if (!formData[field as keyof SaleFormData]) {
+      if (!formData[field as keyof typeof formData] || String(formData[field as keyof typeof formData]).trim() === '') {
         console.log(`Missing required field: ${field}`);
         toast({
           title: "Error",
@@ -163,12 +163,22 @@ const Sales = () => {
       }
     }
     
-    // Validate items
+    // Validate items - more strict validation
     const validItems = formData.items.filter(item => {
-      const isValid = item.product_variant_id && 
-                     item.quantity > 0 && 
-                     item.harga_satuan > 0;
-      console.log(`Item validation:`, { item, isValid });
+      const hasProduct = item.product_variant_id && item.product_variant_id.trim() !== '';
+      const hasValidQty = item.quantity && Number(item.quantity) > 0;
+      const hasValidPrice = item.harga_satuan && Number(item.harga_satuan) > 0;
+      
+      const isValid = hasProduct && hasValidQty && hasValidPrice;
+      
+      console.log(`Item validation:`, { 
+        item, 
+        hasProduct, 
+        hasValidQty, 
+        hasValidPrice, 
+        isValid 
+      });
+      
       return isValid;
     });
     
@@ -178,7 +188,25 @@ const Sales = () => {
       console.log('No valid items found');
       toast({
         title: "Error",
-        description: "Minimal satu item produk harus diisi dengan lengkap",
+        description: "Minimal satu item produk harus diisi dengan lengkap (produk, quantity > 0, harga > 0)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Calculate totals to validate
+    const subtotalCheck = validItems.reduce((sum, item) => {
+      return sum + (Number(item.quantity) * Number(item.harga_satuan));
+    }, 0);
+
+    const totalCheck = subtotalCheck + (Number(formData.ongkir) || 0) - (Number(formData.diskon) || 0);
+
+    console.log('Pre-submission calculations:', { subtotalCheck, totalCheck });
+
+    if (subtotalCheck <= 0 || totalCheck <= 0) {
+      toast({
+        title: "Error",
+        description: "Total pembelian harus lebih dari 0",
         variant: "destructive",
       });
       return;
@@ -201,7 +229,7 @@ const Sales = () => {
         }
         
         const availableStock = product.stok || 0;
-        if (item.quantity > availableStock) {
+        if (Number(item.quantity) > availableStock) {
           toast({
             title: "Stok Tidak Mencukupi",
             description: `${product?.product?.nama_produk} (${product?.warna}-${product?.size}) - Stok tersedia: ${availableStock}, diminta: ${item.quantity}`,
@@ -212,7 +240,7 @@ const Sales = () => {
       }
     }
     
-    // Prepare sale data
+    // Prepare sale data - ensure all numeric values are proper numbers
     const saleData = {
       tanggal: formData.tanggal,
       no_pesanan_platform: formData.no_pesanan_platform.trim(),
@@ -227,22 +255,29 @@ const Sales = () => {
       notes: formData.notes?.trim() || null,
     };
     
-    console.log('Prepared sale data:', saleData);
-    console.log('Valid items for submission:', validItems);
+    // Ensure valid items have proper numeric values
+    const cleanedValidItems = validItems.map(item => ({
+      product_variant_id: item.product_variant_id,
+      quantity: Number(item.quantity),
+      harga_satuan: Number(item.harga_satuan)
+    }));
+    
+    console.log('Final prepared sale data:', saleData);
+    console.log('Final cleaned valid items:', cleanedValidItems);
     
     try {
       let result;
       if (editingSale) {
         console.log('Updating existing sale:', editingSale.id);
-        result = await updateSale(editingSale.id, saleData, validItems, editingSale.sale_items);
+        result = await updateSale(editingSale.id, saleData, cleanedValidItems, editingSale.sale_items);
       } else {
         console.log('Creating new sale...');
-        result = await createSale(saleData, validItems);
+        result = await createSale(saleData, cleanedValidItems);
       }
       
       console.log('Operation result:', result);
       
-      if (result && !result.error) {
+      if (result && result.success) {
         console.log('Success! Closing dialog...');
         setDialogOpen(false);
         resetForm();
@@ -257,7 +292,7 @@ const Sales = () => {
         console.log('Error in operation:', result);
         toast({
           title: "Error",
-          description: result?.message || "Gagal menyimpan penjualan",
+          description: result?.error?.message || result?.message || "Gagal menyimpan penjualan",
           variant: "destructive",
         });
       }

@@ -1,4 +1,4 @@
-// src/hooks/useSales.tsx (Kode Lengkap Baru)
+// src/hooks/useSales.tsx (Perbaikan Perhitungan Subtotal)
 
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -72,14 +72,60 @@ export const useSales = () => {
   const createSale = async (saleData: any, items: any[]) => {
     setLoading(true);
     try {
-      const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.harga_satuan)), 0);
-      const total = subtotal + (Number(saleData.ongkir) || 0) - (Number(saleData.diskon) || 0);
+      console.log('=== CREATE SALE FUNCTION START ===');
+      console.log('Received saleData:', saleData);
+      console.log('Received items:', items);
+
+      // Validasi items terlebih dahulu
+      if (!items || items.length === 0) {
+        throw new Error('Items tidak boleh kosong');
+      }
+
+      // Hitung subtotal dengan validasi yang ketat
+      let subtotal = 0;
+      for (const item of items) {
+        const quantity = Number(item.quantity) || 0;
+        const harga_satuan = Number(item.harga_satuan) || 0;
+        
+        if (quantity <= 0 || harga_satuan <= 0) {
+          throw new Error(`Item tidak valid: qty=${quantity}, harga=${harga_satuan}`);
+        }
+        
+        subtotal += quantity * harga_satuan;
+      }
+
+      // Hitung total dengan validasi
+      const ongkir = Number(saleData.ongkir) || 0;
+      const diskon = Number(saleData.diskon) || 0;
+      const total = subtotal + ongkir - diskon;
+
+      console.log('Calculated values:', { subtotal, ongkir, diskon, total });
+
+      // Pastikan subtotal dan total tidak null atau 0
+      if (subtotal <= 0) {
+        throw new Error('Subtotal harus lebih dari 0');
+      }
+      if (total <= 0) {
+        throw new Error('Total harus lebih dari 0');
+      }
 
       const completeData = {
-        ...saleData,
-        subtotal,
-        total
+        tanggal: saleData.tanggal,
+        no_pesanan_platform: saleData.no_pesanan_platform,
+        store_id: saleData.store_id,
+        customer_name: saleData.customer_name,
+        customer_phone: saleData.customer_phone || null,
+        customer_address: saleData.customer_address || null,
+        ongkir: ongkir,
+        diskon: diskon,
+        no_resi: saleData.no_resi || null,
+        status: saleData.status,
+        notes: saleData.notes || null,
+        subtotal: subtotal,
+        total: total
       };
+
+      console.log('Complete sale data to insert:', completeData);
 
       const { data: saleResult, error: saleError } = await supabase
         .from('sales')
@@ -87,24 +133,45 @@ export const useSales = () => {
         .select()
         .single();
 
-      if (saleError) throw saleError;
+      if (saleError) {
+        console.error('Sale insert error:', saleError);
+        throw saleError;
+      }
 
-      const saleItems = items.map(item => ({
-        sale_id: saleResult.id,
-        product_variant_id: item.product_variant_id,
-        quantity: Number(item.quantity),
-        harga_satuan: Number(item.harga_satuan),
-        subtotal: Number(item.quantity) * Number(item.harga_satuan)
-      }));
+      console.log('Sale inserted successfully:', saleResult);
+
+      // Insert sale items dengan perhitungan subtotal per item
+      const saleItems = items.map(item => {
+        const itemQuantity = Number(item.quantity);
+        const itemHarga = Number(item.harga_satuan);
+        const itemSubtotal = itemQuantity * itemHarga;
+        
+        return {
+          sale_id: saleResult.id,
+          product_variant_id: item.product_variant_id,
+          quantity: itemQuantity,
+          harga_satuan: itemHarga,
+          subtotal: itemSubtotal
+        };
+      });
+
+      console.log('Sale items to insert:', saleItems);
 
       const { error: itemsError } = await supabase
         .from('sale_items')
         .insert(saleItems);
 
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error('Sale items insert error:', itemsError);
+        throw itemsError;
+      }
+
+      console.log('Sale items inserted successfully');
 
       // Create stock movements and update stock only for shipped/delivered sales
       if (saleData.status === 'shipped' || saleData.status === 'delivered') {
+        console.log('Processing stock movements for shipped/delivered sale...');
+        
         for (const item of items) {
           // Update stock
           const { data: currentStock, error: stockFetchError } = await supabase
@@ -127,7 +194,7 @@ export const useSales = () => {
 
           if (stockError) console.error('Stock update error:', stockError);
 
-          // Create stock movement record with enhanced details
+          // Create stock movement record
           const { error: movementError } = await supabase
             .from('stock_movements')
             .insert([{
@@ -143,6 +210,8 @@ export const useSales = () => {
         }
       }
 
+      console.log('=== CREATE SALE FUNCTION SUCCESS ===');
+
       toast({
         title: "Sukses",
         description: "Penjualan berhasil ditambahkan",
@@ -151,13 +220,13 @@ export const useSales = () => {
       await fetchSales();
       return { success: true, data: saleResult, error: null };
     } catch (error) {
-      console.error('Error creating sale:', error);
+      console.error('=== CREATE SALE FUNCTION ERROR ===', error);
       toast({
         title: "Error",
         description: "Gagal menambahkan penjualan: " + (error as Error).message,
         variant: "destructive",
       });
-      return { error: true };
+      return { success: false, error: error };
     } finally {
       setLoading(false);
     }
@@ -166,8 +235,26 @@ export const useSales = () => {
   const updateSale = async (saleId: string, saleData: any, items: any[], existingItems?: any[]) => {
     setLoading(true);
     try {
-      const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.harga_satuan)), 0);
-      const total = subtotal + (Number(saleData.ongkir) || 0) - (Number(saleData.diskon) || 0);
+      // Hitung subtotal dengan validasi yang sama
+      let subtotal = 0;
+      for (const item of items) {
+        const quantity = Number(item.quantity) || 0;
+        const harga_satuan = Number(item.harga_satuan) || 0;
+        
+        if (quantity <= 0 || harga_satuan <= 0) {
+          throw new Error(`Item tidak valid: qty=${quantity}, harga=${harga_satuan}`);
+        }
+        
+        subtotal += quantity * harga_satuan;
+      }
+
+      const ongkir = Number(saleData.ongkir) || 0;
+      const diskon = Number(saleData.diskon) || 0;
+      const total = subtotal + ongkir - diskon;
+
+      if (subtotal <= 0 || total <= 0) {
+        throw new Error('Subtotal dan total harus lebih dari 0');
+      }
 
       const { data: oldSaleData, error: oldSaleError } = await supabase
         .from('sales')
@@ -182,7 +269,11 @@ export const useSales = () => {
       
       console.log('Update Sale - Old Status:', oldStatus, 'New Status:', newStatus);
 
-      const completeData = { ...saleData, subtotal, total };
+      const completeData = { 
+        ...saleData, 
+        subtotal: subtotal, 
+        total: total 
+      };
 
       const { error: saleError } = await supabase.from('sales').update(completeData).eq('id', saleId);
       if (saleError) throw saleError;
