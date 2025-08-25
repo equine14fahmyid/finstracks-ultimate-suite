@@ -56,12 +56,11 @@ export const SaleForm: React.FC<SaleFormProps> = ({
         if (i === index) {
           const updatedItem = { ...item, [field]: value };
 
-          if (field === 'product_variant_id' && value && !item.product_name) {
+          // Auto-fill price when product is selected
+          if (field === 'product_variant_id' && value) {
             const product = stockProducts?.find(p => p?.id === value);
-            if (product?.product) {
-              updatedItem.harga_satuan = product.product.harga_jual_default || 0;
-              updatedItem.product_name = product.product.nama_produk || '';
-              updatedItem.variant_display = `${product.warna || ''} - ${product.size || ''}`;
+            if (product?.product?.harga_jual_default) {
+              updatedItem.harga_satuan = Number(product.product.harga_jual_default);
             }
           }
 
@@ -74,32 +73,17 @@ export const SaleForm: React.FC<SaleFormProps> = ({
 
   const calculateSubtotal = () => {
     return formData.items.reduce((sum, item) =>
-      sum + (item.quantity * item.harga_satuan), 0
+      sum + (Number(item.quantity || 0) * Number(item.harga_satuan || 0)), 0
     );
   };
 
   const calculateTotal = () => {
-    return calculateSubtotal() + formData.ongkir - formData.diskon;
+    return calculateSubtotal() + Number(formData.ongkir || 0) - Number(formData.diskon || 0);
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate form before submitting
-    if (!formData.no_pesanan_platform || !formData.customer_name || !formData.store_id) {
-      alert('Mohon lengkapi data yang wajib diisi');
-      return;
-    }
-    
-    const validItems = formData.items.filter(item => 
-      item.product_variant_id && item.quantity > 0 && item.harga_satuan > 0
-    );
-    
-    if (validItems.length === 0) {
-      alert('Minimal satu item produk harus diisi dengan lengkap');
-      return;
-    }
-    
+    console.log('Form submit triggered with data:', formData);
     onSubmit(e);
   };
 
@@ -151,9 +135,9 @@ export const SaleForm: React.FC<SaleFormProps> = ({
                 <SelectContent>
                   {stores?.map((store) => (
                     <SelectItem key={store.id} value={store.id}>
-                      {store?.nama_toko || 'Toko'} - {store?.platform?.nama_platform || 'Platform'}
+                      {store?.nama_toko} - {store?.platform?.nama_platform}
                     </SelectItem>
-                  )) || <SelectItem value="" disabled>Tidak ada toko</SelectItem>}
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -198,7 +182,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
                 <Label htmlFor="customer_phone" className="text-sm font-medium">No. HP Customer</Label>
                 <Input 
                   id="customer_phone" 
-                  value={formData.customer_phone} 
+                  value={formData.customer_phone || ''} 
                   onChange={(e) => setFormData(prev => ({ ...prev, customer_phone: e.target.value }))} 
                   placeholder="081234567890" 
                   className="w-full"
@@ -209,7 +193,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
                 <Label htmlFor="customer_address" className="text-sm font-medium">Alamat Customer</Label>
                 <Textarea 
                   id="customer_address" 
-                  value={formData.customer_address} 
+                  value={formData.customer_address || ''} 
                   onChange={(e) => setFormData(prev => ({ ...prev, customer_address: e.target.value }))} 
                   placeholder="Alamat lengkap customer" 
                   rows={2}
@@ -239,7 +223,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
               {formData.items.map((item, index) => (
                 <div key={index} className="grid grid-cols-1 lg:grid-cols-6 gap-3 p-4 border rounded-lg bg-card">
                   <div className="lg:col-span-2 space-y-2">
-                    <Label className="text-sm font-medium">Produk</Label>
+                    <Label className="text-sm font-medium">Produk *</Label>
                     <Select 
                       value={item.product_variant_id} 
                       onValueChange={(value) => updateItem(index, 'product_variant_id', value)}
@@ -248,32 +232,34 @@ export const SaleForm: React.FC<SaleFormProps> = ({
                         <SelectValue placeholder="Pilih produk" />
                       </SelectTrigger>
                       <SelectContent>
-                        {stockProducts?.filter(product => product?.stok > 0).map((product) => (
+                        {stockProducts?.map((product) => (
                           <SelectItem key={product.id} value={product.id}>
                             {product?.product?.nama_produk} - {product?.warna} {product?.size} (Stok: {product?.stok})
                           </SelectItem>
-                        )) || <SelectItem value="" disabled>Tidak ada produk</SelectItem>}
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Qty</Label>
+                    <Label className="text-sm font-medium">Qty *</Label>
                     <Input 
                       type="number" 
-                      value={item.quantity || ''} 
+                      value={item.quantity || 1} 
                       onChange={(e) => updateItem(index, 'quantity', Number(e.target.value) || 1)} 
                       min="1"
+                      required
                       className="w-full"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Harga Satuan</Label>
+                    <Label className="text-sm font-medium">Harga Satuan *</Label>
                     <InputCurrency
                       value={item.harga_satuan || 0}
                       onValueChange={(value) => updateItem(index, 'harga_satuan', value)}
                       className="w-full"
+                      required
                     />
                   </div>
 
@@ -328,7 +314,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
               <Label htmlFor="no_resi" className="text-sm font-medium">No. Resi</Label>
               <Input 
                 id="no_resi" 
-                value={formData.no_resi} 
+                value={formData.no_resi || ''} 
                 onChange={(e) => setFormData(prev => ({ ...prev, no_resi: e.target.value }))} 
                 placeholder="JNE123456789" 
                 className="w-full"
@@ -341,7 +327,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
             <Label htmlFor="notes" className="text-sm font-medium">Catatan</Label>
             <Textarea 
               id="notes" 
-              value={formData.notes} 
+              value={formData.notes || ''} 
               onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} 
               placeholder="Catatan tambahan..." 
               rows={3}

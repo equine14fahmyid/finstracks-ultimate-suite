@@ -140,23 +140,42 @@ const Sales = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('Form submitted with data:', formData);
+    console.log('=== FORM SUBMISSION START ===');
+    console.log('Form data received:', formData);
     
-    // Basic validation
-    if (!formData.no_pesanan_platform || !formData.customer_name || !formData.store_id) {
-      toast({
-        title: "Error",
-        description: "Mohon lengkapi data penjualan yang wajib diisi",
-        variant: "destructive",
-      });
-      return;
+    // Enhanced validation
+    const requiredFields = {
+      no_pesanan_platform: 'No. Pesanan Platform',
+      customer_name: 'Nama Customer',
+      store_id: 'Toko'
+    };
+
+    // Check required fields
+    for (const [field, label] of Object.entries(requiredFields)) {
+      if (!formData[field as keyof SaleFormData]) {
+        console.log(`Missing required field: ${field}`);
+        toast({
+          title: "Error",
+          description: `${label} wajib diisi`,
+          variant: "destructive",
+        });
+        return;
+      }
     }
     
-    const validItems = formData.items.filter(item =>
-      item.product_variant_id && item.quantity > 0 && item.harga_satuan > 0
-    );
+    // Validate items
+    const validItems = formData.items.filter(item => {
+      const isValid = item.product_variant_id && 
+                     item.quantity > 0 && 
+                     item.harga_satuan > 0;
+      console.log(`Item validation:`, { item, isValid });
+      return isValid;
+    });
+    
+    console.log('Valid items found:', validItems.length, validItems);
     
     if (validItems.length === 0) {
+      console.log('No valid items found');
       toast({
         title: "Error",
         description: "Minimal satu item produk harus diisi dengan lengkap",
@@ -165,12 +184,13 @@ const Sales = () => {
       return;
     }
     
-    console.log('Valid items:', validItems);
-    
-    // Stock validation only for shipped and delivered status
+    // Stock validation for shipped/delivered items
     if (formData.status === 'shipped' || formData.status === 'delivered') {
+      console.log('Checking stock for shipped/delivered items...');
       for (const item of validItems) {
         const product = stockProducts?.find(p => p?.id === item.product_variant_id);
+        console.log(`Stock check for item:`, { item, product });
+        
         if (!product) {
           toast({
             title: "Error",
@@ -181,22 +201,10 @@ const Sales = () => {
         }
         
         const availableStock = product.stok || 0;
-        let adjustedStock = availableStock;
-        
-        // If editing, add back the existing quantity for this product
-        if (editingSale) {
-          const existingItem = editingSale.sale_items?.find((existing: any) =>
-            existing.product_variant_id === item.product_variant_id
-          );
-          if (existingItem) {
-            adjustedStock += existingItem.quantity;
-          }
-        }
-        
-        if (item.quantity > adjustedStock) {
+        if (item.quantity > availableStock) {
           toast({
             title: "Stok Tidak Mencukupi",
-            description: `${product?.product?.nama_produk} (${product?.warna}-${product?.size}) - Stok tersedia: ${adjustedStock}, diminta: ${item.quantity}`,
+            description: `${product?.product?.nama_produk} (${product?.warna}-${product?.size}) - Stok tersedia: ${availableStock}, diminta: ${item.quantity}`,
             variant: "destructive",
           });
           return;
@@ -207,46 +215,62 @@ const Sales = () => {
     // Prepare sale data
     const saleData = {
       tanggal: formData.tanggal,
-      no_pesanan_platform: formData.no_pesanan_platform,
+      no_pesanan_platform: formData.no_pesanan_platform.trim(),
       store_id: formData.store_id,
-      customer_name: formData.customer_name,
-      customer_phone: formData.customer_phone || null,
-      customer_address: formData.customer_address || null,
-      ongkir: formData.ongkir || 0,
-      diskon: formData.diskon || 0,
-      no_resi: formData.no_resi || null,
+      customer_name: formData.customer_name.trim(),
+      customer_phone: formData.customer_phone?.trim() || null,
+      customer_address: formData.customer_address?.trim() || null,
+      ongkir: Number(formData.ongkir) || 0,
+      diskon: Number(formData.diskon) || 0,
+      no_resi: formData.no_resi?.trim() || null,
       status: formData.status,
-      notes: formData.notes || null,
+      notes: formData.notes?.trim() || null,
     };
     
     console.log('Prepared sale data:', saleData);
+    console.log('Valid items for submission:', validItems);
     
-    let result;
     try {
+      let result;
       if (editingSale) {
+        console.log('Updating existing sale:', editingSale.id);
         result = await updateSale(editingSale.id, saleData, validItems, editingSale.sale_items);
       } else {
+        console.log('Creating new sale...');
         result = await createSale(saleData, validItems);
       }
       
-      console.log('Sale operation result:', result);
+      console.log('Operation result:', result);
       
-      if (!result.error) {
+      if (result && !result.error) {
+        console.log('Success! Closing dialog...');
         setDialogOpen(false);
         resetForm();
         toast({
           title: "Sukses",
           description: editingSale ? "Penjualan berhasil diperbarui" : "Penjualan berhasil ditambahkan",
         });
+        // Refresh data
+        await fetchSales();
+        await fetchStock();
+      } else {
+        console.log('Error in operation:', result);
+        toast({
+          title: "Error",
+          description: result?.message || "Gagal menyimpan penjualan",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error in handleSubmit:', error);
       toast({
         title: "Error",
-        description: "Terjadi kesalahan saat menyimpan penjualan",
+        description: `Terjadi kesalahan: ${(error as Error).message}`,
         variant: "destructive",
       });
     }
+    
+    console.log('=== FORM SUBMISSION END ===');
   };
 
   const handleEdit = (sale: any) => {
