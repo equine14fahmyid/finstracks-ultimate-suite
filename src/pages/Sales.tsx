@@ -1,19 +1,14 @@
-// src/pages/Sales.tsx (Kode Lengkap dengan Perbaikan Final untuk Responsivitas)
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { Plus, ShoppingCart, Edit, Trash2, Download } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSales, useStock, useExpeditions, useStores } from '@/hooks/useSupabase';
 import type { SaleStatus } from '@/hooks/useSales';
-import { DataTable } from '@/components/common/DataTable';
+import { OptimizedDataTable } from '@/components/common/OptimizedDataTable';
 import { formatCurrency, formatShortDate, formatDate } from '@/utils/format';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -21,32 +16,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { exportDataTableAsPDF } from '@/utils/pdfExport';
 import { exportToCSV } from '@/utils/csvExport';
 import DateFilter from '@/components/dashboard/DateFilter';
+import { SaleForm } from '@/components/sales/SaleForm';
+import { handleSaldoUpdate, handleStatusUpdate } from '@/components/sales/SaleHelpers';
+import type { SaleFormData } from '@/types/forms';
 
 interface DateRange {
   from: Date | undefined;
   to: Date | undefined;
-}
-
-interface SaleFormData {
-  tanggal: string;
-  no_pesanan_platform: string;
-  store_id: string;
-  customer_name: string;
-  customer_phone: string;
-  customer_address: string;
-  ongkir: number;
-  diskon: number;
-  no_resi: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned';
-  notes: string;
-  items: {
-    id?: string;
-    product_variant_id: string;
-    quantity: number;
-    harga_satuan: number;
-    product_name?: string;
-    variant_display?: string;
-  }[];
 }
 
 const Sales = () => {
@@ -157,161 +133,8 @@ const Sales = () => {
       });
   };
 
-  const handleSaldoUpdate = async (currentSale: any, newStatus: string) => {
-    try {
-      let saldoChange = 0;
-
-      if (newStatus === 'delivered' && currentSale.status !== 'delivered') {
-        saldoChange = currentSale.total;
-      }
-      else if (currentSale.status === 'delivered' && newStatus !== 'delivered') {
-        saldoChange = -currentSale.total;
-      }
-
-      if (saldoChange !== 0) {
-        const { data: currentStore, error: fetchError } = await supabase
-          .from('stores')
-          .select('saldo_dashboard')
-          .eq('id', currentSale.store_id)
-          .single();
-
-        if (fetchError) {
-          console.error('Error fetching store:', fetchError);
-          return;
-        }
-
-        const newSaldo = (currentStore.saldo_dashboard || 0) + saldoChange;
-
-        const { error } = await supabase
-          .from('stores')
-          .update({ saldo_dashboard: newSaldo })
-          .eq('id', currentSale.store_id);
-
-        if (error) {
-          console.error('Error updating store saldo:', error);
-        } else {
-          console.log('Store saldo updated:', { storeId: currentSale.store_id, change: saldoChange, newSaldo });
-        }
-      }
-    } catch (error) {
-      console.error('Error in handleSaldoUpdate:', error);
-    }
-  };
-
-  const handleStatusUpdate = async (saleId: string, newStatus: string, currentSale: any) => {
-    try {
-      const { data: saleItems, error: itemsError } = await supabase
-        .from('sale_items')
-        .select(`
-          *,
-          product_variant:product_variants(
-            id, 
-            stok,
-            products(nama_produk)
-          )
-        `)
-        .eq('sale_id', saleId);
-      
-      if (itemsError) {
-        throw new Error('Gagal mengambil data item penjualan');
-      }
-      
-      const oldStatus = currentSale.status;
-      
-      for (const item of saleItems || []) {
-        const { data: currentStock, error: stockFetchError } = await supabase
-          .from('product_variants')
-          .select('stok')
-          .eq('id', item.product_variant_id)
-          .single();
-        
-        if (stockFetchError) {
-          console.error('Error fetching stock:', stockFetchError);
-          continue;
-        }
-        
-        let stockChange = 0;
-        let movementType: 'in' | 'out' | null = null;
-        let notes = '';
-        
-        if (oldStatus !== 'shipped' && oldStatus !== 'delivered' &&
-          (newStatus === 'shipped' || newStatus === 'delivered')) {
-          stockChange = -item.quantity;
-          movementType = 'out';
-          notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
-          
-          if ((currentStock.stok || 0) < item.quantity) {
-            throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
-          }
-        }
-        else if ((oldStatus === 'shipped' || oldStatus === 'delivered') &&
-          (newStatus === 'cancelled' || newStatus === 'returned')) {
-          stockChange = item.quantity;
-          movementType = 'in';
-          notes = `Pengembalian stok - status berubah ke ${getStatusLabel(newStatus)}`;
-        }
-        else if ((oldStatus === 'cancelled' || oldStatus === 'returned') &&
-          (newStatus === 'shipped' || newStatus === 'delivered')) {
-          stockChange = -item.quantity;
-          movementType = 'out';
-          notes = `Pengurangan stok - status berubah ke ${getStatusLabel(newStatus)}`;
-          
-          if ((currentStock.stok || 0) < item.quantity) {
-            throw new Error(`Stok tidak mencukupi untuk ${item.product_variant?.products?.nama_produk || 'produk'}. Tersedia: ${currentStock.stok || 0}, dibutuhkan: ${item.quantity}`);
-          }
-        }
-        
-        if (stockChange !== 0 && movementType) {
-          const newStockLevel = (currentStock.stok || 0) + stockChange;
-          
-          const { error: stockUpdateError } = await supabase
-            .from('product_variants')
-            .update({ stok: newStockLevel })
-            .eq('id', item.product_variant_id);
-          
-          if (stockUpdateError) {
-            console.error('Error updating stock:', stockUpdateError);
-            continue;
-          }
-          
-          const { error: movementError } = await supabase
-            .from('stock_movements')
-            .insert([{
-              product_variant_id: item.product_variant_id,
-              movement_type: movementType,
-              quantity: Math.abs(stockChange),
-              reference_type: 'sale_status_change',
-              reference_id: saleId,
-              notes: notes
-            }]);
-          
-          if (movementError) {
-            console.error('Error inserting movement:', movementError);
-          }
-        }
-      }
-      
-      const result = await updateSaleStatus(saleId, newStatus as SaleStatus);
-      
-      if (result.success) {
-        toast({
-          title: "Sukses",
-          description: `Status pesanan berhasil diubah ke ${getStatusLabel(newStatus)}`,
-        });
-        await handleSaldoUpdate(currentSale, newStatus);
-        await fetchSales();
-        await fetchStock();
-      } else {
-        throw new Error(result.message || 'Gagal mengubah status');
-      }
-    } catch (error) {
-      console.error('Error in handleStatusUpdate:', error);
-      toast({
-        title: "Error",
-        description: `Gagal mengubah status pesanan: ${(error as any)?.message || 'Unknown error'}`,
-        variant: "destructive",
-      });
-    }
+  const handleStatusUpdateWrapper = (saleId: string, newStatus: string, currentSale: any) => {
+    return handleStatusUpdate(saleId, newStatus, currentSale, updateSaleStatus, fetchSales, fetchStock);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -450,53 +273,6 @@ const Sales = () => {
     });
   };
 
-  const addItem = () => {
-    setFormData(prev => ({
-      ...prev,
-      items: [...prev.items, { product_variant_id: '', quantity: 1, harga_satuan: 0 }]
-    }));
-  };
-
-  const removeItem = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index)
-    }));
-  };
-
-  const updateItem = (index: number, field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      items: prev.items.map((item, i) => {
-        if (i === index) {
-          const updatedItem = { ...item, [field]: value };
-
-          if (field === 'product_variant_id' && value && !item.product_name) {
-            const product = stockProducts?.find(p => p?.id === value);
-            if (product?.products) {
-              updatedItem.harga_satuan = product.products.harga_jual_default || 0;
-              updatedItem.product_name = product.products.nama_produk || '';
-              updatedItem.variant_display = `${product.warna || ''} - ${product.size || ''}`;
-            }
-          }
-
-          return updatedItem;
-        }
-        return item;
-      })
-    }));
-  };
-
-  const calculateSubtotal = () => {
-    return formData.items.reduce((sum, item) =>
-      sum + (item.quantity * item.harga_satuan), 0
-    );
-  };
-
-  const calculateTotal = () => {
-    return calculateSubtotal() + formData.ongkir - formData.diskon;
-  };
-  
   const columns = [
     {
       key: 'tanggal',
@@ -564,7 +340,7 @@ const Sales = () => {
         <div className="space-y-2">
           <Select
             value={sale?.status || 'pending'}
-            onValueChange={(newStatus) => handleStatusUpdate(sale.id, newStatus, sale)}
+            onValueChange={(newStatus) => handleStatusUpdateWrapper(sale.id, newStatus, sale)}
           >
             <SelectTrigger className="w-full">
               <SelectValue />
@@ -638,147 +414,31 @@ const Sales = () => {
         </div>
         
         {hasPermission('sales.create') && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gradient-primary w-full sm:w-auto" onClick={resetForm}>
-                <Plus className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">{editingSale ? 'Edit Penjualan' : 'Tambah Penjualan'}</span>
-                <span className="sm:hidden">{editingSale ? 'Edit' : 'Tambah'}</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingSale ? 'Edit Penjualan' : 'Tambah Penjualan Baru'}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Form di dalam Dialog perlu dibuat responsif juga */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="tanggal">Tanggal *</Label>
-                    <Input id="tanggal" type="date" value={formData.tanggal} onChange={(e) => setFormData(prev => ({ ...prev, tanggal: e.target.value }))} required />
-                  </div>
-                  <div>
-                    <Label htmlFor="no_pesanan_platform">No. Pesanan Platform *</Label>
-                    <Input id="no_pesanan_platform" value={formData.no_pesanan_platform} onChange={(e) => setFormData(prev => ({ ...prev, no_pesanan_platform: e.target.value }))} placeholder="TKP12345678" required />
-                  </div>
-                  <div>
-                    <Label htmlFor="store_id">Toko *</Label>
-                    <Select value={formData.store_id} onValueChange={(value) => setFormData(prev => ({ ...prev, store_id: value }))}>
-                      <SelectTrigger><SelectValue placeholder="Pilih toko" /></SelectTrigger>
-                      <SelectContent>
-                        {stores?.map((store) => (
-                          <SelectItem key={store.id} value={store.id}>
-                            {store?.nama_toko || 'Toko'} - {store?.platform?.nama_platform || 'Platform'}
-                          </SelectItem>
-                        )) || <SelectItem value="" disabled>Tidak ada toko</SelectItem>}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="customer_name">Nama Customer *</Label>
-                    <Input id="customer_name" value={formData.customer_name} onChange={(e) => setFormData(prev => ({ ...prev, customer_name: e.target.value }))} placeholder="John Doe" required />
-                  </div>
-                  <div>
-                    <Label htmlFor="customer_phone">No. HP Customer</Label>
-                    <Input id="customer_phone" value={formData.customer_phone} onChange={(e) => setFormData(prev => ({ ...prev, customer_phone: e.target.value }))} placeholder="081234567890" />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Label htmlFor="customer_address">Alamat Customer</Label>
-                    <Textarea id="customer_address" value={formData.customer_address} onChange={(e) => setFormData(prev => ({ ...prev, customer_address: e.target.value }))} placeholder="Alamat lengkap customer" rows={2}/>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <Label>Detail Produk *</Label>
-                    <Button type="button" size="sm" variant="outline" onClick={addItem}><Plus className="h-4 w-4 mr-1" />Tambah Item</Button>
-                  </div>
-                  <div className="space-y-3">
-                    {formData.items.map((item, index) => (
-                      <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-2 p-3 border rounded-lg">
-                        <div className="md:col-span-2">
-                          <Label>Produk</Label>
-                          <Select value={item.product_variant_id} onValueChange={(value) => updateItem(index, 'product_variant_id', value)}>
-                            <SelectTrigger><SelectValue placeholder="Pilih produk" /></SelectTrigger>
-                            <SelectContent>
-                              {stockProducts?.map((product) => (
-                                <SelectItem key={product.id} value={product.id}>
-                                  {product?.products?.nama_produk} - {product?.warna} {product?.size} (Stok: {product?.stok})
-                                </SelectItem>
-                              )) || <SelectItem value="" disabled>Tidak ada produk</SelectItem>}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label>Qty</Label>
-                          <Input type="number" value={item.quantity} onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))} min="1"/>
-                        </div>
-                        <div>
-                          <Label>Harga Satuan</Label>
-                          <Input type="number" value={item.harga_satuan} onChange={(e) => updateItem(index, 'harga_satuan', Number(e.target.value))} min="0" />
-                        </div>
-                        <div className="flex items-end">
-                          <div className="w-full">
-                            <Label>Subtotal</Label>
-                            <div className="text-sm font-medium p-2 bg-muted rounded">{formatCurrency(item.quantity * item.harga_satuan)}</div>
-                          </div>
-                          {formData.items.length > 1 && (
-                            <Button type="button" size="sm" variant="outline" onClick={() => removeItem(index)} className="ml-2">×</Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="ongkir">Ongkos Kirim</Label>
-                    <Input id="ongkir" type="number" value={formData.ongkir} onChange={(e) => setFormData(prev => ({ ...prev, ongkir: Number(e.target.value) }))} min="0" />
-                  </div>
-                  <div>
-                    <Label htmlFor="diskon">Diskon</Label>
-                    <Input id="diskon" type="number" value={formData.diskon} onChange={(e) => setFormData(prev => ({ ...prev, diskon: Number(e.target.value) }))} min="0" />
-                  </div>
-                  <div>
-                    <Label htmlFor="status">Status</Label>
-                    <Select value={formData.status} onValueChange={(value: any) => setFormData(prev => ({ ...prev, status: value }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="processing">Diproses</SelectItem>
-                        <SelectItem value="shipped">Dikirim</SelectItem>
-                        <SelectItem value="delivered">Selesai</SelectItem>
-                        <SelectItem value="cancelled">Dibatal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="no_resi">No. Resi</Label>
-                  <Input id="no_resi" value={formData.no_resi} onChange={(e) => setFormData(prev => ({ ...prev, no_resi: e.target.value }))} placeholder="JNE123456789" />
-                </div>
-                <div>
-                  <Label htmlFor="notes">Catatan</Label>
-                  <Textarea id="notes" value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} placeholder="Catatan tambahan..." rows={3} />
-                </div>
-                <div className="bg-muted p-4 rounded-lg">
-                  <div className="space-y-2">
-                    <div className="flex justify-between"><span>Subtotal:</span><span>{formatCurrency(calculateSubtotal())}</span></div>
-                    <div className="flex justify-between"><span>Ongkos Kirim:</span><span>{formatCurrency(formData.ongkir)}</span></div>
-                    <div className="flex justify-between"><span>Diskon:</span><span>-{formatCurrency(formData.diskon)}</span></div>
-                    <div className="flex justify-between font-bold text-lg"><span>Total:</span><span className="text-primary">{formatCurrency(calculateTotal())}</span></div>
-                  </div>
-                </div>
-                <div className="flex gap-2 pt-4">
-                  <Button type="submit" disabled={loading} className="gradient-primary">{loading ? 'Menyimpan...' : editingSale ? 'Update Penjualan' : 'Simpan Penjualan'}</Button>
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Batal</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button 
+            className="gradient-primary w-full sm:w-auto" 
+            onClick={() => {
+              resetForm();
+              setDialogOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Tambah Penjualan</span>
+            <span className="sm:hidden">Tambah</span>
+          </Button>
         )}
+
+        <SaleForm
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          formData={formData}
+          setFormData={setFormData}
+          onSubmit={handleSubmit}
+          loading={loading}
+          isEditing={!!editingSale}
+          stores={stores || []}
+          stockProducts={stockProducts || []}
+          onReset={resetForm}
+        />
       </div>
 
       <Card className="glass-card border-0">
@@ -803,7 +463,7 @@ const Sales = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable
+          <OptimizedDataTable
             data={sales || []}
             columns={columns}
             loading={loading}
