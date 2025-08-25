@@ -140,10 +140,13 @@ const Sales = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.no_pesanan_platform || !formData.customer_name || !formData.store_id || formData.items.length === 0) {
+    console.log('Form submitted with data:', formData);
+    
+    // Basic validation
+    if (!formData.no_pesanan_platform || !formData.customer_name || !formData.store_id) {
       toast({
         title: "Error",
-        description: "Mohon lengkapi data penjualan",
+        description: "Mohon lengkapi data penjualan yang wajib diisi",
         variant: "destructive",
       });
       return;
@@ -156,45 +159,52 @@ const Sales = () => {
     if (validItems.length === 0) {
       toast({
         title: "Error",
-        description: "Minimal satu item produk harus diisi",
+        description: "Minimal satu item produk harus diisi dengan lengkap",
         variant: "destructive",
       });
       return;
     }
     
-    for (const item of validItems) {
-      const product = stockProducts?.find(p => p?.id === item.product_variant_id);
-      if (!product) {
-        toast({
-          title: "Error",
-          description: "Produk tidak ditemukan",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      const availableStock = product.stok || 0;
-      let adjustedStock = availableStock;
-      
-      if (editingSale) {
-        const existingItem = editingSale.sale_items?.find((existing: any) =>
-          existing.product_variant_id === item.product_variant_id
-        );
-        if (existingItem) {
-          adjustedStock += existingItem.quantity;
+    console.log('Valid items:', validItems);
+    
+    // Stock validation only for shipped and delivered status
+    if (formData.status === 'shipped' || formData.status === 'delivered') {
+      for (const item of validItems) {
+        const product = stockProducts?.find(p => p?.id === item.product_variant_id);
+        if (!product) {
+          toast({
+            title: "Error",
+            description: "Produk tidak ditemukan dalam database",
+            variant: "destructive",
+          });
+          return;
         }
-      }
-      
-      if (item.quantity > adjustedStock) {
-        toast({
-          title: "Stok Tidak Mencukupi",
-          description: `${product?.products?.nama_produk} (${product?.warna}-${product?.size}) - Stok tersedia: ${adjustedStock}, diminta: ${item.quantity}`,
-          variant: "destructive",
-        });
-        return;
+        
+        const availableStock = product.stok || 0;
+        let adjustedStock = availableStock;
+        
+        // If editing, add back the existing quantity for this product
+        if (editingSale) {
+          const existingItem = editingSale.sale_items?.find((existing: any) =>
+            existing.product_variant_id === item.product_variant_id
+          );
+          if (existingItem) {
+            adjustedStock += existingItem.quantity;
+          }
+        }
+        
+        if (item.quantity > adjustedStock) {
+          toast({
+            title: "Stok Tidak Mencukupi",
+            description: `${product?.product?.nama_produk} (${product?.warna}-${product?.size}) - Stok tersedia: ${adjustedStock}, diminta: ${item.quantity}`,
+            variant: "destructive",
+          });
+          return;
+        }
       }
     }
     
+    // Prepare sale data
     const saleData = {
       tanggal: formData.tanggal,
       no_pesanan_platform: formData.no_pesanan_platform,
@@ -202,23 +212,40 @@ const Sales = () => {
       customer_name: formData.customer_name,
       customer_phone: formData.customer_phone || null,
       customer_address: formData.customer_address || null,
-      ongkir: formData.ongkir,
-      diskon: formData.diskon,
+      ongkir: formData.ongkir || 0,
+      diskon: formData.diskon || 0,
       no_resi: formData.no_resi || null,
       status: formData.status,
       notes: formData.notes || null,
     };
     
-    let result;
-    if (editingSale) {
-      result = await updateSale(editingSale.id, saleData, validItems, editingSale.sale_items);
-    } else {
-      result = await createSale(saleData, validItems);
-    }
+    console.log('Prepared sale data:', saleData);
     
-    if (!result.error) {
-      setDialogOpen(false);
-      resetForm();
+    let result;
+    try {
+      if (editingSale) {
+        result = await updateSale(editingSale.id, saleData, validItems, editingSale.sale_items);
+      } else {
+        result = await createSale(saleData, validItems);
+      }
+      
+      console.log('Sale operation result:', result);
+      
+      if (!result.error) {
+        setDialogOpen(false);
+        resetForm();
+        toast({
+          title: "Sukses",
+          description: editingSale ? "Penjualan berhasil diperbarui" : "Penjualan berhasil ditambahkan",
+        });
+      }
+    } catch (error) {
+      console.error('Error in handleSubmit:', error);
+      toast({
+        title: "Error",
+        description: "Terjadi kesalahan saat menyimpan penjualan",
+        variant: "destructive",
+      });
     }
   };
 

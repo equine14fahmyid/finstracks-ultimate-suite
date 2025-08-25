@@ -58,9 +58,9 @@ export const SaleForm: React.FC<SaleFormProps> = ({
 
           if (field === 'product_variant_id' && value && !item.product_name) {
             const product = stockProducts?.find(p => p?.id === value);
-            if (product?.products) {
-              updatedItem.harga_satuan = product.products.harga_jual_default || 0;
-              updatedItem.product_name = product.products.nama_produk || '';
+            if (product?.product) {
+              updatedItem.harga_satuan = product.product.harga_jual_default || 0;
+              updatedItem.product_name = product.product.nama_produk || '';
               updatedItem.variant_display = `${product.warna || ''} - ${product.size || ''}`;
             }
           }
@@ -82,6 +82,27 @@ export const SaleForm: React.FC<SaleFormProps> = ({
     return calculateSubtotal() + formData.ongkir - formData.diskon;
   };
 
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate form before submitting
+    if (!formData.no_pesanan_platform || !formData.customer_name || !formData.store_id) {
+      alert('Mohon lengkapi data yang wajib diisi');
+      return;
+    }
+    
+    const validItems = formData.items.filter(item => 
+      item.product_variant_id && item.quantity > 0 && item.harga_satuan > 0
+    );
+    
+    if (validItems.length === 0) {
+      alert('Minimal satu item produk harus diisi dengan lengkap');
+      return;
+    }
+    
+    onSubmit(e);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
@@ -91,7 +112,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={onSubmit} className="space-y-6">
+        <form onSubmit={handleFormSubmit} className="space-y-6">
           {/* Header Information */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -227,9 +248,9 @@ export const SaleForm: React.FC<SaleFormProps> = ({
                         <SelectValue placeholder="Pilih produk" />
                       </SelectTrigger>
                       <SelectContent>
-                        {stockProducts?.map((product) => (
+                        {stockProducts?.filter(product => product?.stok > 0).map((product) => (
                           <SelectItem key={product.id} value={product.id}>
-                            {product?.products?.nama_produk} - {product?.warna} {product?.size} (Stok: {product?.stok})
+                            {product?.product?.nama_produk} - {product?.warna} {product?.size} (Stok: {product?.stok})
                           </SelectItem>
                         )) || <SelectItem value="" disabled>Tidak ada produk</SelectItem>}
                       </SelectContent>
@@ -240,8 +261,8 @@ export const SaleForm: React.FC<SaleFormProps> = ({
                     <Label className="text-sm font-medium">Qty</Label>
                     <Input 
                       type="number" 
-                      value={item.quantity} 
-                      onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))} 
+                      value={item.quantity || ''} 
+                      onChange={(e) => updateItem(index, 'quantity', Number(e.target.value) || 1)} 
                       min="1"
                       className="w-full"
                     />
@@ -250,7 +271,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Harga Satuan</Label>
                     <InputCurrency
-                      value={item.harga_satuan}
+                      value={item.harga_satuan || 0}
                       onValueChange={(value) => updateItem(index, 'harga_satuan', value)}
                       className="w-full"
                     />
@@ -259,7 +280,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Subtotal</Label>
                     <div className="h-10 flex items-center px-3 bg-muted rounded-md text-sm font-medium">
-                      {formatCurrency(item.quantity * item.harga_satuan)}
+                      {formatCurrency((item.quantity || 0) * (item.harga_satuan || 0))}
                     </div>
                   </div>
 
@@ -287,7 +308,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
               <Label htmlFor="ongkir" className="text-sm font-medium">Ongkos Kirim</Label>
               <InputCurrency
                 id="ongkir"
-                value={formData.ongkir}
+                value={formData.ongkir || 0}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, ongkir: value }))}
                 className="w-full"
               />
@@ -297,7 +318,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
               <Label htmlFor="diskon" className="text-sm font-medium">Diskon</Label>
               <InputCurrency
                 id="diskon"
-                value={formData.diskon}
+                value={formData.diskon || 0}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, diskon: value }))}
                 className="w-full"
               />
@@ -338,11 +359,11 @@ export const SaleForm: React.FC<SaleFormProps> = ({
               </div>
               <div className="flex justify-between text-sm">
                 <span>Ongkos Kirim:</span>
-                <span className="font-medium">{formatCurrency(formData.ongkir)}</span>
+                <span className="font-medium">{formatCurrency(formData.ongkir || 0)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span>Diskon:</span>
-                <span className="font-medium text-red-500">-{formatCurrency(formData.diskon)}</span>
+                <span className="font-medium text-red-500">-{formatCurrency(formData.diskon || 0)}</span>
               </div>
               <div className="border-t pt-2 flex justify-between text-lg font-bold">
                 <span>Total:</span>
@@ -363,7 +384,10 @@ export const SaleForm: React.FC<SaleFormProps> = ({
             <Button 
               type="button" 
               variant="outline" 
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                onReset();
+                onOpenChange(false);
+              }}
               className="flex-1 sm:flex-none"
             >
               Batal

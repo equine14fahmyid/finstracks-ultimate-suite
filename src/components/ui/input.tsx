@@ -1,11 +1,10 @@
+
 import * as React from "react"
 import { cn } from "@/lib/utils"
+import { formatCurrency, parseFormattedNumber } from "@/utils/format"
 
-// ========================================================================
-// KOMPONEN INPUT ASLI (TIDAK ADA PERUBAHAN)
-// ========================================================================
-
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+export interface InputProps
+  extends React.InputHTMLAttributes<HTMLInputElement> {}
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, ...props }, ref) => {
@@ -13,7 +12,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       <input
         type={type}
         className={cn(
-          "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
         ref={ref}
@@ -24,50 +23,52 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 )
 Input.displayName = "Input"
 
-// ========================================================================
-// [BARU] KOMPONEN INPUT CURRENCY DITAMBAHKAN DI SINI
-// ========================================================================
-
-const formatNumber = (value: number | string): string => {
-  const num = typeof value === 'string' ? parseInt(value.replace(/[^0-9]/g, ''), 10) : value;
-  if (isNaN(num)) return '';
-  return new Intl.NumberFormat('id-ID').format(num);
-};
-
-const parseNumber = (value: string): number => {
-  return parseInt(value.replace(/[^0-9]/g, ''), 10) || 0;
-};
-
-export interface InputCurrencyProps extends Omit<InputProps, 'onChange' | 'value'> {
+export interface InputCurrencyProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
   value: number;
   onValueChange: (value: number) => void;
 }
 
 const InputCurrency = React.forwardRef<HTMLInputElement, InputCurrencyProps>(
   ({ className, value, onValueChange, ...props }, ref) => {
-    
-    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const parsedValue = parseNumber(event.target.value);
-      onValueChange(parsedValue);
+    const [displayValue, setDisplayValue] = React.useState('');
+
+    React.useEffect(() => {
+      if (value === 0) {
+        setDisplayValue('');
+      } else {
+        setDisplayValue(formatCurrency(value));
+      }
+    }, [value]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const inputValue = e.target.value;
+      
+      // Remove all non-digit characters
+      const numericValue = inputValue.replace(/[^\d]/g, '');
+      
+      if (numericValue === '') {
+        setDisplayValue('');
+        onValueChange(0);
+      } else {
+        const numValue = parseInt(numericValue, 10);
+        setDisplayValue(formatCurrency(numValue));
+        onValueChange(numValue);
+      }
     };
 
     return (
       <Input
-        ref={ref}
-        type="text" // Gunakan tipe text untuk menampilkan format
-        className={cn("text-right", className)} // Rata kanan untuk angka
-        value={formatNumber(value)}
+        type="text"
+        className={cn("text-right", className)}
+        value={displayValue}
         onChange={handleChange}
+        ref={ref}
         {...props}
       />
     )
   }
 )
 InputCurrency.displayName = "InputCurrency"
-
-
-// ========================================================================
-// [PERBAIKAN] PASTIKAN KEDUA KOMPONEN DIEKSPOR
-// ========================================================================
 
 export { Input, InputCurrency }
