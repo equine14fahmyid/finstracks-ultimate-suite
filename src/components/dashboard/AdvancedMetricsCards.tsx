@@ -2,70 +2,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package, Users } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
-
-interface MetricsData {
-  totalRevenue: number;
-  totalOrders: number;
-  averageOrderValue: number;
-  totalProducts: number;
-  lowStockCount: number;
-  activeCustomers: number;
-  revenueGrowth: number;
-  orderGrowth: number;
-}
+import { AdvancedAnalytics } from '@/hooks/useAdvancedAnalytics';
 
 interface AdvancedMetricsCardsProps {
-  data: MetricsData;
+  analytics: AdvancedAnalytics | null;
   loading?: boolean;
 }
 
-const AdvancedMetricsCards = ({ data, loading }: AdvancedMetricsCardsProps) => {
-  const metrics = [
-    {
-      title: 'Total Revenue',
-      value: formatCurrency(data.totalRevenue),
-      icon: DollarSign,
-      trend: data.revenueGrowth,
-      color: 'text-green-600'
-    },
-    {
-      title: 'Total Orders',
-      value: data.totalOrders.toString(),
-      icon: ShoppingCart,
-      trend: data.orderGrowth,
-      color: 'text-blue-600'
-    },
-    {
-      title: 'Rata-rata Order',
-      value: formatCurrency(data.averageOrderValue),
-      icon: TrendingUp,
-      trend: 0,
-      color: 'text-purple-600'
-    },
-    {
-      title: 'Total Products',
-      value: data.totalProducts.toString(),
-      icon: Package,
-      trend: 0,
-      color: 'text-orange-600'
-    },
-    {
-      title: 'Stok Rendah',
-      value: data.lowStockCount.toString(),
-      icon: TrendingDown,
-      trend: 0,
-      color: 'text-red-600'
-    },
-    {
-      title: 'Active Customers',
-      value: data.activeCustomers.toString(),
-      icon: Users,
-      trend: 0,
-      color: 'text-indigo-600'
-    }
-  ];
-
-  if (loading) {
+const AdvancedMetricsCards = ({ analytics, loading }: AdvancedMetricsCardsProps) => {
+  if (loading || !analytics) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {Array.from({ length: 6 }).map((_, index) => (
@@ -82,6 +27,51 @@ const AdvancedMetricsCards = ({ data, loading }: AdvancedMetricsCardsProps) => {
       </div>
     );
   }
+
+  const metrics = [
+    {
+      title: 'Revenue Hari Ini',
+      value: formatCurrency(analytics.todayRevenue),
+      icon: DollarSign,
+      trend: analytics.revenueGrowth,
+      color: 'text-green-600'
+    },
+    {
+      title: 'Penjualan Hari Ini',
+      value: analytics.todaySales.toString(),
+      icon: ShoppingCart,
+      trend: 0,
+      color: 'text-blue-600'
+    },
+    {
+      title: 'Rata-rata Order',
+      value: formatCurrency(analytics.averageOrderValue),
+      icon: TrendingUp,
+      trend: 0,
+      color: 'text-purple-600'
+    },
+    {
+      title: 'Total Products',
+      value: analytics.totalProducts.toString(),
+      icon: Package,
+      trend: 0,
+      color: 'text-orange-600'
+    },
+    {
+      title: 'Stok Rendah',
+      value: analytics.lowStockProducts.toString(),
+      icon: TrendingDown,
+      trend: 0,
+      color: 'text-red-600'
+    },
+    {
+      title: 'Nilai Inventori',
+      value: formatCurrency(analytics.inventoryValue),
+      icon: Users,
+      trend: 0,
+      color: 'text-indigo-600'
+    }
+  ];
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
@@ -108,7 +98,7 @@ const AdvancedMetricsCards = ({ data, loading }: AdvancedMetricsCardsProps) => {
                   ) : (
                     <TrendingDown className="h-3 w-3 mr-1" />
                   )}
-                  {Math.abs(metric.trend).toFixed(1)}% dari bulan lalu
+                  {Math.abs(metric.trend).toFixed(1)}% dari kemarin
                 </div>
               )}
             </CardContent>

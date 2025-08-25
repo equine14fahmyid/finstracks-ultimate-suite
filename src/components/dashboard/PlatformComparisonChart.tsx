@@ -7,7 +7,7 @@ interface PlatformData {
   platform: string;
   revenue: number;
   orders: number;
-  conversion: number;
+  percentage: number;
 }
 
 interface PlatformComparisonChartProps {
@@ -64,7 +64,7 @@ const PlatformComparisonChart = ({ data, loading }: PlatformComparisonChartProps
                 {platform.orders} pesanan
               </p>
               <p className="text-xs text-muted-foreground">
-                {platform.conversion.toFixed(1)}% konversi
+                {platform.percentage.toFixed(1)}% dari total
               </p>
             </div>
           ))}
