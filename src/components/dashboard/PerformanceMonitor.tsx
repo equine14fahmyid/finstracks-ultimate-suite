@@ -47,7 +47,7 @@ const PerformanceMonitor = () => {
             Performance Monitor
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Badge variant={isMonitoring ? 'success' : 'secondary'}>
+            <Badge variant={isMonitoring ? 'default' : 'secondary'}>
               {isMonitoring ? 'Active' : 'Inactive'}
             </Badge>
             <div className={`text-2xl font-bold ${scoreColor}`}>

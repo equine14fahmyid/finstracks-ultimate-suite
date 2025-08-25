@@ -36,8 +36,19 @@ export const useRealtimeNotifications = () => {
         return;
       }
 
-      setNotifications(data || []);
-      setUnreadCount(data?.filter(n => !n.read).length || 0);
+      // Type-safe mapping to ensure correct type
+      const typedNotifications: NotificationData[] = (data || []).map(notification => ({
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        type: notification.type as 'info' | 'success' | 'warning' | 'error',
+        action_url: notification.action_url,
+        created_at: notification.created_at,
+        read: notification.read
+      }));
+
+      setNotifications(typedNotifications);
+      setUnreadCount(typedNotifications.filter(n => !n.read).length);
     };
 
     fetchNotifications();
@@ -54,7 +65,16 @@ export const useRealtimeNotifications = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          const newNotification = payload.new as NotificationData;
+          const newNotification: NotificationData = {
+            id: payload.new.id,
+            title: payload.new.title,
+            message: payload.new.message,
+            type: payload.new.type as 'info' | 'success' | 'warning' | 'error',
+            action_url: payload.new.action_url,
+            created_at: payload.new.created_at,
+            read: payload.new.read
+          };
+          
           setNotifications(prev => [newNotification, ...prev.slice(0, 19)]);
           setUnreadCount(prev => prev + 1);
 
@@ -75,7 +95,16 @@ export const useRealtimeNotifications = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          const updatedNotification = payload.new as NotificationData;
+          const updatedNotification: NotificationData = {
+            id: payload.new.id,
+            title: payload.new.title,
+            message: payload.new.message,
+            type: payload.new.type as 'info' | 'success' | 'warning' | 'error',
+            action_url: payload.new.action_url,
+            created_at: payload.new.created_at,
+            read: payload.new.read
+          };
+          
           setNotifications(prev => 
             prev.map(n => n.id === updatedNotification.id ? updatedNotification : n)
           );

@@ -40,7 +40,7 @@ export const usePerformanceMonitor = () => {
   const measurePageLoad = useCallback(() => {
     const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
     if (navigation) {
-      const loadTime = navigation.loadEventEnd - navigation.navigationStart;
+      const loadTime = navigation.loadEventEnd - navigation.fetchStart;
       setMetrics(prev => ({ ...prev, pageLoadTime: loadTime }));
       
       if (loadTime > thresholds.pageLoadTime) {

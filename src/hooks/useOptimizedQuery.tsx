@@ -50,8 +50,8 @@ export const useOptimizedQuery = <T = any>(config: QueryConfig): QueryResult<T> 
         return;
       }
 
-      // Build query
-      let query = supabase.from(config.table);
+      // Build query - start with basic from() call
+      let query = supabase.from(config.table as any);
 
       if (config.select) {
         query = query.select(config.select);
@@ -67,6 +67,10 @@ export const useOptimizedQuery = <T = any>(config: QueryConfig): QueryResult<T> 
               query = query.in(key, value);
             } else if (typeof value === 'string' && value.includes('%')) {
               query = query.ilike(key, value);
+            } else if (typeof value === 'string' && value.startsWith('gte.')) {
+              query = query.gte(key, value.substring(4));
+            } else if (typeof value === 'string' && value.startsWith('lte.')) {
+              query = query.lte(key, value.substring(4));
             } else {
               query = query.eq(key, value);
             }
