@@ -1,5 +1,4 @@
 
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -46,7 +45,7 @@ export const useOptimizedQuery = <T = any>(config: QueryConfig): QueryResult<T> 
       // Check cache first
       const cached = queryCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < cached.ttl) {
-        setData(cached.data);
+        setData(cached.data as T[]);
         setLoading(false);
         return;
       }
@@ -98,10 +97,11 @@ export const useOptimizedQuery = <T = any>(config: QueryConfig): QueryResult<T> 
         ttl: cacheTTL
       });
 
-      setData(result);
+      setData(result as T[]);
     } catch (err) {
       console.error('Query error:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
+      setData(null);
     } finally {
       setLoading(false);
     }
@@ -123,4 +123,3 @@ export const useOptimizedQuery = <T = any>(config: QueryConfig): QueryResult<T> 
     invalidateCache
   };
 };
-
