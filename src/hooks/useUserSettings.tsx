@@ -1,10 +1,10 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 
 // Interface untuk mendefinisikan struktur data UserSettings
-// Tidak ada perubahan di sini, sudah sesuai.
 interface UserSettings {
   id: string;
   modal_awal: number | null;
@@ -15,7 +15,7 @@ interface UserSettings {
   company_website: string | null;
   tax_number: string | null;
   logo_url: string | null;
-  theme: 'light' | 'dark' | 'auto';
+  theme: 'light' | 'dark' | 'system';
   language: 'id' | 'en';
   timezone: string;
   date_format: string;
@@ -59,7 +59,6 @@ export const useUserSettings = () => {
         throw error;
       }
       
-      // --- PERBAIKAN ERROR TIPE DATA ---
       // Jika ada data, petakan secara manual untuk memastikan tipe datanya 100% cocok
       if (data) {
         setSettings({
@@ -72,8 +71,8 @@ export const useUserSettings = () => {
           company_website: data.company_website,
           tax_number: data.tax_number,
           logo_url: data.logo_url,
-          // Lakukan type casting untuk properti dengan tipe spesifik
-          theme: (data.theme as 'light' | 'dark' | 'auto') || 'auto',
+          // Fix theme type mapping
+          theme: (data.theme as 'light' | 'dark' | 'system') || 'system',
           language: (data.language as 'id' | 'en') || 'id',
           timezone: data.timezone || 'Asia/Jakarta',
           date_format: data.date_format || 'dd/MM/yyyy',
