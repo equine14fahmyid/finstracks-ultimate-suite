@@ -130,7 +130,7 @@ export const useSales = () => {
         throw new Error('Total harus lebih dari 0');
       }
 
-      // PERBAIKAN: Struktur data yang sesuai dengan database
+      // PERBAIKAN: Pastikan subtotal dan total dimasukkan dalam data
       const completeData = {
         tanggal: saleData.tanggal,
         no_pesanan_platform: saleData.no_pesanan_platform.trim(),
@@ -140,8 +140,8 @@ export const useSales = () => {
         customer_address: saleData.customer_address?.trim() || '',
         ongkir: ongkir,
         diskon: diskon,
-        subtotal: subtotal,
-        total: total,
+        subtotal: subtotal, // PERBAIKAN: Pastikan subtotal dimasukkan
+        total: total,       // PERBAIKAN: Pastikan total dimasukkan
         no_resi: saleData.no_resi?.trim() || '',
         status: saleData.status || 'pending',
         notes: saleData.notes?.trim() || ''
