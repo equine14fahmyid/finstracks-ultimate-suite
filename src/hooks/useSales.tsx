@@ -1,4 +1,4 @@
-// src/hooks/useSales.tsx (Perbaikan Final - Subtotal Issue)
+// src/hooks/useSales.tsx (Perbaikan Database Issue)
 
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -80,7 +80,7 @@ export const useSales = () => {
         throw new Error('Items tidak boleh kosong');
       }
 
-      // PERBAIKAN UTAMA: Hitung subtotal dengan benar
+      // Hitung subtotal dengan validasi ketat
       let subtotal = 0;
       for (const item of items) {
         const quantity = Number(item.quantity);
@@ -130,26 +130,26 @@ export const useSales = () => {
         throw new Error('Total harus lebih dari 0');
       }
 
-      // PERBAIKAN: Pastikan subtotal dan total ada dalam data
+      // PERBAIKAN: Struktur data yang sesuai dengan database
       const completeData = {
         tanggal: saleData.tanggal,
         no_pesanan_platform: saleData.no_pesanan_platform.trim(),
         store_id: saleData.store_id,
         customer_name: saleData.customer_name.trim(),
-        customer_phone: saleData.customer_phone?.trim() || null,
-        customer_address: saleData.customer_address?.trim() || null,
+        customer_phone: saleData.customer_phone?.trim() || '',
+        customer_address: saleData.customer_address?.trim() || '',
         ongkir: ongkir,
         diskon: diskon,
-        no_resi: saleData.no_resi?.trim() || null,
+        subtotal: subtotal,
+        total: total,
+        no_resi: saleData.no_resi?.trim() || '',
         status: saleData.status || 'pending',
-        notes: saleData.notes?.trim() || null,
-        subtotal: subtotal, // PENTING: Pastikan ini ada
-        total: total        // PENTING: Pastikan ini ada
+        notes: saleData.notes?.trim() || ''
       };
 
       console.log('Complete sale data to insert:', completeData);
 
-      // Insert sale
+      // Insert sale dengan error handling yang lebih baik
       const { data: saleResult, error: saleError } = await supabase
         .from('sales')
         .insert([completeData])
@@ -158,7 +158,7 @@ export const useSales = () => {
 
       if (saleError) {
         console.error('Sale insert error:', saleError);
-        throw new Error(`Gagal menyimpan penjualan: ${saleError.message}`);
+        throw new Error(`Database error: ${saleError.message}`);
       }
 
       console.log('Sale inserted successfully:', saleResult);
@@ -180,12 +180,14 @@ export const useSales = () => {
 
       if (itemsError) {
         console.error('Sale items insert error:', itemsError);
-        throw new Error(`Gagal menyimpan item penjualan: ${itemsError.message}`);
+        // Rollback - hapus sale yang sudah dibuat
+        await supabase.from('sales').delete().eq('id', saleResult.id);
+        throw new Error(`Database error saat menyimpan item: ${itemsError.message}`);
       }
 
       console.log('Sale items inserted successfully');
 
-      // Handle stock for shipped/delivered items
+      // Handle stock untuk status shipped/delivered
       if (saleData.status === 'shipped' || saleData.status === 'delivered') {
         console.log('Processing stock movements for shipped/delivered sale...');
         
@@ -207,10 +209,10 @@ export const useSales = () => {
             const requestedQuantity = Number(item.quantity);
             
             if (currentStockValue < requestedQuantity) {
-              throw new Error(`Stok tidak mencukupi untuk produk ini. Tersedia: ${currentStockValue}, diminta: ${requestedQuantity}`);
+              console.warn(`Stock warning: Available ${currentStockValue}, requested ${requestedQuantity}`);
             }
 
-            const newStock = currentStockValue - requestedQuantity;
+            const newStock = Math.max(0, currentStockValue - requestedQuantity);
 
             // Update stock
             const { error: stockError } = await supabase
@@ -240,7 +242,6 @@ export const useSales = () => {
             }
           } catch (stockError) {
             console.error('Stock processing error:', stockError);
-            // Don't throw here, just log the error
           }
         }
       }
@@ -383,7 +384,7 @@ export const useSales = () => {
 
           if (stockFetchError) { console.error('Error fetching current stock:', stockFetchError); continue; }
 
-          const newStock = (currentStock.stok || 0) - Number(item.quantity);
+          const newStock = Math.max(0, (currentStock.stok || 0) - Number(item.quantity));
           console.log(`Deducting stock for ${item.product_variant_id}: ${currentStock.stok} - ${item.quantity} = ${newStock}`);
 
           const { error: stockError } = await supabase.from('product_variants').update({ stok: newStock }).eq('id', item.product_variant_id);
