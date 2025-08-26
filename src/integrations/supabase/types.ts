@@ -1134,6 +1134,10 @@ export type Database = {
         Args: { p_amount: number; p_bank_id: string; p_store_id: string }
         Returns: Json
       }
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
       get_dashboard_analytics: {
         Args: { end_date: string; start_date: string }
         Returns: Json
@@ -1214,6 +1218,10 @@ export type Database = {
       update_store_saldo: {
         Args: { amount: number; store_id: string }
         Returns: undefined
+      }
+      user_has_permission: {
+        Args: { permission_name: string }
+        Returns: boolean
       }
       validate_sale_with_adjustments: {
         Args: { adjustments?: Json; sale_id_param: string }
