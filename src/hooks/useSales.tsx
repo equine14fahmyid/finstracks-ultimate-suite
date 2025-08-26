@@ -80,7 +80,7 @@ export const useSales = () => {
         throw new Error('Items tidak boleh kosong');
       }
 
-      // PERBAIKAN: Hitung subtotal dengan validasi ketat
+      // Hitung subtotal dengan validasi ketat
       let subtotal = 0;
       for (const item of items) {
         const quantity = parseFloat(item.quantity) || 0;
@@ -117,14 +117,14 @@ export const useSales = () => {
         throw new Error('Nama Customer harus diisi');
       }
 
-      // PERBAIKAN: Pastikan konversi ke number yang benar
+      // Pastikan konversi ke number yang benar
       const ongkir = parseFloat(saleData.ongkir) || 0;
       const diskon = parseFloat(saleData.diskon) || 0;
       const total = subtotal + ongkir - diskon;
 
       console.log('Final calculations:', { subtotal, ongkir, diskon, total });
 
-      // PERBAIKAN: Validasi nilai harus positif
+      // Validasi nilai harus positif
       if (subtotal <= 0) {
         throw new Error('Subtotal harus lebih dari 0');
       }
@@ -132,7 +132,7 @@ export const useSales = () => {
         throw new Error('Total harus lebih dari 0');
       }
 
-      // PERBAIKAN: Pastikan semua field numerik adalah number yang valid
+      // PERBAIKAN UTAMA: Pastikan semua field numerik sudah dalam format yang benar
       const completeData = {
         tanggal: saleData.tanggal,
         no_pesanan_platform: saleData.no_pesanan_platform.trim(),
@@ -140,10 +140,10 @@ export const useSales = () => {
         customer_name: saleData.customer_name.trim(),
         customer_phone: saleData.customer_phone?.trim() || null,
         customer_address: saleData.customer_address?.trim() || null,
-        ongkir: ongkir,
-        diskon: diskon,
-        subtotal: Math.round(subtotal * 100) / 100, // PERBAIKAN: Bulatkan ke 2 desimal
-        total: Math.round(total * 100) / 100,       // PERBAIKAN: Bulatkan ke 2 desimal
+        ongkir: parseFloat(ongkir.toString()), // Pastikan tipe number
+        diskon: parseFloat(diskon.toString()), // Pastikan tipe number
+        subtotal: parseFloat(subtotal.toFixed(2)), // PENTING: Bulatkan dan pastikan number
+        total: parseFloat(total.toFixed(2)), // PENTING: Bulatkan dan pastikan number
         no_resi: saleData.no_resi?.trim() || null,
         status: saleData.status || 'pending',
         notes: saleData.notes?.trim() || null
@@ -152,12 +152,14 @@ export const useSales = () => {
       console.log('Complete sale data to insert:', completeData);
       console.log('Data types check:', {
         subtotal: typeof completeData.subtotal,
+        subtotal_value: completeData.subtotal,
         total: typeof completeData.total,
+        total_value: completeData.total,
         ongkir: typeof completeData.ongkir,
         diskon: typeof completeData.diskon
       });
 
-      // Insert sale dengan error handling yang lebih baik
+      // PERBAIKAN: Hapus parameter columns yang membatasi field
       const { data: saleResult, error: saleError } = await supabase
         .from('sales')
         .insert([completeData])
@@ -175,9 +177,9 @@ export const useSales = () => {
       const saleItems = items.map(item => ({
         sale_id: saleResult.id,
         product_variant_id: item.product_variant_id,
-        quantity: parseFloat(item.quantity) || 0,
-        harga_satuan: parseFloat(item.harga_satuan) || 0,
-        subtotal: Math.round((parseFloat(item.quantity) || 0) * (parseFloat(item.harga_satuan) || 0) * 100) / 100
+        quantity: parseInt(item.quantity.toString()) || 0,
+        harga_satuan: parseFloat(item.harga_satuan.toString()) || 0,
+        subtotal: parseFloat((parseFloat(item.quantity) * parseFloat(item.harga_satuan)).toFixed(2))
       }));
 
       console.log('Sale items to insert:', saleItems);
