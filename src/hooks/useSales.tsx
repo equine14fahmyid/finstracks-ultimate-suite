@@ -1,4 +1,4 @@
-// src/hooks/useSales.tsx (Perbaikan Lengkap Create Sale)
+// src/hooks/useSales.tsx (Perbaikan Final - Subtotal Issue)
 
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -80,7 +80,7 @@ export const useSales = () => {
         throw new Error('Items tidak boleh kosong');
       }
 
-      // Validasi dan hitung subtotal
+      // PERBAIKAN UTAMA: Hitung subtotal dengan benar
       let subtotal = 0;
       for (const item of items) {
         const quantity = Number(item.quantity);
@@ -101,6 +101,8 @@ export const useSales = () => {
         subtotal += quantity * harga_satuan;
       }
 
+      console.log('Calculated subtotal:', subtotal);
+
       // Validasi data sale
       if (!saleData.tanggal) {
         throw new Error('Tanggal harus diisi');
@@ -119,6 +121,8 @@ export const useSales = () => {
       const diskon = Number(saleData.diskon) || 0;
       const total = subtotal + ongkir - diskon;
 
+      console.log('Final calculations:', { subtotal, ongkir, diskon, total });
+
       if (subtotal <= 0) {
         throw new Error('Subtotal harus lebih dari 0');
       }
@@ -126,9 +130,7 @@ export const useSales = () => {
         throw new Error('Total harus lebih dari 0');
       }
 
-      console.log('Calculated values:', { subtotal, ongkir, diskon, total });
-
-      // Prepare complete sale data
+      // PERBAIKAN: Pastikan subtotal dan total ada dalam data
       const completeData = {
         tanggal: saleData.tanggal,
         no_pesanan_platform: saleData.no_pesanan_platform.trim(),
@@ -141,8 +143,8 @@ export const useSales = () => {
         no_resi: saleData.no_resi?.trim() || null,
         status: saleData.status || 'pending',
         notes: saleData.notes?.trim() || null,
-        subtotal: subtotal,
-        total: total
+        subtotal: subtotal, // PENTING: Pastikan ini ada
+        total: total        // PENTING: Pastikan ini ada
       };
 
       console.log('Complete sale data to insert:', completeData);
