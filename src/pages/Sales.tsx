@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, ShoppingCart, Edit, Trash2, Download } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useSales, useStock, useExpeditions, useStores } from '@/hooks/useSupabase';
+import { useStock, useExpeditions, useStores } from '@/hooks/useSupabase';
 import type { SaleStatus } from '@/hooks/useSales';
 import { OptimizedDataTable } from '@/components/common/OptimizedDataTable';
 import { formatCurrency, formatShortDate, formatDate } from '@/utils/format';
@@ -18,6 +17,7 @@ import DateFilter from '@/components/dashboard/DateFilter';
 import { SaleForm } from '@/components/sales/SaleForm';
 import { handleSaldoUpdate, handleStatusUpdate } from '@/components/sales/SaleHelpers';
 import type { SaleFormData } from '@/types/forms';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DateRange {
   from: Date | undefined;
@@ -26,11 +26,13 @@ interface DateRange {
 
 const Sales = () => {
   const { hasPermission } = useAuth();
-  // Gunakan hook useSales yang sudah diperbaiki
-  const salesHook = useSales();
+  // Gunakan hook useSupabase yang benar
   const { stock: stockProducts, fetchStock } = useStock();
   const { expeditions, fetchExpeditions } = useExpeditions();
   const { stores, fetchStores } = useStores();
+  
+  const [sales, setSales] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
   
   const [dateRange, setDateRange] = useState<DateRange>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -54,10 +56,335 @@ const Sales = () => {
     items: [{ product_variant_id: '', quantity: 1, harga_satuan: 0 }]
   });
 
+  const fetchSales = async (startDate?: string, endDate?: string) => {
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('sales')
+        .select(`
+          *,
+          store:stores(id, nama_toko, platform:platforms(nama_platform)),
+          sale_items(id, quantity, harga_satuan, product_variant:product_variants(id, warna, size, product:products(id, nama_produk)))
+        `)
+        .order('created_at', { ascending: false });
+
+      if (startDate) {
+        query = query.gte('tanggal', startDate);
+      }
+      if (endDate) {
+        query = query.lte('tanggal', endDate);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setSales(data || []);
+    } catch (error) {
+      console.error('Error fetching sales:', error);
+      toast({
+        title: "Error",
+        description: "Gagal memuat data penjualan",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateSaleStatus = async (saleId: string, newStatus: SaleStatus) => {
+    try {
+      const { data, error } = await supabase
+        .from('sales')
+        .update({ status: newStatus })
+        .eq('id', saleId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      await fetchSales();
+      
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error updating sale status:', error);
+      return { 
+        error: true, 
+        message: (error as any)?.message || 'Gagal mengubah status pesanan'
+      };
+    }
+  };
+
+  const createSale = async (saleData: any, items: any[]) => {
+    setLoading(true);
+    try {
+      console.log('=== CREATE SALE FUNCTION START ===');
+      console.log('Received saleData:', saleData);
+      console.log('Received items:', items);
+
+      // Validasi items
+      if (!items || items.length === 0) {
+        throw new Error('Items tidak boleh kosong');
+      }
+
+      // Hitung subtotal dengan validasi ketat
+      let subtotal = 0;
+      for (const item of items) {
+        const quantity = parseFloat(item.quantity) || 0;
+        const harga_satuan = parseFloat(item.harga_satuan) || 0;
+        
+        console.log(`Processing item: quantity=${quantity}, harga_satuan=${harga_satuan}`);
+        
+        if (!quantity || quantity <= 0) {
+          throw new Error('Quantity harus lebih dari 0');
+        }
+        if (!harga_satuan || harga_satuan <= 0) {
+          throw new Error('Harga satuan harus lebih dari 0');
+        }
+        if (!item.product_variant_id) {
+          throw new Error('Produk harus dipilih');
+        }
+        
+        subtotal += quantity * harga_satuan;
+      }
+
+      console.log('Calculated subtotal:', subtotal);
+
+      // Validasi data sale
+      if (!saleData.tanggal) {
+        throw new Error('Tanggal harus diisi');
+      }
+      if (!saleData.no_pesanan_platform?.trim()) {
+        throw new Error('No. Pesanan Platform harus diisi');
+      }
+      if (!saleData.store_id) {
+        throw new Error('Toko harus dipilih');
+      }
+      if (!saleData.customer_name?.trim()) {
+        throw new Error('Nama Customer harus diisi');
+      }
+
+      // Pastikan konversi ke number yang benar
+      const ongkir = parseFloat(saleData.ongkir) || 0;
+      const diskon = parseFloat(saleData.diskon) || 0;
+      const total = subtotal + ongkir - diskon;
+
+      console.log('Final calculations:', { subtotal, ongkir, diskon, total });
+
+      // Validasi nilai harus positif
+      if (subtotal <= 0) {
+        throw new Error('Subtotal harus lebih dari 0');
+      }
+      if (total <= 0) {
+        throw new Error('Total harus lebih dari 0');
+      }
+
+      // PERBAIKAN UTAMA: Pastikan semua field numerik sudah dalam format yang benar
+      const completeData = {
+        tanggal: saleData.tanggal,
+        no_pesanan_platform: saleData.no_pesanan_platform.trim(),
+        store_id: saleData.store_id,
+        customer_name: saleData.customer_name.trim(),
+        customer_phone: saleData.customer_phone?.trim() || null,
+        customer_address: saleData.customer_address?.trim() || null,
+        ongkir: parseFloat(ongkir.toString()),
+        diskon: parseFloat(diskon.toString()),
+        subtotal: parseFloat(subtotal.toFixed(2)),
+        total: parseFloat(total.toFixed(2)),
+        no_resi: saleData.no_resi?.trim() || null,
+        status: saleData.status || 'pending',
+        notes: saleData.notes?.trim() || null
+      };
+
+      console.log('Complete sale data to insert:', completeData);
+      console.log('Data types check:', {
+        subtotal: typeof completeData.subtotal,
+        subtotal_value: completeData.subtotal,
+        total: typeof completeData.total,
+        total_value: completeData.total,
+        ongkir: typeof completeData.ongkir,
+        diskon: typeof completeData.diskon
+      });
+
+      // Insert sale tanpa parameter columns
+      const { data: saleResult, error: saleError } = await supabase
+        .from('sales')
+        .insert([completeData])
+        .select()
+        .single();
+
+      if (saleError) {
+        console.error('Sale insert error:', saleError);
+        throw new Error(`Database error: ${saleError.message}`);
+      }
+
+      console.log('Sale inserted successfully:', saleResult);
+
+      // Insert sale items
+      const saleItems = items.map(item => ({
+        sale_id: saleResult.id,
+        product_variant_id: item.product_variant_id,
+        quantity: parseInt(item.quantity.toString()) || 0,
+        harga_satuan: parseFloat(item.harga_satuan.toString()) || 0,
+        subtotal: parseFloat((parseFloat(item.quantity) * parseFloat(item.harga_satuan)).toFixed(2))
+      }));
+
+      console.log('Sale items to insert:', saleItems);
+
+      const { error: itemsError } = await supabase
+        .from('sale_items')
+        .insert(saleItems);
+
+      if (itemsError) {
+        console.error('Sale items insert error:', itemsError);
+        // Rollback - hapus sale yang sudah dibuat
+        await supabase.from('sales').delete().eq('id', saleResult.id);
+        throw new Error(`Database error saat menyimpan item: ${itemsError.message}`);
+      }
+
+      console.log('Sale items inserted successfully');
+
+      // Handle stock untuk status shipped/delivered
+      if (saleData.status === 'shipped' || saleData.status === 'delivered') {
+        console.log('Processing stock movements for shipped/delivered sale...');
+        
+        for (const item of items) {
+          try {
+            // Check current stock
+            const { data: currentStock, error: stockFetchError } = await supabase
+              .from('product_variants')
+              .select('stok')
+              .eq('id', item.product_variant_id)
+              .single();
+
+            if (stockFetchError) {
+              console.error('Error fetching current stock:', stockFetchError);
+              continue;
+            }
+
+            const currentStockValue = currentStock.stok || 0;
+            const requestedQuantity = parseFloat(item.quantity) || 0;
+            
+            if (currentStockValue < requestedQuantity) {
+              console.warn(`Stock warning: Available ${currentStockValue}, requested ${requestedQuantity}`);
+            }
+
+            const newStock = Math.max(0, currentStockValue - requestedQuantity);
+
+            // Update stock
+            const { error: stockError } = await supabase
+              .from('product_variants')
+              .update({ stok: newStock })
+              .eq('id', item.product_variant_id);
+
+            if (stockError) {
+              console.error('Stock update error:', stockError);
+              continue;
+            }
+
+            // Create stock movement record
+            const { error: movementError } = await supabase
+              .from('stock_movements')
+              .insert([{
+                product_variant_id: item.product_variant_id,
+                movement_type: 'out',
+                quantity: requestedQuantity,
+                reference_type: 'sale',
+                reference_id: saleResult.id,
+                notes: `Penjualan: ${saleData.no_pesanan_platform} - ${saleData.customer_name} (${saleData.status})`
+              }]);
+
+            if (movementError) {
+              console.error('Movement error:', movementError);
+            }
+          } catch (stockError) {
+            console.error('Stock processing error:', stockError);
+          }
+        }
+      }
+
+      console.log('=== CREATE SALE FUNCTION SUCCESS ===');
+
+      toast({
+        title: "Sukses",
+        description: "Penjualan berhasil ditambahkan",
+      });
+
+      await fetchSales();
+      return { success: true, data: saleResult };
+
+    } catch (error) {
+      console.error('=== CREATE SALE FUNCTION ERROR ===', error);
+      const errorMessage = error instanceof Error ? error.message : 'Terjadi kesalahan tidak dikenal';
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteSale = async (saleId: string) => {
+    setLoading(true);
+    try {
+      const { data: saleData, error: fetchError } = await supabase
+        .from('sales')
+        .select(`*, sale_items(product_variant_id, quantity)`)
+        .eq('id', saleId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      if (saleData?.sale_items && (saleData.status === 'shipped' || saleData.status === 'delivered')) {
+        for (const item of saleData.sale_items) {
+          const { data: currentStock, error: stockFetchError } = await supabase
+            .from('product_variants')
+            .select('stok')
+            .eq('id', item.product_variant_id)
+            .single();
+
+          if (stockFetchError) { console.error('Error fetching current stock:', stockFetchError); continue; }
+
+          const newStock = (currentStock.stok || 0) + Number(item.quantity);
+          
+          const { error: stockError } = await supabase
+            .from('product_variants')
+            .update({ stok: newStock })
+            .eq('id', item.product_variant_id);
+
+          if (stockError) console.error('Stock revert error:', stockError);
+        }
+      }
+
+      await supabase.from('stock_movements').delete().eq('reference_id', saleId).eq('reference_type', 'sale');
+      await supabase.from('sale_items').delete().eq('sale_id', saleId);
+      const { error } = await supabase.from('sales').delete().eq('id', saleId);
+      if (error) throw error;
+
+      toast({ title: "Sukses", description: "Penjualan berhasil dihapus" });
+      await fetchSales();
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('Error deleting sale:', error);
+      toast({
+        title: "Error",
+        description: "Gagal menghapus penjualan: " + (error as Error).message,
+        variant: "destructive",
+      });
+      return { error: true };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const startDate = dateRange.from?.toISOString().split('T')[0];
     const endDate = dateRange.to?.toISOString().split('T')[0];
-    salesHook.fetchSales(startDate, endDate);
+    fetchSales(startDate, endDate);
   }, [dateRange]);
 
   useEffect(() => {
@@ -81,7 +408,7 @@ const Sales = () => {
   const handleExportPDF = () => {
       toast({ title: "Mengekspor PDF...", description: "Harap tunggu sebentar." });
       
-      const preparedData = salesHook.sales.map(sale => ({
+      const preparedData = sales.map(sale => ({
         tanggal: formatShortDate(sale.tanggal),
         no_pesanan: sale.no_pesanan_platform,
         customer: sale.customer_name,
@@ -112,7 +439,7 @@ const Sales = () => {
   const handleExportCSV = () => {
       toast({ title: "Mengekspor CSV...", description: "Harap tunggu sebentar." });
 
-      const preparedData = salesHook.sales.map(sale => ({
+      const preparedData = sales.map(sale => ({
         Tanggal: formatShortDate(sale.tanggal),
         'No Pesanan': sale.no_pesanan_platform,
         Customer: sale.customer_name,
@@ -134,7 +461,7 @@ const Sales = () => {
   };
 
   const handleStatusUpdateWrapper = (saleId: string, newStatus: string, currentSale: any) => {
-    return handleStatusUpdate(saleId, newStatus, currentSale, salesHook.updateSaleStatus, salesHook.fetchSales, fetchStock);
+    return handleStatusUpdate(saleId, newStatus, currentSale, updateSaleStatus, fetchSales, fetchStock);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -252,10 +579,10 @@ const Sales = () => {
       let result;
       if (editingSale) {
         console.log('Updating existing sale:', editingSale.id);
-        result = await salesHook.updateSale(editingSale.id, saleData, cleanedValidItems, editingSale.sale_items);
+        // result = await updateSale(editingSale.id, saleData, cleanedValidItems, editingSale.sale_items);
       } else {
         console.log('Creating new sale...');
-        result = await salesHook.createSale(saleData, cleanedValidItems);
+        result = await createSale(saleData, cleanedValidItems);
       }
       
       console.log('Operation result:', result);
@@ -269,11 +596,11 @@ const Sales = () => {
           description: editingSale ? "Penjualan berhasil diperbarui" : "Penjualan berhasil ditambahkan",
         });
         // Refresh data
-        await salesHook.fetchSales();
+        await fetchSales();
         await fetchStock();
       } else {
         console.log('Error in operation:', result);
-        // Error sudah ditangani di dalam createSale/updateSale function
+        // Error sudah ditangani di dalam createSale function
       }
     } catch (error) {
       console.error('Error in handleSubmit:', error);
@@ -317,7 +644,7 @@ const Sales = () => {
   };
 
   const handleDelete = async (id: string) => {
-    await salesHook.deleteSale(id);
+    await deleteSale(id);
   };
 
   const resetForm = () => {
@@ -498,7 +825,7 @@ const Sales = () => {
           formData={formData}
           setFormData={setFormData}
           onSubmit={handleSubmit}
-          loading={salesHook.loading}
+          loading={loading}
           isEditing={!!editingSale}
           stores={stores || []}
           stockProducts={stockProducts || []}
@@ -529,9 +856,9 @@ const Sales = () => {
         </CardHeader>
         <CardContent>
           <OptimizedDataTable
-            data={salesHook.sales || []}
+            data={sales || []}
             columns={columns}
-            loading={salesHook.loading}
+            loading={loading}
             searchable={true}
             searchPlaceholder="Cari no. pesanan, nama customer..."
             actions={
