@@ -83,7 +83,39 @@ export const SaleForm: React.FC<SaleFormProps> = ({
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submit triggered with data:', formData);
+    console.log('SaleForm - Form submit triggered with data:', formData);
+    
+    // Basic validation before calling parent onSubmit
+    if (!formData.tanggal) {
+      console.log('SaleForm - Missing tanggal');
+      return;
+    }
+    if (!formData.no_pesanan_platform?.trim()) {
+      console.log('SaleForm - Missing no_pesanan_platform');
+      return;
+    }
+    if (!formData.store_id) {
+      console.log('SaleForm - Missing store_id');
+      return;
+    }
+    if (!formData.customer_name?.trim()) {
+      console.log('SaleForm - Missing customer_name');
+      return;
+    }
+    
+    const validItems = formData.items.filter(item => 
+      item.product_variant_id && 
+      item.product_variant_id.trim() !== '' &&
+      item.quantity > 0 && 
+      item.harga_satuan > 0
+    );
+    
+    if (validItems.length === 0) {
+      console.log('SaleForm - No valid items');
+      return;
+    }
+    
+    console.log('SaleForm - Validation passed, calling parent onSubmit');
     onSubmit(e);
   };
 
@@ -128,6 +160,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
               <Select 
                 value={formData.store_id} 
                 onValueChange={(value) => setFormData(prev => ({ ...prev, store_id: value }))}
+                required
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Pilih toko" />
@@ -227,6 +260,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
                     <Select 
                       value={item.product_variant_id} 
                       onValueChange={(value) => updateItem(index, 'product_variant_id', value)}
+                      required
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Pilih produk" />
@@ -246,7 +280,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
                     <Input 
                       type="number" 
                       value={item.quantity || 1} 
-                      onChange={(e) => updateItem(index, 'quantity', Number(e.target.value) || 1)} 
+                      onChange={(e) => updateItem(index, 'quantity', Math.max(1, Number(e.target.value) || 1))} 
                       min="1"
                       required
                       className="w-full"
@@ -257,7 +291,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
                     <Label className="text-sm font-medium">Harga Satuan *</Label>
                     <InputCurrency
                       value={item.harga_satuan || 0}
-                      onValueChange={(value) => updateItem(index, 'harga_satuan', value)}
+                      onValueChange={(value) => updateItem(index, 'harga_satuan', Math.max(0, value))}
                       className="w-full"
                       required
                     />
@@ -295,7 +329,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
               <InputCurrency
                 id="ongkir"
                 value={formData.ongkir || 0}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, ongkir: value }))}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, ongkir: Math.max(0, value) }))}
                 className="w-full"
               />
             </div>
@@ -305,7 +339,7 @@ export const SaleForm: React.FC<SaleFormProps> = ({
               <InputCurrency
                 id="diskon"
                 value={formData.diskon || 0}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, diskon: value }))}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, diskon: Math.max(0, value) }))}
                 className="w-full"
               />
             </div>

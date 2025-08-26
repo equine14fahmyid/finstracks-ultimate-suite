@@ -143,129 +143,112 @@ const Sales = () => {
     console.log('=== FORM SUBMISSION START ===');
     console.log('Form data received:', formData);
     
-    // Enhanced validation
-    const requiredFields = {
-      no_pesanan_platform: 'No. Pesanan Platform',
-      customer_name: 'Nama Customer',
-      store_id: 'Toko'
-    };
-
-    // Check required fields
-    for (const [field, label] of Object.entries(requiredFields)) {
-      if (!formData[field as keyof typeof formData] || String(formData[field as keyof typeof formData]).trim() === '') {
-        console.log(`Missing required field: ${field}`);
+    try {
+      // Validasi field wajib
+      if (!formData.tanggal?.trim()) {
         toast({
           title: "Error",
-          description: `${label} wajib diisi`,
+          description: "Tanggal wajib diisi",
           variant: "destructive",
         });
         return;
       }
-    }
-    
-    // Validate items - more strict validation
-    const validItems = formData.items.filter(item => {
-      const hasProduct = item.product_variant_id && item.product_variant_id.trim() !== '';
-      const hasValidQty = item.quantity && Number(item.quantity) > 0;
-      const hasValidPrice = item.harga_satuan && Number(item.harga_satuan) > 0;
+
+      if (!formData.no_pesanan_platform?.trim()) {
+        toast({
+          title: "Error",
+          description: "No. Pesanan Platform wajib diisi",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!formData.store_id?.trim()) {
+        toast({
+          title: "Error",
+          description: "Toko wajib dipilih",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!formData.customer_name?.trim()) {
+        toast({
+          title: "Error",
+          description: "Nama Customer wajib diisi",
+          variant: "destructive",
+        });
+        return;
+      }
       
-      const isValid = hasProduct && hasValidQty && hasValidPrice;
-      
-      console.log(`Item validation:`, { 
-        item, 
-        hasProduct, 
-        hasValidQty, 
-        hasValidPrice, 
-        isValid 
+      // Validasi items - filter dan validasi lebih ketat
+      const validItems = formData.items.filter(item => {
+        return item.product_variant_id && 
+               item.product_variant_id.trim() !== '' &&
+               item.quantity > 0 && 
+               item.harga_satuan > 0;
       });
       
-      return isValid;
-    });
-    
-    console.log('Valid items found:', validItems.length, validItems);
-    
-    if (validItems.length === 0) {
-      console.log('No valid items found');
-      toast({
-        title: "Error",
-        description: "Minimal satu item produk harus diisi dengan lengkap (produk, quantity > 0, harga > 0)",
-        variant: "destructive",
-      });
-      return;
-    }
+      console.log('Valid items found:', validItems.length, validItems);
+      
+      if (validItems.length === 0) {
+        toast({
+          title: "Error",
+          description: "Minimal satu item produk harus diisi dengan lengkap",
+          variant: "destructive",
+        });
+        return;
+      }
 
-    // Calculate totals to validate
-    const subtotalCheck = validItems.reduce((sum, item) => {
-      return sum + (Number(item.quantity) * Number(item.harga_satuan));
-    }, 0);
-
-    const totalCheck = subtotalCheck + (Number(formData.ongkir) || 0) - (Number(formData.diskon) || 0);
-
-    console.log('Pre-submission calculations:', { subtotalCheck, totalCheck });
-
-    if (subtotalCheck <= 0 || totalCheck <= 0) {
-      toast({
-        title: "Error",
-        description: "Total pembelian harus lebih dari 0",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Stock validation for shipped/delivered items
-    if (formData.status === 'shipped' || formData.status === 'delivered') {
-      console.log('Checking stock for shipped/delivered items...');
-      for (const item of validItems) {
-        const product = stockProducts?.find(p => p?.id === item.product_variant_id);
-        console.log(`Stock check for item:`, { item, product });
-        
-        if (!product) {
-          toast({
-            title: "Error",
-            description: "Produk tidak ditemukan dalam database",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        const availableStock = product.stok || 0;
-        if (Number(item.quantity) > availableStock) {
-          toast({
-            title: "Stok Tidak Mencukupi",
-            description: `${product?.product?.nama_produk} (${product?.warna}-${product?.size}) - Stok tersedia: ${availableStock}, diminta: ${item.quantity}`,
-            variant: "destructive",
-          });
-          return;
+      // Validasi stok untuk status shipped/delivered
+      if (formData.status === 'shipped' || formData.status === 'delivered') {
+        for (const item of validItems) {
+          const product = stockProducts?.find(p => p?.id === item.product_variant_id);
+          if (!product) {
+            toast({
+              title: "Error",
+              description: "Produk tidak ditemukan dalam database",
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          const availableStock = product.stok || 0;
+          if (item.quantity > availableStock) {
+            toast({
+              title: "Stok Tidak Mencukupi",
+              description: `${product?.product?.nama_produk} (${product?.warna}-${product?.size}) - Stok tersedia: ${availableStock}, diminta: ${item.quantity}`,
+              variant: "destructive",
+            });
+            return;
+          }
         }
       }
-    }
-    
-    // Prepare sale data - ensure all numeric values are proper numbers
-    const saleData = {
-      tanggal: formData.tanggal,
-      no_pesanan_platform: formData.no_pesanan_platform.trim(),
-      store_id: formData.store_id,
-      customer_name: formData.customer_name.trim(),
-      customer_phone: formData.customer_phone?.trim() || null,
-      customer_address: formData.customer_address?.trim() || null,
-      ongkir: Number(formData.ongkir) || 0,
-      diskon: Number(formData.diskon) || 0,
-      no_resi: formData.no_resi?.trim() || null,
-      status: formData.status,
-      notes: formData.notes?.trim() || null,
-    };
-    
-    // Ensure valid items have proper numeric values
-    const cleanedValidItems = validItems.map(item => ({
-      product_variant_id: item.product_variant_id,
-      quantity: Number(item.quantity),
-      harga_satuan: Number(item.harga_satuan)
-    }));
-    
-    console.log('Final prepared sale data:', saleData);
-    console.log('Final cleaned valid items:', cleanedValidItems);
-    
-    try {
+      
+      // Prepare data
+      const saleData = {
+        tanggal: formData.tanggal,
+        no_pesanan_platform: formData.no_pesanan_platform.trim(),
+        store_id: formData.store_id,
+        customer_name: formData.customer_name.trim(),
+        customer_phone: formData.customer_phone?.trim() || null,
+        customer_address: formData.customer_address?.trim() || null,
+        ongkir: Number(formData.ongkir) || 0,
+        diskon: Number(formData.diskon) || 0,
+        no_resi: formData.no_resi?.trim() || null,
+        status: formData.status,
+        notes: formData.notes?.trim() || null,
+      };
+      
+      const cleanedValidItems = validItems.map(item => ({
+        product_variant_id: item.product_variant_id,
+        quantity: Number(item.quantity),
+        harga_satuan: Number(item.harga_satuan)
+      }));
+      
+      console.log('Final prepared sale data:', saleData);
+      console.log('Final cleaned valid items:', cleanedValidItems);
+      
       let result;
       if (editingSale) {
         console.log('Updating existing sale:', editingSale.id);
@@ -290,11 +273,7 @@ const Sales = () => {
         await fetchStock();
       } else {
         console.log('Error in operation:', result);
-        toast({
-          title: "Error",
-          description: result?.error?.message || result?.message || "Gagal menyimpan penjualan",
-          variant: "destructive",
-        });
+        // Error sudah ditangani di dalam createSale/updateSale function
       }
     } catch (error) {
       console.error('Error in handleSubmit:', error);

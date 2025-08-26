@@ -1,4 +1,4 @@
-// src/hooks/useSales.tsx (Perbaikan Perhitungan Subtotal)
+// src/hooks/useSales.tsx (Perbaikan Lengkap Create Sale)
 
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,7 +22,6 @@ export const useSales = () => {
         `)
         .order('created_at', { ascending: false });
 
-      // Menambahkan filter tanggal jika ada
       if (startDate) {
         query = query.gte('tanggal', startDate);
       }
@@ -76,32 +75,50 @@ export const useSales = () => {
       console.log('Received saleData:', saleData);
       console.log('Received items:', items);
 
-      // Validasi items terlebih dahulu
+      // Validasi items
       if (!items || items.length === 0) {
         throw new Error('Items tidak boleh kosong');
       }
 
-      // Hitung subtotal dengan validasi yang ketat
+      // Validasi dan hitung subtotal
       let subtotal = 0;
       for (const item of items) {
-        const quantity = Number(item.quantity) || 0;
-        const harga_satuan = Number(item.harga_satuan) || 0;
+        const quantity = Number(item.quantity);
+        const harga_satuan = Number(item.harga_satuan);
         
-        if (quantity <= 0 || harga_satuan <= 0) {
-          throw new Error(`Item tidak valid: qty=${quantity}, harga=${harga_satuan}`);
+        console.log(`Processing item: quantity=${quantity}, harga_satuan=${harga_satuan}`);
+        
+        if (!quantity || quantity <= 0) {
+          throw new Error('Quantity harus lebih dari 0');
+        }
+        if (!harga_satuan || harga_satuan <= 0) {
+          throw new Error('Harga satuan harus lebih dari 0');
+        }
+        if (!item.product_variant_id) {
+          throw new Error('Produk harus dipilih');
         }
         
         subtotal += quantity * harga_satuan;
       }
 
-      // Hitung total dengan validasi
+      // Validasi data sale
+      if (!saleData.tanggal) {
+        throw new Error('Tanggal harus diisi');
+      }
+      if (!saleData.no_pesanan_platform?.trim()) {
+        throw new Error('No. Pesanan Platform harus diisi');
+      }
+      if (!saleData.store_id) {
+        throw new Error('Toko harus dipilih');
+      }
+      if (!saleData.customer_name?.trim()) {
+        throw new Error('Nama Customer harus diisi');
+      }
+
       const ongkir = Number(saleData.ongkir) || 0;
       const diskon = Number(saleData.diskon) || 0;
       const total = subtotal + ongkir - diskon;
 
-      console.log('Calculated values:', { subtotal, ongkir, diskon, total });
-
-      // Pastikan subtotal dan total tidak null atau 0
       if (subtotal <= 0) {
         throw new Error('Subtotal harus lebih dari 0');
       }
@@ -109,24 +126,28 @@ export const useSales = () => {
         throw new Error('Total harus lebih dari 0');
       }
 
+      console.log('Calculated values:', { subtotal, ongkir, diskon, total });
+
+      // Prepare complete sale data
       const completeData = {
         tanggal: saleData.tanggal,
-        no_pesanan_platform: saleData.no_pesanan_platform,
+        no_pesanan_platform: saleData.no_pesanan_platform.trim(),
         store_id: saleData.store_id,
-        customer_name: saleData.customer_name,
-        customer_phone: saleData.customer_phone || null,
-        customer_address: saleData.customer_address || null,
+        customer_name: saleData.customer_name.trim(),
+        customer_phone: saleData.customer_phone?.trim() || null,
+        customer_address: saleData.customer_address?.trim() || null,
         ongkir: ongkir,
         diskon: diskon,
-        no_resi: saleData.no_resi || null,
-        status: saleData.status,
-        notes: saleData.notes || null,
+        no_resi: saleData.no_resi?.trim() || null,
+        status: saleData.status || 'pending',
+        notes: saleData.notes?.trim() || null,
         subtotal: subtotal,
         total: total
       };
 
       console.log('Complete sale data to insert:', completeData);
 
+      // Insert sale
       const { data: saleResult, error: saleError } = await supabase
         .from('sales')
         .insert([completeData])
@@ -135,25 +156,19 @@ export const useSales = () => {
 
       if (saleError) {
         console.error('Sale insert error:', saleError);
-        throw saleError;
+        throw new Error(`Gagal menyimpan penjualan: ${saleError.message}`);
       }
 
       console.log('Sale inserted successfully:', saleResult);
 
-      // Insert sale items dengan perhitungan subtotal per item
-      const saleItems = items.map(item => {
-        const itemQuantity = Number(item.quantity);
-        const itemHarga = Number(item.harga_satuan);
-        const itemSubtotal = itemQuantity * itemHarga;
-        
-        return {
-          sale_id: saleResult.id,
-          product_variant_id: item.product_variant_id,
-          quantity: itemQuantity,
-          harga_satuan: itemHarga,
-          subtotal: itemSubtotal
-        };
-      });
+      // Insert sale items
+      const saleItems = items.map(item => ({
+        sale_id: saleResult.id,
+        product_variant_id: item.product_variant_id,
+        quantity: Number(item.quantity),
+        harga_satuan: Number(item.harga_satuan),
+        subtotal: Number(item.quantity) * Number(item.harga_satuan)
+      }));
 
       console.log('Sale items to insert:', saleItems);
 
@@ -163,50 +178,68 @@ export const useSales = () => {
 
       if (itemsError) {
         console.error('Sale items insert error:', itemsError);
-        throw itemsError;
+        throw new Error(`Gagal menyimpan item penjualan: ${itemsError.message}`);
       }
 
       console.log('Sale items inserted successfully');
 
-      // Create stock movements and update stock only for shipped/delivered sales
+      // Handle stock for shipped/delivered items
       if (saleData.status === 'shipped' || saleData.status === 'delivered') {
         console.log('Processing stock movements for shipped/delivered sale...');
         
         for (const item of items) {
-          // Update stock
-          const { data: currentStock, error: stockFetchError } = await supabase
-            .from('product_variants')
-            .select('stok')
-            .eq('id', item.product_variant_id)
-            .single();
+          try {
+            // Check current stock
+            const { data: currentStock, error: stockFetchError } = await supabase
+              .from('product_variants')
+              .select('stok')
+              .eq('id', item.product_variant_id)
+              .single();
 
-          if (stockFetchError) {
-            console.error('Error fetching current stock:', stockFetchError);
-            continue;
+            if (stockFetchError) {
+              console.error('Error fetching current stock:', stockFetchError);
+              continue;
+            }
+
+            const currentStockValue = currentStock.stok || 0;
+            const requestedQuantity = Number(item.quantity);
+            
+            if (currentStockValue < requestedQuantity) {
+              throw new Error(`Stok tidak mencukupi untuk produk ini. Tersedia: ${currentStockValue}, diminta: ${requestedQuantity}`);
+            }
+
+            const newStock = currentStockValue - requestedQuantity;
+
+            // Update stock
+            const { error: stockError } = await supabase
+              .from('product_variants')
+              .update({ stok: newStock })
+              .eq('id', item.product_variant_id);
+
+            if (stockError) {
+              console.error('Stock update error:', stockError);
+              continue;
+            }
+
+            // Create stock movement record
+            const { error: movementError } = await supabase
+              .from('stock_movements')
+              .insert([{
+                product_variant_id: item.product_variant_id,
+                movement_type: 'out',
+                quantity: requestedQuantity,
+                reference_type: 'sale',
+                reference_id: saleResult.id,
+                notes: `Penjualan: ${saleData.no_pesanan_platform} - ${saleData.customer_name} (${saleData.status})`
+              }]);
+
+            if (movementError) {
+              console.error('Movement error:', movementError);
+            }
+          } catch (stockError) {
+            console.error('Stock processing error:', stockError);
+            // Don't throw here, just log the error
           }
-
-          const newStock = (currentStock.stok || 0) - Number(item.quantity);
-
-          const { error: stockError } = await supabase
-            .from('product_variants')
-            .update({ stok: newStock })
-            .eq('id', item.product_variant_id);
-
-          if (stockError) console.error('Stock update error:', stockError);
-
-          // Create stock movement record
-          const { error: movementError } = await supabase
-            .from('stock_movements')
-            .insert([{
-              product_variant_id: item.product_variant_id,
-              movement_type: 'out',
-              quantity: Number(item.quantity),
-              reference_type: 'sale',
-              reference_id: saleResult.id,
-              notes: `Penjualan: ${saleData.no_pesanan_platform} - ${saleData.customer_name} (${saleData.status})`
-            }]);
-
-          if (movementError) console.error('Movement error:', movementError);
         }
       }
 
@@ -218,15 +251,19 @@ export const useSales = () => {
       });
 
       await fetchSales();
-      return { success: true, data: saleResult, error: null };
+      return { success: true, data: saleResult };
+
     } catch (error) {
       console.error('=== CREATE SALE FUNCTION ERROR ===', error);
+      const errorMessage = error instanceof Error ? error.message : 'Terjadi kesalahan tidak dikenal';
+      
       toast({
         title: "Error",
-        description: "Gagal menambahkan penjualan: " + (error as Error).message,
+        description: errorMessage,
         variant: "destructive",
       });
-      return { success: false, error: error };
+      
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
