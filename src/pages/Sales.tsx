@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,11 +9,9 @@ import { useSales, useStock, useExpeditions, useStores } from '@/hooks/useSupaba
 import type { SaleStatus } from '@/hooks/useSales';
 import { OptimizedDataTable } from '@/components/common/OptimizedDataTable';
 import { formatCurrency, formatShortDate, formatDate } from '@/utils/format';
-import { DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { supabase } from '@/integrations/supabase/client';
 import { exportDataTableAsPDF } from '@/utils/pdfExport';
 import { exportToCSV } from '@/utils/csvExport';
 import DateFilter from '@/components/dashboard/DateFilter';
@@ -27,7 +26,8 @@ interface DateRange {
 
 const Sales = () => {
   const { hasPermission } = useAuth();
-  const { sales, loading, fetchSales, createSale, updateSale, deleteSale, updateSaleStatus } = useSales();
+  // Gunakan hook useSales yang sudah diperbaiki
+  const salesHook = useSales();
   const { stock: stockProducts, fetchStock } = useStock();
   const { expeditions, fetchExpeditions } = useExpeditions();
   const { stores, fetchStores } = useStores();
@@ -57,7 +57,7 @@ const Sales = () => {
   useEffect(() => {
     const startDate = dateRange.from?.toISOString().split('T')[0];
     const endDate = dateRange.to?.toISOString().split('T')[0];
-    fetchSales(startDate, endDate);
+    salesHook.fetchSales(startDate, endDate);
   }, [dateRange]);
 
   useEffect(() => {
@@ -81,7 +81,7 @@ const Sales = () => {
   const handleExportPDF = () => {
       toast({ title: "Mengekspor PDF...", description: "Harap tunggu sebentar." });
       
-      const preparedData = sales.map(sale => ({
+      const preparedData = salesHook.sales.map(sale => ({
         tanggal: formatShortDate(sale.tanggal),
         no_pesanan: sale.no_pesanan_platform,
         customer: sale.customer_name,
@@ -112,7 +112,7 @@ const Sales = () => {
   const handleExportCSV = () => {
       toast({ title: "Mengekspor CSV...", description: "Harap tunggu sebentar." });
 
-      const preparedData = sales.map(sale => ({
+      const preparedData = salesHook.sales.map(sale => ({
         Tanggal: formatShortDate(sale.tanggal),
         'No Pesanan': sale.no_pesanan_platform,
         Customer: sale.customer_name,
@@ -134,7 +134,7 @@ const Sales = () => {
   };
 
   const handleStatusUpdateWrapper = (saleId: string, newStatus: string, currentSale: any) => {
-    return handleStatusUpdate(saleId, newStatus, currentSale, updateSaleStatus, fetchSales, fetchStock);
+    return handleStatusUpdate(saleId, newStatus, currentSale, salesHook.updateSaleStatus, salesHook.fetchSales, fetchStock);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -252,10 +252,10 @@ const Sales = () => {
       let result;
       if (editingSale) {
         console.log('Updating existing sale:', editingSale.id);
-        result = await updateSale(editingSale.id, saleData, cleanedValidItems, editingSale.sale_items);
+        result = await salesHook.updateSale(editingSale.id, saleData, cleanedValidItems, editingSale.sale_items);
       } else {
         console.log('Creating new sale...');
-        result = await createSale(saleData, cleanedValidItems);
+        result = await salesHook.createSale(saleData, cleanedValidItems);
       }
       
       console.log('Operation result:', result);
@@ -269,7 +269,7 @@ const Sales = () => {
           description: editingSale ? "Penjualan berhasil diperbarui" : "Penjualan berhasil ditambahkan",
         });
         // Refresh data
-        await fetchSales();
+        await salesHook.fetchSales();
         await fetchStock();
       } else {
         console.log('Error in operation:', result);
@@ -317,7 +317,7 @@ const Sales = () => {
   };
 
   const handleDelete = async (id: string) => {
-    await deleteSale(id);
+    await salesHook.deleteSale(id);
   };
 
   const resetForm = () => {
@@ -498,7 +498,7 @@ const Sales = () => {
           formData={formData}
           setFormData={setFormData}
           onSubmit={handleSubmit}
-          loading={loading}
+          loading={salesHook.loading}
           isEditing={!!editingSale}
           stores={stores || []}
           stockProducts={stockProducts || []}
@@ -529,9 +529,9 @@ const Sales = () => {
         </CardHeader>
         <CardContent>
           <OptimizedDataTable
-            data={sales || []}
+            data={salesHook.sales || []}
             columns={columns}
-            loading={loading}
+            loading={salesHook.loading}
             searchable={true}
             searchPlaceholder="Cari no. pesanan, nama customer..."
             actions={
